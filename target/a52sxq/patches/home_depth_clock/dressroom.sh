@@ -387,6 +387,26 @@ else:
     assert b5.count("    .locals %d\n\n" % nlocals(b5)) == 1
     open(f, "w").write(s5.replace(b5, xpatch_fs(b5), 1))
     print("  - SaveImageMaker.g -> FrameSize.saveRatios")
+# the frame paths of the clock fit (EditorStretchAreaMediatorImpl.updateCroppedFramePath, p8.h0.o) at the frame size
+f = one("p8/h0.smali")
+assert '"updateCroppedFramePath: "' in open(f).read(), "p8.h0 updateCroppedFramePath"
+assert re.search(r"^\.method public final n\(Lcom/samsung/android/app/dressroom/presentation/preview/widget/CropImageView;\)V$", open(f).read(), re.M) and '"updateCropRect: null drawable"' in open(f).read(), "p8.h0.n updateCropRect"
+def hpaths(body):
+    n = nlocals(body)
+    assert n >= 1
+    hdr = "    .locals %d\n\n" % n
+    assert body.count(hdr) == 1
+    call = ("    const/4 v0, 0x0\n\n    invoke-static {p0, p1, v0}, %s->framePath(Ljava/lang/Object;Landroid/graphics/Path;I)Landroid/graphics/Path;\n\n"
+            "    move-result-object p1\n\n    const/4 v0, 0x1\n\n    invoke-static {p0, p2, v0}, %s->framePath(Ljava/lang/Object;Landroid/graphics/Path;I)Landroid/graphics/Path;\n\n"
+            "    move-result-object p2\n\n") % (FS, FS)
+    return body.replace(hdr, hdr + call, 1)
+s5 = open(f).read()
+b5 = method(s5, "public final o(Landroid/graphics/Path;Landroid/graphics/Path;)V")
+if FS in b5:
+    print("  - updateCroppedFramePath already hooked")
+else:
+    open(f, "w").write(s5.replace(b5, hpaths(b5), 1))
+    print("  - updateCroppedFramePath -> FrameSize.framePath")
 vp = open(one("va/p.smali")).read()
 assert ".field public final a:Ljava/lang/Object;" in vp and ".field public final b:Ljava/lang/Object;" in vp and ".method public constructor <init>(Ljava/lang/Object;Ljava/lang/Object;)V" in vp, "va.p"
 ci = open(one(W + "CropImageView.smali")).read()

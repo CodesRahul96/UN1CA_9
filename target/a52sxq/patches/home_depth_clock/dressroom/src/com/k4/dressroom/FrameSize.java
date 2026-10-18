@@ -3,6 +3,8 @@ package com.k4.dressroom;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
@@ -11,6 +13,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
 import java.util.WeakHashMap;
 
 /**
@@ -24,7 +28,9 @@ import java.util.WeakHashMap;
  * <li>the plates are drawn scaled ({@link #drawPlate}, MaskImageView.onDraw of the plate views);</li>
  * <li>the hole (CropImageView.mFrameBounds of the picture and subject views) is scaled, with the picture's minimum zoom
  * Samsung derives from it, and the picture grown when it no longer covers a bigger hole ({@link #applyHole});</li>
- * <li>the save's frame layer crops are scaled ({@link #saveRatios}).</li>
+ * <li>the save's frame layer crops are scaled ({@link #saveRatios});</li>
+ * <li>the frame paths Samsung fits the clock to are scaled ({@link #framePath}), and sent again with the subject region
+ * when the size changes.</li>
  * </ul>
  * A frame change (another frame, or a new editor) starts from Samsung's size again ({@link #reset}).
  */
@@ -102,6 +108,7 @@ public final class FrameSize {
                 sLive = 1f;
                 if (Math.abs(live - 1f) > 0.002f) {
                     applyHole(v);
+                    refit(v);
                     Log.i(TAG, String.format(java.util.Locale.US, "frame size: %.3f of Samsung's", sScale));
                 }
                 EditXf.redraw(v);
@@ -274,6 +281,66 @@ public final class FrameSize {
             Log.i(TAG, "frame size: picture " + b + " -> " + nb + " to cover the hole " + cover);
         } catch (Throwable t) {
             Log.e(TAG, "frame size: hole", t);
+        }
+    }
+
+    // ---- clock fit (EditorStretchAreaMediatorImpl.updateCroppedFramePath, p8.h0.o) ----
+
+    private static WeakReference<Object> sPathMediator = new WeakReference<>(null);
+    private static Path sBasePath, sBottomPath;
+
+    /**
+     * p8.h0.o(basePath, bottomPath) start, for each path (which: 0 base, 1 bottom): the frame plate's path in preview
+     * coordinates, scaled to the kept size about the hole's middle; Samsung's own paths are kept to send again.
+     */
+    public static Path framePath(Object mediator, Path p, int which) {
+        sPathMediator = new WeakReference<>(mediator);
+        if (which == 0) {
+            sBasePath = p;
+        } else {
+            sBottomPath = p;
+        }
+        float k = sScale;
+        if (p == null || k == 1f || !HomeClock.active) {
+            return p;
+        }
+        Path q = new Path(p);
+        Matrix m = new Matrix();
+        m.setScale(k, k, sHx, sHy);
+        q.transform(m);
+        return q;
+    }
+
+    /**
+     * After a size change: Samsung's frame paths sent again (through {@link #framePath}). That blocks the clock fit as a
+     * frame change until the crop is updated (updateCropRect, p8.h0.n, for the crop view the mediator follows), then
+     * the subject region goes again ({@link EditXf#refit}).
+     */
+    static void refit(View v) {
+        Object m = sPathMediator.get();
+        if (m == null) {
+            return;
+        }
+        try {
+            m.getClass().getMethod("o", Path.class, Path.class).invoke(m, sBasePath, sBottomPath);
+            Method crop = null;
+            for (Method x : m.getClass().getMethods()) {
+                if (x.getName().equals("n") && x.getParameterCount() == 1 && x.getParameterTypes()[0].getName().equals(EditXf.CROP)) {
+                    crop = x;
+                }
+            }
+            if (crop != null && v.getParent() instanceof ViewGroup) {
+                ViewGroup g = (ViewGroup) v.getParent();
+                for (int i = 0; i < g.getChildCount(); i++) {
+                    View c = g.getChildAt(i);
+                    if (EditXf.CROP.equals(c.getClass().getName())) {
+                        crop.invoke(m, c); // returns at once for the views the mediator does not follow
+                    }
+                }
+            }
+            EditXf.refit();
+        } catch (Throwable t) {
+            Log.e(TAG, "frame size: clock fit", t);
         }
     }
 
