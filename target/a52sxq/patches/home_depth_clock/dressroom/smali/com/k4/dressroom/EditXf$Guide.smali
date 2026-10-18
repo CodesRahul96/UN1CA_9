@@ -393,37 +393,27 @@
 
     add-float/2addr v10, v9
 
-    invoke-virtual {v2}, Landroid/view/View;->getWidth()I
+    invoke-static {v2}, Lcom/k4/dressroom/EditXf;->pivot(Landroid/view/View;)[F
 
-    move-result v11
+    move-result-object v2
 
-    int-to-float v11, v11
-
-    const/high16 v12, 0x40000000    # 2.0f
-
-    div-float/2addr v11, v12
+    aget v11, v2, v6
 
     mul-float/2addr v11, v5
 
     add-float/2addr v11, v7
 
-    invoke-virtual {v2}, Landroid/view/View;->getHeight()I
-
-    move-result v2
-
-    int-to-float v2, v2
-
-    div-float/2addr v2, v12
+    aget v2, v2, v8
 
     mul-float/2addr v2, v5
 
-    add-float v13, v9, v2
+    add-float v12, v9, v2
 
     invoke-static {}, Lcom/k4/dressroom/EditXf;->shownDeg()F
 
-    move-result v14
+    move-result v13
 
-    cmpl-float v2, v14, v4
+    cmpl-float v2, v13, v4
 
     if-nez v2, :cond_1
 
@@ -466,13 +456,15 @@
 
     invoke-virtual {v1, v7, v9, v3, v10}, Landroid/graphics/Canvas;->clipRect(FFFF)Z
 
-    div-float v15, v4, v12
+    const/high16 v14, 0x40000000    # 2.0f
+
+    div-float v15, v4, v14
 
     move v4, v3
 
-    sub-float v3, v13, v15
+    sub-float v3, v12, v15
 
-    add-float v5, v13, v15
+    add-float v5, v12, v15
 
     move v6, v2
 
@@ -496,7 +488,7 @@
 
     move-object v9, v0
 
-    invoke-static {v14}, Ljava/lang/Math;->round(F)I
+    invoke-static {v13}, Ljava/lang/Math;->round(F)I
 
     move-result v0
 
@@ -524,11 +516,11 @@
 
     invoke-virtual {v1}, Landroid/graphics/Paint;->getFontMetrics()Landroid/graphics/Paint$FontMetrics;
 
-    move-result-object v14
+    move-result-object v13
 
-    iget v1, v14, Landroid/graphics/Paint$FontMetrics;->descent:F
+    iget v1, v13, Landroid/graphics/Paint$FontMetrics;->descent:F
 
-    iget v2, v14, Landroid/graphics/Paint$FontMetrics;->ascent:F
+    iget v2, v13, Landroid/graphics/Paint$FontMetrics;->ascent:F
 
     sub-float/2addr v1, v2
 
@@ -558,9 +550,9 @@
 
     mul-float/2addr v2, v3
 
-    sub-float/2addr v13, v2
+    sub-float/2addr v12, v2
 
-    sub-float v2, v13, v1
+    sub-float v2, v12, v1
 
     iget-object v3, v9, Lcom/k4/dressroom/EditXf$Guide;->pill:Landroid/graphics/Paint;
 
@@ -576,7 +568,7 @@
 
     invoke-virtual {v3, v4}, Landroid/graphics/Paint;->setAlpha(I)V
 
-    div-float/2addr v0, v12
+    div-float/2addr v0, v14
 
     move v3, v1
 
@@ -586,7 +578,7 @@
 
     add-float v4, v2, v3
 
-    div-float v5, v3, v12
+    div-float v5, v3, v14
 
     iget-object v7, v9, Lcom/k4/dressroom/EditXf$Guide;->pill:Landroid/graphics/Paint;
 
@@ -616,13 +608,13 @@
 
     add-float/2addr v2, v5
 
-    iget v0, v14, Landroid/graphics/Paint$FontMetrics;->ascent:F
+    iget v0, v13, Landroid/graphics/Paint$FontMetrics;->ascent:F
 
-    iget v3, v14, Landroid/graphics/Paint$FontMetrics;->descent:F
+    iget v3, v13, Landroid/graphics/Paint$FontMetrics;->descent:F
 
     add-float/2addr v0, v3
 
-    div-float/2addr v0, v12
+    div-float/2addr v0, v14
 
     sub-float/2addr v2, v0
 

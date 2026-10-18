@@ -9,9 +9,11 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Region;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
@@ -56,11 +58,15 @@ import java.util.ArrayList;
  * While two fingers rotate, a level guide (Samsung's align assist line drawable and guide box colour, lit up when level)
  * and an angle badge are drawn on the window overlay; they fade out on release.
  * <p>
- * Only the plain layout's main picture (the CropImageView of view type d7.w NONE, CropImageController.l) gets T. Frame
+ * In the plain layout the main picture (the CropImageView of view type d7.w NONE, CropImageController.l) gets T. Frame
  * layouts (Frame, and the Suggest results that are frames) hide that view and show Samsung's own frame views instead
- * (FRAME_BACKGROUND, FRAME_BASE, OBJECT, FRAME_BOTTOM; only one of them takes touches, the frame plates stay put, the
- * subject is its own view): there the editor stays stock. T is dropped when a frame layout appears ({@link #layout}),
- * touches on any other view type pass untouched, and nothing is baked.
+ * (FRAME_BACKGROUND the picture, OBJECT its cut-out subject, FRAME_BASE / FRAME_BOTTOM the frame plates; only the picture
+ * or the subject takes touches and Samsung keeps the two on the same bounds). There T goes to the picture and the subject
+ * alike, about the middle of the frame (CropImageView.getMFrameBounds()), the fill only inside the frame bounds, and the plates
+ * stay put. Both are drawn through T in MaskImageView.onDraw, so everything Samsung composes by drawing those views (the
+ * editor, its stacked preview bitmap, HomeClock.SubjectView's front layers) follows; the save bakes the picture and the
+ * subject like the plain layout's, and the plates are saved by Samsung as they are. T is dropped whenever the layout
+ * changes ({@link #layout}); a frame transform is not kept for a re-edit.
  * <p>
  * A saved transform comes back when the same wallpaper is edited again ({@link #saveRecord}, {@link #tryRestore}):
  * Samsung re-opens its own copy of the original picture at the crop it saved, so T (and the fill) are stored next to
@@ -101,6 +107,8 @@ public final class EditXf {
         sSwitch = new WeakReference<>(null);
         sKeepStretch = null;
         sFrameLayout = false;
+        sFrameKey = null;
+        sFitDirty = false; // the stretch mediator and subject region stay: the next setObjectRegion replaces them
         sPending = null;
         sPendingRead = false;
         sFixedColor = null;
@@ -122,15 +130,71 @@ public final class EditXf {
         return HomeClock.active && v != null && sView.get() == v;
     }
 
-    /** T in view coordinates of the crop view. */
+    /** T in view coordinates of the crop view, about {@link #pivot}. */
     static Matrix matrix(View v) {
         Matrix m = new Matrix();
-        float cx = v.getWidth() / 2f, cy = v.getHeight() / 2f;
-        m.setTranslate(-cx, -cy);
+        float[] p = pivot(v);
+        m.setTranslate(-p[0], -p[1]);
         m.postScale(s, s);
         m.postRotate(shownDeg());
-        m.postTranslate(cx + tx, cy + ty);
+        m.postTranslate(p[0] + tx, p[1] + ty);
         return m;
+    }
+
+    /** The middle T scales and turns about: the frame's in a frame layout, else the view's. */
+    static float[] pivot(View v) {
+        RectF fr = sFrameLayout ? frameRect(v) : null;
+        return fr != null ? new float[] {fr.centerX(), fr.centerY()} : new float[] {v.getWidth() / 2f, v.getHeight() / 2f};
+    }
+
+    /** Frame layout views T applies to: the picture and its cut-out subject (not the frame plates). */
+    static boolean frameTarget(View v) {
+        String t = viewType(v);
+        return "FRAME_BACKGROUND".equals(t) || "OBJECT".equals(t);
+    }
+
+    /** The frame layout view of this type next to v (Samsung's frame views share one parent), or null. */
+    static View frameView(View v, String type) {
+        if (v == null) {
+            return null;
+        }
+        if (type.equals(viewType(v))) {
+            return v;
+        }
+        if (v.getParent() instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v.getParent();
+            for (int i = 0; i < g.getChildCount(); i++) {
+                View c = g.getChildAt(i);
+                if (CROP.equals(c.getClass().getName()) && type.equals(viewType(c))) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The frame's hole in view coordinates: CropImageView.getMFrameBounds() (drawable-bounds space, set on the frame view
+     * that takes touches) through that view's image matrix. Null outside a frame layout.
+     */
+    static RectF frameRect(View v) {
+        for (String type : new String[] {"FRAME_BACKGROUND", "OBJECT"}) {
+            View f = frameView(v, type);
+            if (f == null) {
+                continue;
+            }
+            try {
+                Object o = call(f, "getMFrameBounds");
+                if (o instanceof RectF && !((RectF) o).isEmpty()) {
+                    RectF r = new RectF((RectF) o);
+                    imageMatrix((ImageView) f).mapRect(r);
+                    r.offset(f.getLeft() - v.getLeft(), f.getTop() - v.getTop());
+                    return r;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
     }
 
     /** SubjectView: draw through T too (no-op unless the Home editor's picture is zoomed out or rotated). */
@@ -168,64 +232,78 @@ public final class EditXf {
     /** A frame layout is showing (Samsung's FRAME_* views visible); kept up to date every frame of the Home editor. */
     static volatile boolean sFrameLayout;
 
-    static boolean frameIn(View v) {
+    /** A visible frame layout view (FRAME_*) under v, or null. */
+    static View frameView(View v) {
         if (v.getVisibility() != View.VISIBLE) {
-            return false;
+            return null;
         }
         if (CROP.equals(v.getClass().getName())) {
             String t = viewType(v);
             if (t != null && t.startsWith("FRAME_")) {
-                return true;
+                return v;
             }
         }
         if (v instanceof android.view.ViewGroup) {
             android.view.ViewGroup g = (android.view.ViewGroup) v;
             for (int i = 0; i < g.getChildCount(); i++) {
-                if (frameIn(g.getChildAt(i))) {
-                    return true;
+                View f = frameView(g.getChildAt(i));
+                if (f != null) {
+                    return f;
                 }
             }
         }
-        return false;
+        return null;
     }
 
+    /** The frame layout view seen when T was last reset (another frame: T starts over). */
+    private static String sFrameKey;
+
     /**
-     * Frame layout check (UI thread): every frame of the Home editor (HomeClock's pre-draw) and at each touch down.
-     * When a frame layout appears (Frame, a frame Suggest, a frame re-edit) the transform is dropped: the editor and the
-     * save are Samsung's own there.
+     * Layout check (UI thread): every frame of the Home editor (HomeClock's pre-draw) and at each touch down. When the
+     * layout changes (a frame layout appears or goes, or another frame replaces it) the transform is dropped: it belongs to
+     * the picture of the layout it was made in (the main picture, or the frame's picture and subject).
      */
     static void layout(View any) {
         if (any == null) {
             return;
         }
-        boolean frame = frameIn(any.getRootView());
-        if (frame == sFrameLayout) {
+        View frameView = frameView(any.getRootView());
+        boolean frame = frameView != null;
+        // Samsung builds new frame views for every frame it shows (CropImageController destroy / createFrameCropImageView)
+        String key = frame ? Integer.toHexString(System.identityHashCode(frameView)) : null;
+        if (frame == sFrameLayout && java.util.Objects.equals(key, sFrameKey)) {
             return;
         }
+        boolean switched = frame != sFrameLayout;
         sFrameLayout = frame;
-        Log.i(TAG, frame ? "frame layout: zoom-out / tilt off, stock editor" : "plain layout: zoom-out / tilt available");
-        if (frame) {
-            sPending = null;
-            View crop = sView.get();
-            if (!identity()) {
-                s = 1f;
-                deg = 0f;
-                tx = 0f;
-                ty = 0f;
-                if (crop != null) {
-                    redraw(crop);
-                }
-            }
-            if (sRotating) {
-                sRotating = false;
-                if (crop != null) {
-                    guide(crop, false);
-                }
-            }
+        sFrameKey = key;
+        if (switched) {
+            Log.i(TAG, frame ? "frame layout: zoom-out / tilt on the framed picture" : "plain layout: zoom-out / tilt on the picture");
+        } else {
+            Log.i(TAG, "frame layout: another frame, transform reset");
+        }
+        sPending = null;
+        View crop = sView.get();
+        if (!identity()) {
+            s = 1f;
+            deg = 0f;
+            tx = 0f;
+            ty = 0f;
             if (crop != null) {
-                showSwitch(crop, false);
+                redraw(crop);
+            }
+            refit();
+        }
+        if (sRotating) {
+            sRotating = false;
+            if (crop != null) {
+                guide(crop, false);
             }
         }
+        if (crop != null) {
+            showSwitch(crop, false);
+        }
+        sView = new WeakReference<>(null);
     }
 
     // ---- saved transform (re-edit) ----
@@ -448,6 +526,7 @@ public final class EditXf {
             Log.i(TAG, String.format(java.util.Locale.US, "re-edit: home picture transform restored: scale %.3f, %.1f deg, offset %.0f,%.0f, fill %s, crop %s",
                     s, shownDeg(), tx, ty, sFill == FILL_BLUR ? "blur" : "colour", b));
             redraw(v);
+            refit();
             showSwitchLater(v);
         } catch (Throwable t) {
             sPending = null;
@@ -537,8 +616,8 @@ public final class EditXf {
                     sPending = null;
                 }
             }
-            if (sFrameLayout || !isMain(v) || !handles(v)) {
-                return e; // frame layout views (or the frame layout itself): stock
+            if (!(sFrameLayout ? frameTarget(v) : isMain(v)) || !handles(v)) {
+                return e; // frame plates, and views Samsung does not let move: stock
             }
             noStretch(v);
             if (sView.get() != v) {
@@ -627,12 +706,16 @@ public final class EditXf {
                     changed = true;
                 }
                 if (end) {
+                    if (sFitDirty) {
+                        refit();
+                    }
                     showSwitchLater(v);
                     Log.i(TAG, String.format(java.util.Locale.US, "home picture: scale %.3f, %.1f deg, offset %.0f,%.0f", s, shownDeg(), tx, ty));
                 }
             }
             if (changed) {
                 redraw(v);
+                sFitDirty = true;
             }
             if (sGuide != null) {
                 sGuide.invalidateSelf();
@@ -694,15 +777,26 @@ public final class EditXf {
         }
     }
 
-    /** The zoomed-out picture's middle stays on the screen. */
+    /** The zoomed-out picture's middle stays on the screen (in a frame layout: inside the frame). */
     static void clampT(View v) {
-        float mx = v.getWidth() / 2f, my = v.getHeight() / 2f;
+        RectF fr = sFrameLayout ? frameRect(v) : null;
+        float mx = fr != null ? fr.width() / 2f : v.getWidth() / 2f, my = fr != null ? fr.height() / 2f : v.getHeight() / 2f;
         tx = Math.max(-mx, Math.min(mx, tx));
         ty = Math.max(-my, Math.min(my, ty));
     }
 
     static void redraw(View v) {
         v.invalidate();
+        if (sFrameLayout && v.getParent() instanceof android.view.ViewGroup) {
+            // the frame's picture and subject are drawn through T, the plates above them are drawn over them again
+            android.view.ViewGroup g = (android.view.ViewGroup) v.getParent();
+            for (int i = 0; i < g.getChildCount(); i++) {
+                View c = g.getChildAt(i);
+                if (CROP.equals(c.getClass().getName()) && !isMain(c)) {
+                    c.invalidate();
+                }
+            }
+        }
         View sv = HomeClock.sSubjectView.get();
         if (sv != null) {
             sv.invalidate();
@@ -773,7 +867,7 @@ public final class EditXf {
 
     /** CropImageView.N(scaleFactor) start: the factor Samsung's zoom gets. */
     public static float scale(View v, float f) {
-        if (!mine(v) || sFrameLayout || f == 1f || Float.isNaN(f)) {
+        if (!mine(v) || f == 1f || Float.isNaN(f)) {
             return f;
         }
         try {
@@ -789,6 +883,7 @@ public final class EditXf {
                 if (s < 1f || atMin(v)) {
                     s = Math.max(MIN_S, s * f);
                     redraw(v);
+                    sFitDirty = true;
                     return 1f;
                 }
             } else if (s < 1f) {
@@ -798,6 +893,7 @@ public final class EditXf {
                 ty *= r;
                 s = ns;
                 redraw(v);
+                sFitDirty = true;
                 return 1f;
             }
         } catch (Throwable t) {
@@ -813,7 +909,10 @@ public final class EditXf {
         if (HomeClock.active && (sPending != null || !sPendingRead) && v != null && CROP.equals(v.getClass().getName())) {
             tryRestore(v);
         }
-        if (!mine(v) || identity() || sFrameLayout) {
+        if (sFrameLayout) {
+            return drawFramed(v, c);
+        }
+        if (!mine(v) || identity()) {
             return false;
         }
         try {
@@ -823,6 +922,57 @@ public final class EditXf {
             Log.e(TAG, "draw", t);
             return false;
         }
+    }
+
+    /**
+     * Frame layout: the picture (FRAME_BACKGROUND) over the fill inside the frame bounds, and the picture and its subject
+     * (OBJECT) through T. Samsung's own ImageView draw runs right after on this canvas (inside MaskImageView's save /
+     * restore), so its Effect colour filters and drawable layers stay as they are; false = let it draw.
+     */
+    static boolean drawFramed(View v, Canvas c) {
+        if (!HomeClock.active || identity() || v == null || !CROP.equals(v.getClass().getName()) || !frameTarget(v)) {
+            return false;
+        }
+        try {
+            if ("FRAME_BACKGROUND".equals(viewType(v))) {
+                frameFill(v, c, picture(v));
+            }
+            c.concat(matrix(v));
+        } catch (Throwable t) {
+            Log.e(TAG, "draw (frame)", t);
+        }
+        return false;
+    }
+
+    /** The frame layout's fill: {@link #fill}, inside the frame bounds only (the plates cover the rest). */
+    static void frameFill(View v, Canvas c, Bitmap pic) {
+        RectF fr = frameRect(v);
+        int save = c.save();
+        if (fr != null) {
+            c.clipRect(fr);
+        }
+        fill(v, c, pic);
+        c.restoreToCount(save);
+    }
+
+    /** A crop view of this editor: the one T belongs to, else the main picture's (frame views are its siblings). */
+    static View anyCrop() {
+        View v = sView.get();
+        if (v != null) {
+            return v;
+        }
+        HomeClock.SubjectView sv = HomeClock.sSubjectView.get();
+        return sv != null ? sv.crop : null;
+    }
+
+    /** The picture bitmap a crop view shows (layer 0 of its drawable). */
+    static Bitmap picture(View v) {
+        Drawable outer = outer(v);
+        Drawable base = ((ImageView) v).getDrawable();
+        if (base == outer && outer instanceof LayerDrawable && ((LayerDrawable) outer).getNumberOfLayers() > 0) {
+            base = ((LayerDrawable) outer).getDrawable(0);
+        }
+        return bitmapOf(base);
     }
 
     static Drawable outer(View v) {
@@ -1030,7 +1180,11 @@ public final class EditXf {
         Matrix img = imageMatrix(iv);
         Matrix t = matrix(v);
         Bitmap pic = bitmapOf(base);
-        fill(v, c, pic);
+        if (sFrameLayout) {
+            frameFill(v, c, pic);
+        } else {
+            fill(v, c, pic);
+        }
 
         Drawable pd = base;
         if (own) {
@@ -1100,7 +1254,7 @@ public final class EditXf {
         if (!HomeClock.active || maker == null) {
             return;
         }
-        if (sFrameLayout || identity()) {
+        if (identity()) {
             if (sFrameLayout) {
                 Log.i(TAG, "home save: frame layout, saved as Samsung composed it");
             }
@@ -1111,7 +1265,8 @@ public final class EditXf {
             return;
         }
         try {
-            View v = sView.get();
+            // a frame layout's background is its picture view (the subject view may be the one that took the touches)
+            View v = sFrameLayout ? frameView(anyCrop(), "FRAME_BACKGROUND") : sView.get();
             if (v == null || v.getWidth() == 0 || v.getHeight() == 0) {
                 Log.w(TAG, "home save: no editor view, picture saved without zoom-out/rotation");
                 return;
@@ -1138,15 +1293,19 @@ public final class EditXf {
                 }
             } catch (Throwable ignored) {
             }
-            saveRecord(v, maker);
+            if (sFrameLayout) {
+                clearRecord(v, maker); // Samsung re-opens a frame re-edit in its own layout state: nothing to restore into
+            } else {
+                saveRecord(v, maker);
+            }
             port.set(0f, 0f, w, h);
             float lh = w * (float) w / h; // landscape crop (h x w screen) out of the portrait picture
             land.set(0f, (h - lh) / 2f, w, (h + lh) / 2f);
             square.set(0f, (h - w) / 2f, w, (h + w) / 2f);
             sBakedBg = bg;
             sBaked = new WeakReference<>(maker);
-            Log.i(TAG, String.format(java.util.Locale.US, "home save: background rendered %dx%d (scale %.3f, %.1f deg, offset %.0f,%.0f)",
-                    w, h, s, shownDeg(), tx, ty));
+            Log.i(TAG, String.format(java.util.Locale.US, "home save: %sbackground rendered %dx%d (scale %.3f, %.1f deg, offset %.0f,%.0f)",
+                    sFrameLayout ? "frame layout, " : "", w, h, s, shownDeg(), tx, ty));
         } catch (Throwable t) {
             Log.e(TAG, "bakeBackground", t);
         }
@@ -1162,9 +1321,18 @@ public final class EditXf {
             return obj;
         }
         try {
-            View v = sView.get();
-            HomeClock.SubjectView sv = HomeClock.sSubjectView.get();
-            if (v == null || sv == null || sv.subject == null || sv.crop != v) {
+            View v;
+            Bitmap full; // full picture size: the frame of reference of Samsung's bounds
+            if (sFrameLayout) {
+                // the frame's picture view: its picture is the whole original picture, like the plain layout's
+                v = frameView(anyCrop(), "FRAME_BACKGROUND");
+                full = v != null ? picture(v) : null;
+            } else {
+                v = sView.get();
+                HomeClock.SubjectView sv = HomeClock.sSubjectView.get();
+                full = v != null && sv != null && sv.subject != null && sv.crop == v ? sv.subject.getBitmap() : null;
+            }
+            if (v == null || full == null) {
                 Log.w(TAG, "home save: no subject for the rendered picture");
                 return obj;
             }
@@ -1172,8 +1340,7 @@ public final class EditXf {
             int w = size.getWidth(), h = size.getHeight();
             ImageView iv = (ImageView) v;
             Drawable outer = outer(v);
-            Bitmap full = sv.subject.getBitmap(); // full picture size: the frame of reference of Samsung's bounds
-            if (outer == null || full == null || obj == null) {
+            if (outer == null || obj == null) {
                 return obj;
             }
             // Samsung's own subject for the save (ImagePreviewController.Z2: the Effect's colour, grayscale or blurred
@@ -1190,7 +1357,7 @@ public final class EditXf {
             c.drawBitmap(sb, null, dst, new Paint(Paint.FILTER_BITMAP_FLAG));
             bounds.set(0, 0, w, h);
             sObjBaked.set(Boolean.TRUE);
-            Log.i(TAG, "home save: subject rendered " + w + "x" + h);
+            Log.i(TAG, "home save: " + (sFrameLayout ? "frame layout, " : "") + "subject rendered " + w + "x" + h);
             return out;
         } catch (Throwable t) {
             Log.e(TAG, "bakeObject", t);
@@ -1226,6 +1393,101 @@ public final class EditXf {
             }
         } catch (Throwable t) {
             Log.e(TAG, "beforeXml", t);
+        }
+    }
+
+    // ---- clock fit: Samsung's stretch / clock position pipeline sees the subject where T puts it ----
+
+    private static WeakReference<Object> sStretchMediator = new WeakReference<>(null);
+    private static volatile Region sObjectRegion;
+    /** T changed since Samsung last fitted the clock to the subject. */
+    private static boolean sFitDirty;
+
+    /**
+     * EditorStretchAreaMediatorImpl.setObjectRegion start (p8.h0.j): the subject region (picture pixels) Samsung fits the
+     * stretch clock's digits and its clock position suggestion to; kept to send again when T changes ({@link #refit}).
+     */
+    public static void objectRegion(Object mediator, Region region) {
+        sStretchMediator = new WeakReference<>(mediator);
+        sObjectRegion = region;
+    }
+
+    /**
+     * WallpaperDrawingSizeProcess result (ql.h.d, the subject stage: the one feeding frameHideObjectProcess): the space
+     * around the subject in preview coordinates, with the subject moved through T, so the clock is fitted to the subject
+     * where the zoomed-out / tilted picture shows it (and the stretch heights saved with the home clock match the home
+     * screen). Samsung's 1 px corner marks (which keep the region's bounds the preview size) stay where they are. Runs on
+     * the stretch pipeline's thread.
+     */
+    public static Region stretchRegion(Object process, Region out, Size size) {
+        if (out == null || size == null || !HomeClock.active || identity()) {
+            return out;
+        }
+        try {
+            Object next = HomeClock.field(process, "b");
+            if (next == null || !"Stretch__frameHideObjectProcess".equals(HomeClock.field(next, "a"))) {
+                return out;
+            }
+            View v = sView.get();
+            if (v == null || v.getWidth() == 0 || v.getHeight() == 0) {
+                return out;
+            }
+            int w = size.getWidth(), h = size.getHeight();
+            float kx = w / (float) v.getWidth(), ky = h / (float) v.getHeight();
+            Matrix m = new Matrix();
+            m.setScale(1f / kx, 1f / ky);
+            m.postConcat(matrix(v));
+            m.postScale(kx, ky);
+            Rect[] corners = {new Rect(0, 0, 1, 1), new Rect(w - 1, 0, w, 1), new Rect(w - 1, h - 1, w, h), new Rect(0, h - 1, 1, h)};
+            // the stage carries the free space (Samsung's crop rect minus the subject, wallpaperCropRectProcess), so the
+            // subject is what the preview minus that leaves; moved through T, and the free space is the rest again
+            Region free = new Region(out);
+            for (Rect c : corners) {
+                free.op(c, Region.Op.DIFFERENCE);
+            }
+            Region subject = new Region(0, 0, w, h);
+            subject.op(free, Region.Op.DIFFERENCE);
+            for (Rect c : corners) {
+                subject.op(c, Region.Op.DIFFERENCE);
+            }
+            Path path = subject.getBoundaryPath();
+            path.transform(m);
+            Region moved = new Region();
+            moved.setPath(path, new Region(0, 0, w, h));
+            Region res = new Region(0, 0, w, h);
+            res.op(moved, Region.Op.DIFFERENCE);
+            for (Rect c : corners) {
+                res.op(c, Region.Op.UNION);
+            }
+            Log.i(TAG, "clock fit: subject " + subject.getBounds() + " -> " + moved.getBounds() + " in " + w + "x" + h);
+            return res;
+        } catch (Throwable t) {
+            Log.e(TAG, "stretch region", t);
+            return out;
+        }
+    }
+
+    /** Samsung's pipeline skips unchanged inputs: after T changed, send it the subject region again (UI thread). */
+    static void refit() {
+        sFitDirty = false;
+        Object m = sStretchMediator.get();
+        Region r = sObjectRegion;
+        if (m == null || r == null) {
+            return;
+        }
+        try {
+            // each stage passes its result on only when it changed (ql.c.e: output vs field e): with the same subject
+            // region the first stage stops the run, so the stages' last outputs go first (mediator g = mb.d, its first
+            // stage k = ObjectRegionProcess, each stage's next b)
+            Object stage = HomeClock.field(HomeClock.field(m, "g"), "k");
+            for (int i = 0; stage != null && i < 16; i++) {
+                set(stage, "e", null);
+                stage = HomeClock.field(stage, "b");
+            }
+            m.getClass().getMethod("j", Region.class).invoke(m, new Region(r));
+            Log.i(TAG, String.format(java.util.Locale.US, "clock fit: subject region sent again (scale %.3f, %.1f deg)", s, shownDeg()));
+        } catch (Throwable t) {
+            Log.e(TAG, "refit", t);
         }
     }
 
@@ -1499,9 +1761,10 @@ public final class EditXf {
             v.getLocationInWindow(loc);
             float sc = HomeClock.scale(v);
             float left = loc[0], top = loc[1], right = left + v.getWidth() * sc, bottom = top + v.getHeight() * sc;
-            // fixed to the screen (the preview's middle), not to the picture: level is judged against the screen the
-            // way Samsung's align assist lines and the photo editor's straighten grid stay put while the picture turns
-            float cx = left + v.getWidth() / 2f * sc, cy = top + v.getHeight() / 2f * sc;
+            // fixed to the screen (the preview's middle, or the frame's), not to the picture: level is judged against the
+            // screen the way Samsung's align assist lines and the photo editor's straighten grid stay put while it turns
+            float[] p = pivot(v);
+            float cx = left + p[0] * sc, cy = top + p[1] * sc;
             float d = shownDeg();
             boolean level = d == 0f;
             int a = Math.round(alpha * (level ? 255 : 110));

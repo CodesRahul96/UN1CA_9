@@ -305,7 +305,7 @@ dm = open(one("d7/m.smali")).read()
 for fld in ("k", "l", "m"):
     assert ".field public %s:Landroid/graphics/Bitmap;" % fld in dm, "d7.m." + fld
 for m in ("public final getDrawableInner()Landroid/graphics/drawable/Drawable;", "public final getDrawableBounds()Landroid/graphics/RectF;",
-          "public final getDrawableOriginScaledBounds()Landroid/graphics/RectF;"):
+          "public final getDrawableOriginScaledBounds()Landroid/graphics/RectF;", "public final getMFrameBounds()Landroid/graphics/RectF;"):
     assert re.search(r"^\.method %s$" % re.escape(m), s, re.M), "CropImageView." + m
 xpatch(f, "public final onTouchEvent(Landroid/view/MotionEvent;)Z", at_start(
     "    invoke-static {p0, p1}, %s->touch(Landroid/view/View;Landroid/view/MotionEvent;)Landroid/view/MotionEvent;\n\n    move-result-object p1\n\n" % XF, 2),
@@ -349,6 +349,29 @@ def hxml(body):
     assert body.count(hdr) == 1
     return body.replace(hdr, hdr + "    invoke-static/range {p0 .. p2}, %s->beforeXml(Ljava/lang/Object;Ljava/util/ArrayList;Ljava/lang/Object;)V\n\n" % XF, 1)
 xpatch(f, "public final i(Ljava/util/ArrayList;Lc7/c0;)V", hxml, "SaveImageMaker.i -> EditXf.beforeXml")
+# clock fit: the subject region of the stretch pipeline (ql.h WallpaperDrawingSizeProcess, the stage before
+# frameHideObjectProcess) through T; EditorStretchAreaMediatorImpl.setObjectRegion (p8.h0.j) remembered to re-send it
+qc = open(one("ql/c.smali")).read()
+assert ".field public final a:Ljava/lang/String;" in qc and ".field public final b:Lql/c;" in qc, "ql.c tag / next"
+assert '"WallpaperDrawingSizeProcess"' in open(one("ql/h.smali")).read(), "ql.h tag"
+md = open(one("mb/d.smali")).read()
+assert '"frameHideObjectProcess"' in md and ".field public k:Lmb/b;" in md, "mb.d frameHideObjectProcess / first stage k"
+assert ".field public e:Ljava/lang/Object;" in qc, "ql.c last output e"
+assert ".field public final g:Lmb/d;" in open(one("p8/h0.smali")).read(), "p8.h0 detector g"
+def hregion(body):
+    a = ("    invoke-virtual {p0, p1, p2}, Lql/h;->h(Landroid/graphics/Region;Landroid/util/Size;)Landroid/graphics/Region;\n\n"
+         "    move-result-object p0\n\n    return-object p0\n")
+    assert body.count(a) == 1, "ql.h.d bridge"
+    return body.replace(a, "    invoke-virtual {p0, p1, p2}, Lql/h;->h(Landroid/graphics/Region;Landroid/util/Size;)Landroid/graphics/Region;\n\n"
+                        "    move-result-object p1\n\n    invoke-static {p0, p1, p2}, %s->stretchRegion(Ljava/lang/Object;Landroid/graphics/Region;Landroid/util/Size;)Landroid/graphics/Region;\n\n"
+                        "    move-result-object p0\n\n    return-object p0\n" % XF, 1)
+xpatch(one("ql/h.smali"), "public final bridge synthetic d(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", hregion,
+       "WallpaperDrawingSizeProcess.d -> EditXf.stretchRegion")
+f = one("p8/h0.smali")
+assert '"EditorStretchAreaMediatorImpl"' in open(f).read() and '"setObjectRegion: "' in open(f).read(), "p8.h0 setObjectRegion"
+xpatch(f, "public final j(Landroid/graphics/Region;)V", at_start(
+    "    invoke-static {p0, p1}, %s->objectRegion(Ljava/lang/Object;Landroid/graphics/Region;)V\n\n" % XF, 0),
+    "EditorStretchAreaMediatorImpl.setObjectRegion -> EditXf.objectRegion")
 
 # 6. helper classes into the last dex, menu icon resources
 for old in glob.glob(root + "/smali*/com/k4/dressroom"):
