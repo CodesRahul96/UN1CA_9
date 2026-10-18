@@ -373,6 +373,27 @@ xpatch(f, "public final j(Landroid/graphics/Region;)V", at_start(
     "    invoke-static {p0, p1}, %s->objectRegion(Ljava/lang/Object;Landroid/graphics/Region;)V\n\n" % XF, 0),
     "EditorStretchAreaMediatorImpl.setObjectRegion -> EditXf.objectRegion")
 
+# 5d. frame size (FrameSize): the save's frame layer crops (SaveImageMaker.g(plate, (port, land) margins)) for the
+# kept frame size; the hole / minimum zoom / picture bounds of the frame views are set through CropImageView's own setters
+FS = "Lcom/k4/dressroom/FrameSize;"
+f = by_text('"makeBackgroundImage"')
+xpatch_fs = lambda body: body.replace("    .locals %d\n\n" % nlocals(body), "    .locals %d\n\n    invoke-static {p2}, %s->saveRatios(Ljava/lang/Object;)Ljava/lang/Object;\n\n"
+                                     "    move-result-object p2\n\n    check-cast p2, Lva/p;\n\n" % (nlocals(body), FS), 1)
+s5 = open(f).read()
+b5 = method(s5, "public final g(Landroid/graphics/drawable/Drawable;Lva/p;)Lva/p;")
+if FS in b5:
+    print("  - SaveImageMaker.g already hooked")
+else:
+    assert b5.count("    .locals %d\n\n" % nlocals(b5)) == 1
+    open(f, "w").write(s5.replace(b5, xpatch_fs(b5), 1))
+    print("  - SaveImageMaker.g -> FrameSize.saveRatios")
+vp = open(one("va/p.smali")).read()
+assert ".field public final a:Ljava/lang/Object;" in vp and ".field public final b:Ljava/lang/Object;" in vp and ".method public constructor <init>(Ljava/lang/Object;Ljava/lang/Object;)V" in vp, "va.p"
+ci = open(one(W + "CropImageView.smali")).read()
+for sig in ("public final setMFrameBounds(Landroid/graphics/RectF;)V", "public final setMinScale(F)V",
+            "public final setDrawableBoundsExternal(Landroid/graphics/RectF;)V", "public final getMFrameBounds()Landroid/graphics/RectF;"):
+    assert re.search(r"^\.method %s$" % re.escape(sig), ci, re.M), "CropImageView " + sig
+
 # 6. helper classes into the last dex, menu icon resources
 for old in glob.glob(root + "/smali*/com/k4/dressroom"):
     shutil.rmtree(old)

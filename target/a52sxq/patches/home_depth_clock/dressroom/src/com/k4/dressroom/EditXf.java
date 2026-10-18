@@ -108,6 +108,7 @@ public final class EditXf {
         sKeepStretch = null;
         sFrameLayout = false;
         sFrameKey = null;
+        FrameSize.reset();
         sFitDirty = false; // the stretch mediator and subject region stay: the next setObjectRegion replaces them
         sPending = null;
         sPendingRead = false;
@@ -274,6 +275,11 @@ public final class EditXf {
         if (frame == sFrameLayout && java.util.Objects.equals(key, sFrameKey)) {
             return;
         }
+        if (frame && sFrameLayout && FrameSize.relayoutDone()) {
+            sFrameKey = key; // the frame views FrameSize had Samsung rebuild at the new size: same layout, T stays
+            return;
+        }
+        FrameSize.reset();
         boolean switched = frame != sFrameLayout;
         sFrameLayout = frame;
         sFrameKey = key;
@@ -619,6 +625,17 @@ public final class EditXf {
             if (!(sFrameLayout ? frameTarget(v) : isMain(v)) || !handles(v)) {
                 return e; // frame plates, and views Samsung does not let move: stock
             }
+            if (sFrameLayout && FrameSize.touch(v, e)) {
+                // a gesture that started on the frame (outside its hole) sizes the frame; Samsung's picture handling
+                // sees it cancelled
+                MotionEvent c = MotionEvent.obtain(e);
+                c.setAction(MotionEvent.ACTION_CANCEL);
+                if (sCopy != null) {
+                    sCopy.recycle();
+                }
+                sCopy = c;
+                return c;
+            }
             noStretch(v);
             if (sView.get() != v) {
                 if (sView.get() != null && !identity()) {
@@ -930,7 +947,10 @@ public final class EditXf {
      * restore), so its Effect colour filters and drawable layers stay as they are; false = let it draw.
      */
     static boolean drawFramed(View v, Canvas c) {
-        if (!HomeClock.active || identity() || v == null || !CROP.equals(v.getClass().getName()) || !frameTarget(v)) {
+        if (!HomeClock.active || v == null || !CROP.equals(v.getClass().getName())) {
+            return false;
+        }
+        if (FrameSize.drawPlate(v, c) || identity() || !frameTarget(v)) {
             return false;
         }
         try {
