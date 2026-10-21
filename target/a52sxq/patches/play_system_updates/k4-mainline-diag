@@ -200,6 +200,14 @@ elif [ -n "$LIVE_KNOWN" ]; then
 elif [ -s "$T/live.pins" ]; then
     LINE="$LINE (BPF maps covered by name; this netd.o is not in the ROM's verified list)"
 fi
+# Local Network Protection: the 5.4 stats programs a52_netd.o loads do not enforce it (tethering/module.prop); fine
+# while Google keeps RESTRICT_LOCAL_NETWORK off, a gap the day a train turns it on (globally or per package)
+LNP="$(dumpsys platform_compat 2> /dev/null | grep -o 'ChangeId(365139289;[^)]*)' | head -n 1)"
+case "$LNP" in
+    ""|*"; disabled"*) case "$LNP" in *"=true"*) LNP_ON=1 ;; *) LNP_ON=0 ;; esac ;;
+    *) LNP_ON=1 ;;
+esac
+[ "$LNP_ON" = 1 ] && LINE="$LINE; WARNING: Local Network Protection is on in this Tethering ($LNP) but not enforced on kernel 5.4 - developer: ship the 5.4 LNP stats variant"
 echo "$LINE"
 echo "$LINE" > "$T/verdict.txt"
 [ "$VERBOSE" = 1 ] || exit 0
