@@ -874,76 +874,72 @@
 
     move-result p0
 
-    const v7, 0x3fcccccd    # 1.6f
+    iget v7, v0, Landroid/graphics/RectF;->left:F
 
-    sget v8, Lcom/k4/dressroom/FrameSize;->sScale:F
+    cmpg-float v7, v7, v3
 
-    div-float/2addr v7, v8
+    const/4 v8, 0x0
 
-    iget v8, v0, Landroid/graphics/RectF;->left:F
+    if-gez v7, :cond_1
 
-    cmpg-float v8, v8, v3
-
-    if-gez v8, :cond_1
-
-    sub-float v8, v3, p0
+    sub-float v7, v3, p0
 
     iget v9, v0, Landroid/graphics/RectF;->left:F
 
     sub-float v9, v3, v9
 
-    div-float/2addr v8, v9
+    div-float/2addr v7, v9
 
-    invoke-static {v7, v8}, Ljava/lang/Math;->min(FF)F
+    invoke-static {v8, v7}, Ljava/lang/Math;->max(FF)F
 
-    move-result v7
+    move-result v8
 
     :cond_1
-    iget v8, v0, Landroid/graphics/RectF;->right:F
+    iget v7, v0, Landroid/graphics/RectF;->right:F
 
-    cmpl-float v8, v8, v3
+    cmpl-float v7, v7, v3
 
-    if-lez v8, :cond_2
+    if-lez v7, :cond_2
 
-    sub-float v8, v5, p0
+    sub-float v7, v5, p0
 
-    sub-float/2addr v8, v3
+    sub-float/2addr v7, v3
 
     iget v9, v0, Landroid/graphics/RectF;->right:F
 
     sub-float/2addr v9, v3
 
-    div-float/2addr v8, v9
+    div-float/2addr v7, v9
 
-    invoke-static {v7, v8}, Ljava/lang/Math;->min(FF)F
+    invoke-static {v8, v7}, Ljava/lang/Math;->max(FF)F
 
-    move-result v7
+    move-result v8
 
     :cond_2
-    iget v8, v0, Landroid/graphics/RectF;->top:F
+    iget v7, v0, Landroid/graphics/RectF;->top:F
 
-    cmpg-float v8, v8, v4
+    cmpg-float v7, v7, v4
 
-    if-gez v8, :cond_3
+    if-gez v7, :cond_3
 
-    sub-float v8, v4, p0
+    sub-float v7, v4, p0
 
     iget v9, v0, Landroid/graphics/RectF;->top:F
 
     sub-float v9, v4, v9
 
-    div-float/2addr v8, v9
+    div-float/2addr v7, v9
 
-    invoke-static {v7, v8}, Ljava/lang/Math;->min(FF)F
+    invoke-static {v8, v7}, Ljava/lang/Math;->max(FF)F
 
-    move-result v7
+    move-result v8
 
     :cond_3
-    iget v8, v0, Landroid/graphics/RectF;->bottom:F
+    iget v7, v0, Landroid/graphics/RectF;->bottom:F
 
-    cmpl-float v8, v8, v4
+    cmpl-float v7, v7, v4
 
-    if-lez v8, :cond_4
+    if-lez v7, :cond_4
 
     sub-float p0, v6, p0
 
@@ -955,11 +951,21 @@
 
     div-float/2addr p0, v0
 
-    invoke-static {v7, p0}, Ljava/lang/Math;->min(FF)F
+    invoke-static {v8, p0}, Ljava/lang/Math;->max(FF)F
 
-    move-result v7
+    move-result v8
 
     :cond_4
+    const p0, 0x3fcccccd    # 1.6f
+
+    sget v0, Lcom/k4/dressroom/FrameSize;->sScale:F
+
+    div-float/2addr p0, v0
+
+    invoke-static {p0, v8}, Ljava/lang/Math;->min(FF)F
+
+    move-result p0
+
     sput v3, Lcom/k4/dressroom/FrameSize;->sHx:F
 
     sput v4, Lcom/k4/dressroom/FrameSize;->sHy:F
@@ -968,23 +974,23 @@
 
     sput v6, Lcom/k4/dressroom/FrameSize;->sVh:F
 
-    const p0, 0x3eb33333    # 0.35f
+    const v0, 0x3eb33333    # 0.35f
 
-    sget v0, Lcom/k4/dressroom/FrameSize;->sScale:F
+    sget v3, Lcom/k4/dressroom/FrameSize;->sScale:F
 
-    div-float/2addr p0, v0
+    div-float/2addr v0, v3
 
-    sput p0, Lcom/k4/dressroom/FrameSize;->sMin:F
+    sput v0, Lcom/k4/dressroom/FrameSize;->sMin:F
 
-    const/high16 p0, 0x3f800000    # 1.0f
+    const/high16 v0, 0x3f800000    # 1.0f
 
-    invoke-static {p0, v7}, Ljava/lang/Math;->max(FF)F
+    invoke-static {v0, p0}, Ljava/lang/Math;->max(FF)F
 
-    move-result v0
+    move-result p0
 
-    sput v0, Lcom/k4/dressroom/FrameSize;->sMax:F
+    sput p0, Lcom/k4/dressroom/FrameSize;->sMax:F
 
-    sput p0, Lcom/k4/dressroom/FrameSize;->sLive:F
+    sput v0, Lcom/k4/dressroom/FrameSize;->sLive:F
 
     sget-object p0, Ljava/util/Locale;->US:Ljava/util/Locale;
 
@@ -2001,21 +2007,21 @@
 .end method
 
 .method public static saveResult(Ljava/lang/Object;)Ljava/lang/Object;
-    .locals 22
+    .locals 25
 
     move-object/from16 v1, p0
 
-    const-string v0, "a"
-
     const-string v2, "K4HomeClock"
+
+    const-string v0, "a"
 
     const-string v3, "b"
 
-    if-eqz v1, :cond_7
+    if-eqz v1, :cond_b
 
     sget-boolean v4, Lcom/k4/dressroom/HomeClock;->active:Z
 
-    if-eqz v4, :cond_7
+    if-eqz v4, :cond_b
 
     sget v4, Lcom/k4/dressroom/FrameSize;->sScale:F
 
@@ -2025,7 +2031,7 @@
 
     if-ltz v4, :cond_0
 
-    goto/16 :goto_2
+    goto/16 :goto_3
 
     :cond_0
     :try_start_0
@@ -2037,205 +2043,334 @@
 
     invoke-static {v1, v3}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
 
-    move-result-object v5
+    move-result-object v6
 
-    if-eqz v4, :cond_7
+    if-eqz v4, :cond_b
 
-    if-nez v5, :cond_1
+    if-nez v6, :cond_1
 
-    goto/16 :goto_2
+    goto/16 :goto_3
 
     :cond_1
-    invoke-static {v5, v0}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+    invoke-static {v6, v0}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
 
-    move-result-object v0
+    move-result-object v7
 
-    invoke-static {v0, v3}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+    invoke-static {v7, v3}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
 
-    move-result-object v0
+    move-result-object v7
 
-    check-cast v0, Landroid/graphics/RectF;
-
-    invoke-static {v5, v3}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
-
-    move-result-object v6
+    check-cast v7, Landroid/graphics/RectF;
 
     invoke-static {v6, v3}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
 
-    move-result-object v3
+    move-result-object v8
 
-    check-cast v3, Landroid/graphics/RectF;
+    invoke-static {v8, v3}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
 
-    filled-new-array {v0, v3}, [Landroid/graphics/RectF;
+    move-result-object v8
 
-    move-result-object v0
+    check-cast v8, Landroid/graphics/RectF;
+
+    filled-new-array {v7, v8}, [Landroid/graphics/RectF;
+
+    move-result-object v7
 
     invoke-virtual {v4}, Landroid/graphics/Bitmap;->getWidth()I
 
-    move-result v3
+    move-result v8
 
-    int-to-float v3, v3
+    int-to-float v8, v8
 
     invoke-virtual {v4}, Landroid/graphics/Bitmap;->getHeight()I
 
-    move-result v6
+    move-result v9
 
-    int-to-float v6, v6
+    int-to-float v9, v9
 
-    const/4 v8, 0x0
+    move/from16 v16, v5
 
-    move v9, v8
-
-    move v10, v9
-
-    move v11, v10
+    const/4 v5, 0x0
 
     const/4 v12, 0x0
 
+    const/4 v13, 0x0
+
+    const/4 v14, 0x0
+
+    const/4 v15, 0x0
+
+    const/16 v17, 0x0
+
     :goto_0
-    const/4 v13, 0x2
+    const/4 v10, 0x2
 
-    if-ge v12, v13, :cond_3
+    if-ge v12, v10, :cond_3
 
-    aget-object v13, v0, v12
+    aget-object v10, v7, v12
 
-    if-nez v13, :cond_2
+    if-nez v10, :cond_2
 
-    goto/16 :goto_2
+    goto/16 :goto_3
 
     :cond_2
-    iget v14, v13, Landroid/graphics/RectF;->left:F
+    const/16 v18, 0x0
 
-    neg-float v14, v14
+    iget v11, v10, Landroid/graphics/RectF;->left:F
 
-    invoke-static {v8, v14}, Ljava/lang/Math;->max(FF)F
+    neg-float v11, v11
 
-    move-result v8
+    invoke-static {v13, v11}, Ljava/lang/Math;->max(FF)F
 
-    iget v14, v13, Landroid/graphics/RectF;->top:F
+    move-result v13
 
-    neg-float v14, v14
+    iget v11, v10, Landroid/graphics/RectF;->top:F
 
-    invoke-static {v9, v14}, Ljava/lang/Math;->max(FF)F
+    neg-float v11, v11
 
-    move-result v9
+    invoke-static {v14, v11}, Ljava/lang/Math;->max(FF)F
 
-    iget v14, v13, Landroid/graphics/RectF;->right:F
+    move-result v14
 
-    sub-float/2addr v14, v3
+    iget v11, v10, Landroid/graphics/RectF;->right:F
 
-    invoke-static {v10, v14}, Ljava/lang/Math;->max(FF)F
+    sub-float/2addr v11, v8
 
-    move-result v10
+    invoke-static {v15, v11}, Ljava/lang/Math;->max(FF)F
 
-    iget v13, v13, Landroid/graphics/RectF;->bottom:F
+    move-result v15
 
-    sub-float/2addr v13, v6
+    iget v10, v10, Landroid/graphics/RectF;->bottom:F
 
-    invoke-static {v11, v13}, Ljava/lang/Math;->max(FF)F
+    sub-float/2addr v10, v9
 
-    move-result v11
+    invoke-static {v5, v10}, Ljava/lang/Math;->max(FF)F
+
+    move-result v5
 
     add-int/lit8 v12, v12, 0x1
 
     goto :goto_0
 
     :cond_3
-    const/high16 v12, 0x3f000000    # 0.5f
+    const/16 v18, 0x0
 
-    cmpg-float v14, v8, v12
+    const/high16 v11, 0x3f000000    # 0.5f
 
-    if-gez v14, :cond_4
-
-    cmpg-float v14, v9, v12
-
-    if-gez v14, :cond_4
-
-    cmpg-float v14, v10, v12
-
-    if-gez v14, :cond_4
-
-    cmpg-float v12, v11, v12
+    cmpg-float v12, v13, v11
 
     if-gez v12, :cond_4
 
-    goto/16 :goto_2
+    cmpg-float v12, v14, v11
+
+    if-gez v12, :cond_4
+
+    cmpg-float v12, v15, v11
+
+    if-gez v12, :cond_4
+
+    cmpg-float v11, v5, v11
+
+    if-gez v11, :cond_4
+
+    goto/16 :goto_3
 
     :cond_4
-    float-to-double v14, v8
+    invoke-static {v6, v0}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    invoke-static {v6, v3}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+
+    move-result-object v3
+
+    filled-new-array {v0, v3}, [Ljava/lang/Object;
+
+    move-result-object v0
+
+    move/from16 v3, v17
+
+    move/from16 v11, v18
+
+    :goto_1
+    if-ge v3, v10, :cond_6
+
+    aget-object v12, v0, v3
+
+    const-string v10, "c"
+
+    invoke-static {v12, v10}, Lcom/k4/dressroom/HomeClock;->field(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+
+    move-result-object v10
+
+    check-cast v10, Landroid/graphics/RectF;
+
+    if-eqz v10, :cond_5
+
+    aget-object v12, v7, v3
+
+    invoke-virtual {v12}, Landroid/graphics/RectF;->width()F
+
+    move-result v12
+
+    cmpl-float v12, v12, v18
+
+    if-lez v12, :cond_5
+
+    aget-object v12, v7, v3
+
+    invoke-virtual {v12}, Landroid/graphics/RectF;->height()F
+
+    move-result v12
+
+    cmpl-float v12, v12, v18
+
+    if-lez v12, :cond_5
+
+    invoke-virtual {v10}, Landroid/graphics/RectF;->width()F
+
+    move-result v12
+
+    aget-object v19, v7, v3
+
+    invoke-virtual/range {v19 .. v19}, Landroid/graphics/RectF;->width()F
+
+    move-result v19
+
+    div-float v12, v12, v19
+
+    invoke-virtual {v10}, Landroid/graphics/RectF;->height()F
+
+    move-result v10
+
+    aget-object v19, v7, v3
+
+    invoke-virtual/range {v19 .. v19}, Landroid/graphics/RectF;->height()F
+
+    move-result v19
+
+    div-float v10, v10, v19
+
+    invoke-static {v12, v10}, Ljava/lang/Math;->max(FF)F
+
+    move-result v10
+
+    invoke-static {v11, v10}, Ljava/lang/Math;->max(FF)F
+
+    move-result v11
+
+    :cond_5
+    add-int/lit8 v3, v3, 0x1
+
+    const/4 v10, 0x2
+
+    goto :goto_1
+
+    :cond_6
+    cmpg-float v0, v11, v18
+
+    if-lez v0, :cond_7
+
+    cmpl-float v0, v11, v16
+
+    if-lez v0, :cond_8
+
+    :cond_7
+    move/from16 v11, v16
+
+    :cond_8
+    float-to-double v12, v13
+
+    invoke-static {v12, v13}, Ljava/lang/Math;->ceil(D)D
+
+    move-result-wide v12
+
+    double-to-int v0, v12
+
+    float-to-double v12, v14
+
+    invoke-static {v12, v13}, Ljava/lang/Math;->ceil(D)D
+
+    move-result-wide v12
+
+    double-to-int v3, v12
+
+    int-to-float v0, v0
+
+    add-float/2addr v8, v0
+
+    float-to-double v12, v8
+
+    float-to-double v14, v15
 
     invoke-static {v14, v15}, Ljava/lang/Math;->ceil(D)D
 
     move-result-wide v14
 
-    double-to-int v8, v14
+    add-double/2addr v12, v14
 
-    float-to-double v14, v9
+    float-to-double v14, v11
 
-    invoke-static {v14, v15}, Ljava/lang/Math;->ceil(D)D
+    mul-double/2addr v12, v14
 
-    move-result-wide v14
+    invoke-static {v12, v13}, Ljava/lang/Math;->ceil(D)D
 
-    double-to-int v9, v14
+    move-result-wide v12
 
-    float-to-int v3, v3
+    double-to-int v8, v12
 
-    add-int/2addr v3, v8
+    int-to-float v3, v3
 
-    float-to-double v14, v10
+    add-float/2addr v9, v3
 
-    invoke-static {v14, v15}, Ljava/lang/Math;->ceil(D)D
+    float-to-double v9, v9
 
-    move-result-wide v14
+    float-to-double v12, v5
 
-    double-to-int v10, v14
+    invoke-static {v12, v13}, Ljava/lang/Math;->ceil(D)D
 
-    add-int/2addr v3, v10
+    move-result-wide v12
 
-    float-to-int v6, v6
+    add-double/2addr v9, v12
 
-    add-int/2addr v6, v9
+    mul-double/2addr v9, v14
 
-    float-to-double v10, v11
+    invoke-static {v9, v10}, Ljava/lang/Math;->ceil(D)D
 
-    invoke-static {v10, v11}, Ljava/lang/Math;->ceil(D)D
-
-    move-result-wide v10
+    move-result-wide v9
     :try_end_0
     .catchall {:try_start_0 .. :try_end_0} :catchall_0
 
-    double-to-int v10, v10
+    double-to-int v5, v9
 
-    add-int/2addr v6, v10
+    int-to-long v9, v8
 
-    int-to-long v10, v3
+    int-to-long v12, v5
 
-    int-to-long v14, v6
+    mul-long/2addr v9, v12
 
-    mul-long/2addr v10, v14
+    const-wide/32 v12, 0x2800000
 
-    const-wide/32 v14, 0x4000000
+    cmp-long v9, v9, v12
 
-    cmp-long v10, v10, v14
+    const-string v10, "x"
 
-    const-string v11, "x"
-
-    if-lez v10, :cond_5
+    if-lez v9, :cond_9
 
     :try_start_1
     new-instance v0, Ljava/lang/StringBuilder;
 
     invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
 
-    const-string v4, "frame size: padded plate would be "
+    const-string v3, "frame size: padded plate would be "
 
-    invoke-virtual {v0, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+    invoke-virtual {v0, v8}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v0, v11}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v0, v10}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v0, v6}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+    invoke-virtual {v0, v5}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
     const-string v3, ", saved without"
 
@@ -2249,160 +2384,192 @@
 
     return-object v1
 
-    :cond_5
-    sget-object v10, Landroid/graphics/Bitmap$Config;->ARGB_8888:Landroid/graphics/Bitmap$Config;
+    :cond_9
+    sget-object v9, Landroid/graphics/Bitmap$Config;->ARGB_8888:Landroid/graphics/Bitmap$Config;
 
-    invoke-static {v3, v6, v10}, Landroid/graphics/Bitmap;->createBitmap(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;
+    invoke-static {v8, v5, v9}, Landroid/graphics/Bitmap;->createBitmap(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;
 
-    move-result-object v10
+    move-result-object v9
 
     new-instance v12, Landroid/graphics/BitmapShader;
 
+    sget-object v13, Landroid/graphics/Shader$TileMode;->CLAMP:Landroid/graphics/Shader$TileMode;
+
     sget-object v14, Landroid/graphics/Shader$TileMode;->CLAMP:Landroid/graphics/Shader$TileMode;
 
-    sget-object v15, Landroid/graphics/Shader$TileMode;->CLAMP:Landroid/graphics/Shader$TileMode;
+    invoke-direct {v12, v4, v13, v14}, Landroid/graphics/BitmapShader;-><init>(Landroid/graphics/Bitmap;Landroid/graphics/Shader$TileMode;Landroid/graphics/Shader$TileMode;)V
 
-    invoke-direct {v12, v4, v14, v15}, Landroid/graphics/BitmapShader;-><init>(Landroid/graphics/Bitmap;Landroid/graphics/Shader$TileMode;Landroid/graphics/Shader$TileMode;)V
+    new-instance v13, Landroid/graphics/Matrix;
 
-    new-instance v14, Landroid/graphics/Matrix;
+    invoke-direct {v13}, Landroid/graphics/Matrix;-><init>()V
 
-    invoke-direct {v14}, Landroid/graphics/Matrix;-><init>()V
+    invoke-virtual {v13, v0, v3}, Landroid/graphics/Matrix;->setTranslate(FF)V
 
-    int-to-float v8, v8
+    invoke-virtual {v13, v11, v11}, Landroid/graphics/Matrix;->postScale(FF)Z
 
-    int-to-float v9, v9
+    invoke-virtual {v12, v13}, Landroid/graphics/BitmapShader;->setLocalMatrix(Landroid/graphics/Matrix;)V
 
-    invoke-virtual {v14, v8, v9}, Landroid/graphics/Matrix;->setTranslate(FF)V
+    new-instance v13, Landroid/graphics/Paint;
 
-    invoke-virtual {v12, v14}, Landroid/graphics/BitmapShader;->setLocalMatrix(Landroid/graphics/Matrix;)V
+    const/4 v14, 0x2
 
-    new-instance v14, Landroid/graphics/Paint;
+    invoke-direct {v13, v14}, Landroid/graphics/Paint;-><init>(I)V
 
-    invoke-direct {v14}, Landroid/graphics/Paint;-><init>()V
+    invoke-virtual {v13, v12}, Landroid/graphics/Paint;->setShader(Landroid/graphics/Shader;)Landroid/graphics/Shader;
 
-    invoke-virtual {v14, v12}, Landroid/graphics/Paint;->setShader(Landroid/graphics/Shader;)Landroid/graphics/Shader;
+    new-instance v12, Landroid/graphics/Canvas;
 
-    new-instance v15, Landroid/graphics/Canvas;
+    invoke-direct {v12, v9}, Landroid/graphics/Canvas;-><init>(Landroid/graphics/Bitmap;)V
 
-    invoke-direct {v15, v10}, Landroid/graphics/Canvas;-><init>(Landroid/graphics/Bitmap;)V
+    int-to-float v14, v8
 
-    int-to-float v12, v3
+    int-to-float v15, v5
+
+    const/16 v20, 0x0
 
     const/16 v21, 0x0
 
-    int-to-float v7, v6
+    move-object/from16 v19, v12
 
-    const/16 v16, 0x0
+    move-object/from16 v24, v13
 
-    const/16 v17, 0x0
+    move/from16 v22, v14
 
-    move/from16 v19, v7
+    move/from16 v23, v15
 
-    move/from16 v18, v12
+    invoke-virtual/range {v19 .. v24}, Landroid/graphics/Canvas;->drawRect(FFFFLandroid/graphics/Paint;)V
 
-    move-object/from16 v20, v14
+    move/from16 v12, v17
 
-    invoke-virtual/range {v15 .. v20}, Landroid/graphics/Canvas;->drawRect(FFFFLandroid/graphics/Paint;)V
+    :goto_2
+    const/4 v14, 0x2
 
-    move/from16 v7, v21
+    if-ge v12, v14, :cond_a
 
-    :goto_1
-    if-ge v7, v13, :cond_6
+    aget-object v13, v7, v12
 
-    aget-object v12, v0, v7
+    invoke-virtual {v13, v0, v3}, Landroid/graphics/RectF;->offset(FF)V
 
-    invoke-virtual {v12, v8, v9}, Landroid/graphics/RectF;->offset(FF)V
+    iget v15, v13, Landroid/graphics/RectF;->left:F
 
-    add-int/lit8 v7, v7, 0x1
+    mul-float/2addr v15, v11
 
-    goto :goto_1
+    iget v14, v13, Landroid/graphics/RectF;->top:F
 
-    :cond_6
+    mul-float/2addr v14, v11
+
+    move/from16 v16, v0
+
+    iget v0, v13, Landroid/graphics/RectF;->right:F
+
+    mul-float/2addr v0, v11
+
+    iget v1, v13, Landroid/graphics/RectF;->bottom:F
+
+    mul-float/2addr v1, v11
+
+    invoke-virtual {v13, v15, v14, v0, v1}, Landroid/graphics/RectF;->set(FFFF)V
+
+    add-int/lit8 v12, v12, 0x1
+
+    move-object/from16 v1, p0
+
+    move/from16 v0, v16
+
+    goto :goto_2
+
+    :cond_a
     invoke-virtual {v4}, Landroid/graphics/Bitmap;->getWidth()I
 
-    move-result v7
+    move-result v0
 
     invoke-virtual {v4}, Landroid/graphics/Bitmap;->getHeight()I
 
-    move-result v4
+    move-result v1
 
-    aget-object v8, v0, v21
+    aget-object v3, v7, v17
 
-    invoke-static {v8}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
+    invoke-static {v3}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
 
-    move-result-object v8
+    move-result-object v3
 
-    const/4 v9, 0x1
+    const/4 v4, 0x1
 
-    aget-object v0, v0, v9
+    aget-object v4, v7, v4
 
-    invoke-static {v0}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
+    invoke-static {v4}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
 
-    move-result-object v0
+    move-result-object v4
 
-    new-instance v9, Ljava/lang/StringBuilder;
+    new-instance v7, Ljava/lang/StringBuilder;
 
-    invoke-direct {v9}, Ljava/lang/StringBuilder;-><init>()V
+    invoke-direct {v7}, Ljava/lang/StringBuilder;-><init>()V
 
     const-string v12, "frame size: saved plate "
 
-    invoke-virtual {v9, v12}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v12}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v7}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v0}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v11}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v10}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v4}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
-    const-string v4, " padded to "
+    const-string v0, " padded to "
 
-    invoke-virtual {v9, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v3}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v8}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v11}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v10}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v6}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v5}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
-    const-string v3, " (edges extended), port "
+    const-string v0, " (edges extended, scale "
 
-    invoke-virtual {v9, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v8}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v11}, Ljava/lang/StringBuilder;->append(F)Ljava/lang/StringBuilder;
 
-    const-string v3, ", land "
+    const-string v0, "), port "
 
-    invoke-virtual {v9, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v7, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    invoke-virtual {v9}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+    const-string v0, ", land "
+
+    invoke-virtual {v7, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v7, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v7}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
 
     move-result-object v0
 
     invoke-static {v2, v0}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    invoke-virtual {v1}, Ljava/lang/Object;->getClass()Ljava/lang/Class;
+    invoke-virtual/range {p0 .. p0}, Ljava/lang/Object;->getClass()Ljava/lang/Class;
 
     move-result-object v0
+
+    const-class v1, Ljava/lang/Object;
 
     const-class v3, Ljava/lang/Object;
 
-    const-class v4, Ljava/lang/Object;
+    filled-new-array {v1, v3}, [Ljava/lang/Class;
 
-    filled-new-array {v3, v4}, [Ljava/lang/Class;
+    move-result-object v1
 
-    move-result-object v3
-
-    invoke-virtual {v0, v3}, Ljava/lang/Class;->getConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;
+    invoke-virtual {v0, v1}, Ljava/lang/Class;->getConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;
 
     move-result-object v0
 
-    filled-new-array {v10, v5}, [Ljava/lang/Object;
+    filled-new-array {v9, v6}, [Ljava/lang/Object;
 
-    move-result-object v3
+    move-result-object v1
 
-    invoke-virtual {v0, v3}, Ljava/lang/reflect/Constructor;->newInstance([Ljava/lang/Object;)Ljava/lang/Object;
+    invoke-virtual {v0, v1}, Ljava/lang/reflect/Constructor;->newInstance([Ljava/lang/Object;)Ljava/lang/Object;
 
     move-result-object v0
     :try_end_1
@@ -2413,13 +2580,13 @@
     :catchall_0
     move-exception v0
 
-    const-string v3, "frame size: save padding"
+    const-string v1, "frame size: save padding"
 
-    invoke-static {v2, v3, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
+    invoke-static {v2, v1, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    :cond_7
-    :goto_2
-    return-object v1
+    :cond_b
+    :goto_3
+    return-object p0
 .end method
 
 .method static scale(Landroid/graphics/RectF;FFF)V

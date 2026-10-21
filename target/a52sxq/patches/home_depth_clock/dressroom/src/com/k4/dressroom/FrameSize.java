@@ -40,8 +40,8 @@ import java.util.WeakHashMap;
  * <p>
  * Grabbing: a gesture starting on a plate or anywhere outside the hole sizes the frame at once; a pinch whose second
  * finger lands while either finger is on the frame or within {@link #BAND_DP} inside the hole's edge takes over too (a
- * one-finger drag there still moves the picture). The hole never grows so far that less than {@link #EDGE} of the screen's
- * shorter side (at least {@link #EDGE_DP}) of frame stays visible around it, so there is always frame left to pinch.
+ * one-finger drag there still moves the picture). The hole stops growing before the last side with a band of frame of at
+ * least {@link #EDGE} of the screen's shorter side (at least {@link #EDGE_DP}) loses it, so there is always frame left to pinch.
  * Smaller than Samsung's plates allow (the base plate no longer covering the screen): the plates are drawn and saved
  * with their edge pixels extended ({@link #drawPlate}, {@link #saveResult}), down to {@link #MIN} of Samsung's size.
  */
@@ -206,12 +206,15 @@ public final class FrameSize {
         }
         float hx = hole.centerX(), hy = hole.centerY(), w = v.getWidth(), h = v.getHeight();
         float m = Math.max(EDGE * Math.min(w, h), EDGE_DP * v.getResources().getDisplayMetrics().density);
-        // hole is drawn at scaled(); the factor (against now) that puts each side at the margin
-        float kmax = MAX / sScale;
-        if (hole.left < hx) kmax = Math.min(kmax, (hx - m) / (hx - hole.left));
-        if (hole.right > hx) kmax = Math.min(kmax, (w - m - hx) / (hole.right - hx));
-        if (hole.top < hy) kmax = Math.min(kmax, (hy - m) / (hy - hole.top));
-        if (hole.bottom > hy) kmax = Math.min(kmax, (h - m - hy) / (hole.bottom - hy));
+        // the hole is drawn at scaled(): the factor (against now) at which each side's band of frame shrinks to the margin.
+        // It may grow while at least one side still has that band to pinch (a hole that already reaches the screen edge on
+        // one side, like Samsung's heart, still grows into the space above and below it).
+        float band = 0f;
+        if (hole.left < hx) band = Math.max(band, (hx - m) / (hx - hole.left));
+        if (hole.right > hx) band = Math.max(band, (w - m - hx) / (hole.right - hx));
+        if (hole.top < hy) band = Math.max(band, (hy - m) / (hy - hole.top));
+        if (hole.bottom > hy) band = Math.max(band, (h - m - hy) / (hole.bottom - hy));
+        float kmax = Math.min(MAX / sScale, band);
         sHx = hx;
         sHy = hy;
         sVw = w;
@@ -474,8 +477,22 @@ public final class FrameSize {
             if (l < 0.5f && t < 0.5f && r < 0.5f && b < 0.5f) {
                 return pair;
             }
-            int pl = (int) Math.ceil(l), pt = (int) Math.ceil(t), nw = pl + (int) w + (int) Math.ceil(r), nh = pt + (int) h + (int) Math.ceil(b);
-            if ((long) nw * nh > 64L * 1024 * 1024) {
+            // The layers only ever show their rect at screen size (layer field c), and a small frame makes the rects about
+            // 1/k as big as the plate: keep only the resolution the screen needs (never more than the plate's own).
+            float sc = 0f;
+            Object[] ls = {HomeClock.field(layers, "a"), HomeClock.field(layers, "b")};
+            for (int i = 0; i < rs.length; i++) {
+                RectF scr = (RectF) HomeClock.field(ls[i], "c");
+                if (scr != null && rs[i].width() > 0 && rs[i].height() > 0) {
+                    sc = Math.max(sc, Math.max(scr.width() / rs[i].width(), scr.height() / rs[i].height()));
+                }
+            }
+            if (sc <= 0f || sc > 1f) {
+                sc = 1f;
+            }
+            int pl = (int) Math.ceil(l), pt = (int) Math.ceil(t);
+            int nw = (int) Math.ceil((pl + w + Math.ceil(r)) * sc), nh = (int) Math.ceil((pt + h + Math.ceil(b)) * sc);
+            if ((long) nw * nh > 40L * 1024 * 1024) {
                 Log.w(TAG, "frame size: padded plate would be " + nw + "x" + nh + ", saved without");
                 return pair;
             }
@@ -483,15 +500,17 @@ public final class FrameSize {
             BitmapShader sh = new BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
             Matrix lm = new Matrix();
             lm.setTranslate(pl, pt);
+            lm.postScale(sc, sc);
             sh.setLocalMatrix(lm);
-            Paint paint = new Paint();
+            Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
             paint.setShader(sh);
             new Canvas(out).drawRect(0, 0, nw, nh, paint);
             for (RectF x : rs) {
                 x.offset(pl, pt);
+                x.set(x.left * sc, x.top * sc, x.right * sc, x.bottom * sc);
             }
             Log.i(TAG, "frame size: saved plate " + bmp.getWidth() + "x" + bmp.getHeight() + " padded to " + nw + "x" + nh
-                    + " (edges extended), port " + rs[0] + ", land " + rs[1]);
+                    + " (edges extended, scale " + sc + "), port " + rs[0] + ", land " + rs[1]);
             return pair.getClass().getConstructor(Object.class, Object.class).newInstance(out, layers);
         } catch (Throwable t) {
             Log.e(TAG, "frame size: save padding", t);
