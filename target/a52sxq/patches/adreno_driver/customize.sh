@@ -89,6 +89,7 @@ if ! grep -q "^; k4 gpu driver selector" "$PLAT_CIL"; then
     } >> "$PLAT_CIL"
 fi
 
-SET_PROP "vendor" "ro.k4.gpu_drivers" "$GPU_DEFAULT $GPU_SETS"
+# read by Settings (GpuDriverPreferenceController): a system prop; init does not load ro.k4.* from the vendor build.prop
+SET_PROP "system" "ro.k4.gpu_drivers" "$GPU_DEFAULT $GPU_SETS"
 LOG "- GPU driver selector: stock V@0$GPU_DEFAULT default, V@0${GPU_SETS// /, V@0} selectable"
 unset GPU_DEFAULT GPU_SETS VK13 SRC LABEL VKXML RC PLAT_CIL v t d f
