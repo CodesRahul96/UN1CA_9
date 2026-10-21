@@ -5,7 +5,7 @@
     <com.samsung.android.settings.widget.SecInsetCategoryPreference />
     <SecSwitchPreference android:title="@string/unica_vulkan_title" android:key="unica_vulkan" android:summary="@string/unica_vulkan_summary" settings:controller="io.mesalabs.unica.settings.ui.VulkanPreferenceController" />
     <com.samsung.android.settings.widget.SecInsetCategoryPreference />
-    <com.samsung.android.settings.widget.SecUnclickablePreference android:title="@string/k4_gpu_driver_active_title" android:key="k4_gpu_driver_active" />
+    <SecPreference android:title="@string/k4_gpu_driver_active_title" android:key="k4_gpu_driver_active" android:selectable="false" />
     <SecDropDownPreference android:title="@string/k4_gpu_driver_title" android:key="k4_gpu_driver" android:entries="@array/k4_gpu_driver_entries" android:entryValues="@array/k4_gpu_driver_values" android:persistent="false" settings:controller="io.mesalabs.unica.settings.ui.GpuDriverPreferenceController" />
     <com.android.settingslib.widget.BannerMessagePreference android:title="@string/k4_gpu_driver_restart_title" android:key="k4_gpu_driver_restart" settings:isPreferenceVisible="false" />
     <com.samsung.android.settings.widget.SecInsetCategoryPreference />
