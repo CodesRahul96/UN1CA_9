@@ -395,11 +395,14 @@ else:
     print("  - SaveImageMaker.g -> FrameSize.saveRatios")
 # the saved front plate (FRAME_BOTTOM task: the plate copy just before SaveImageMaker.g) below Samsung's size: the faded
 # base plate (FrameSize.saveFront), so the pop-out fades into the frame on the home screen as in the editor
-f = by_text('"frame_bottom.png"')
-s6 = open(f).read()
-assert '"frame_base.png"' in s6, "frame plate save task: frame_base.png"
-b6 = method(s6, "public final run()V")
 gcall = "    invoke-virtual {v0, v1, p0}, Ld7/z;->g(Landroid/graphics/drawable/Drawable;Lva/p;)Lva/p;\n"
+# "frame_bottom.png" is in 6 classes (SaveImageMaker, the editor, loaders): the task is the Runnable that saves both plates via g
+hits = [f for f in glob.glob(root + "/smali*/**/*.smali", recursive=True)
+        if all(t in open(f).read() for t in ('"frame_bottom.png"', '"frame_base.png"', ".implements Ljava/lang/Runnable;", gcall))]
+assert len(hits) == 1, "frame plate save task: %d classes" % len(hits)
+f = hits[0]
+s6 = open(f).read()
+b6 = method(s6, "public final run()V")
 if FS + "->saveFront" in b6:
     print("  - frame_bottom save already hooked")
 else:
