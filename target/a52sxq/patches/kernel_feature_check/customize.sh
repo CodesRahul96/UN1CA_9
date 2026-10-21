@@ -24,6 +24,17 @@ if ! grep -q -x -F "(type k4kcheck)" "$CIL"; then
     [ "$(grep -c "^(typeattributeset domain (" "$CIL")" = 1 ] || ABORT "kernel_feature_check: no single domain attribute set in plat_sepolicy.cil"
     sed -i "s/^(typeattributeset domain (/(typeattributeset domain (k4kcheck /" "$CIL"
     grep -q "^(typeattributeset domain (k4kcheck " "$CIL" || ABORT "kernel_feature_check: failed to add k4kcheck to domain"
+    # its own property type for sys.k4.kernel.* (it used to set any system_prop): a platform-private system property
+    # (init's property area + dumpstate via property_type; shell reads it in sepolicy.cil)
+    for a in property_type system_property_type; do
+        [ "$(grep -c "^(typeattributeset $a (" "$CIL")" = 1 ] || ABORT "kernel_feature_check: no single $a attribute set in plat_sepolicy.cil"
+        sed -i "s/^(typeattributeset $a (/(typeattributeset $a (k4_kernel_prop /" "$CIL"
+        grep -q "^(typeattributeset $a (k4_kernel_prop " "$CIL" || ABORT "kernel_feature_check: failed to add k4_kernel_prop to $a"
+    done
+    PC="$SYS/etc/selinux/plat_property_contexts"
+    grep -q "^sys\.k4\.kernel\." "$PC" && ABORT "kernel_feature_check: sys.k4.kernel. already in plat_property_contexts"
+    [ -z "$(tail -c 1 "$PC")" ] || echo >> "$PC"
+    echo "sys.k4.kernel.          u:object_r:k4_kernel_prop:s0" >> "$PC"
     [ -z "$(tail -c 1 "$CIL")" ] || echo >> "$CIL"
     cat "$SRC/sepolicy.cil" >> "$CIL"
     # Vendor sysfs labels (battery/pass_through, kgsl): only if this vendor defines them; without them those probes
@@ -41,4 +52,4 @@ grep -q -x -F "(allow k4kcheck shell_exec (file (read getattr map execute open e
     ABORT "kernel_feature_check: k4kcheck rules missing from plat_sepolicy.cil"
 
 LOG "- Added k4-kernel-diag and the boot-time kernel check (logcat K4KernelCheck, sys.k4.kernel.*)"
-unset SRC SYS CIL VCIL RULE t
+unset SRC SYS CIL VCIL RULE t a PC

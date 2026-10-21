@@ -58,12 +58,12 @@ cat <<'EOF' >> "$SEPOLICY"
 ; init -> prophide_exec -> prophide
 (typetransition init prophide_exec process prophide)
 (allow init prophide (process (transition)))
-(allow init prophide (process (noatsecure rlimitinh siginh)))
+(allow init prophide (process (rlimitinh siginh)))
 (allow init prophide (fd (use)))
 ; prophide -> init_exec -> init
 (typetransition prophide init_exec process init)
 (allow prophide init (process (transition)))
-(allow prophide init (process (noatsecure rlimitinh siginh)))
+(allow prophide init (process (rlimitinh siginh)))
 ; block access
 (allow prophide block_device (blk_file (read open getattr ioctl)))
 ; allow calling init_exec by escalating when needed
