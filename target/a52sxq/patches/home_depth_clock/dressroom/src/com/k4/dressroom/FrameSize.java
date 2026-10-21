@@ -4,12 +4,16 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -44,6 +48,12 @@ import java.util.WeakHashMap;
  * least {@link #EDGE} of the screen's shorter side (at least {@link #EDGE_DP}) loses it, so there is always frame left to pinch.
  * Smaller than Samsung's plates allow (the base plate no longer covering the screen): the plates are drawn and saved
  * with their edge pixels extended ({@link #drawPlate}, {@link #saveResult}), down to {@link #MIN} of Samsung's size.
+ * <p>
+ * Pop-out: Samsung's FRAME_BOTTOM plate (in front of the subject) is the frame below one straight line through the hole,
+ * so the subject shows over the frame above that line across the whole width. With a smaller hole that line cuts the
+ * subject straight across beside the hole; below Samsung's size the front plate is therefore the full FRAME_BASE plate
+ * faded in across that line ({@link #FADE} of the screen height either side), so the subject fades into the frame there
+ * while the hole's own outline stays sharp ({@link #frontPlate}; editor in {@link #drawPlate}, save in {@link #saveFront}).
  */
 public final class FrameSize {
     static final String TAG = HomeClock.TAG;
@@ -55,6 +65,8 @@ public final class FrameSize {
     static final float EDGE_DP = 40f;
     /** Band inside the hole's edge where a pinch still grabs the frame. */
     static final float BAND_DP = 36f;
+    /** Half the width of the pop-out fade across the front plate's line, as a share of the screen height. */
+    static final float FADE = 0.035f;
 
     /** Kept size (1 = Samsung's), and the extra factor while the fingers move. */
     private static volatile float sScale = 1f;
@@ -245,6 +257,28 @@ public final class FrameSize {
             return 1;
         }
         Drawable d = ((ImageView) v).getDrawable();
+        if ("FRAME_BASE".equals(EditXf.viewType(v))) {
+            sBaseView = new WeakReference<>(v);
+        }
+        if (k < 1f && d != null && "FRAME_BOTTOM".equals(EditXf.viewType(v))) {
+            View base = EditXf.frameView(v, "FRAME_BASE");
+            Drawable bd = base instanceof ImageView ? ((ImageView) base).getDrawable() : null;
+            if (bd != null && d.getBounds().width() > 0 && d.getBounds().height() > 0) {
+                try {
+                    Matrix m = EditXf.imageMatrix((ImageView) v);
+                    m.postScale(k, k, hole.centerX(), hole.centerY());
+                    // the fade is FADE of the view height on screen: in plate pixels through the plate's own scale
+                    float ramp = FADE * v.getHeight() / Math.max(1e-3f, m.mapRadius(1f));
+                    Bitmap front = frontPlate(bd, d, d.getBounds().width(), d.getBounds().height(), ramp, true);
+                    if (front != null) {
+                        drawBitmapClamped(v, c, front, d.getBounds(), m);
+                        return 2;
+                    }
+                } catch (Throwable t) {
+                    Log.e(TAG, "frame size: front plate", t);
+                }
+            }
+        }
         if (d != null && d.getBounds().width() > 0 && d.getBounds().height() > 0) {
             Matrix m = EditXf.imageMatrix((ImageView) v);
             m.postScale(k, k, hole.centerX(), hole.centerY());
@@ -277,6 +311,11 @@ public final class FrameSize {
         Canvas bc = new Canvas(bmp);
         bc.translate(-b.left, -b.top);
         d.draw(bc);
+        drawBitmapClamped(v, c, bmp, b, toView);
+    }
+
+    /** bmp (the plate drawn at its drawable bounds b) over the whole view through toView, edge pixels extended. */
+    static void drawBitmapClamped(View v, Canvas c, Bitmap bmp, Rect b, Matrix toView) {
         BitmapShader sh = new BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
         Matrix lm = new Matrix();
         lm.setTranslate(b.left, b.top);
@@ -285,6 +324,139 @@ public final class FrameSize {
         Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
         paint.setShader(sh);
         c.drawRect(0, 0, v.getWidth(), v.getHeight(), paint);
+    }
+
+    /** The editor's FRAME_BASE view (the save of the front plate needs its drawable). */
+    private static WeakReference<View> sBaseView = new WeakReference<>(null);
+    /** Editor cache of the faded front plate: rebuilt when a drawable, the colour or the fade changes. */
+    private static Bitmap sFront;
+    private static Object[] sFrontKey;
+
+    /**
+     * The front plate below Samsung's size: the base plate (drawn w x h, with its colour filter) faded in across the
+     * front plate's straight line (alpha 0 at line - ramp, full at line + ramp), so the subject fades into the frame there.
+     * null when the front plate has no clear straight line (then Samsung's plate is used).
+     */
+    static Bitmap frontPlate(Drawable base, Drawable bottom, int w, int h, float ramp, boolean cache) {
+        Object[] key = {base, bottom, base.getColorFilter(), bottom.getColorFilter(), w, h, Math.round(ramp)};
+        if (cache && sFront != null && sFrontKey != null && java.util.Arrays.equals(key, sFrontKey)) {
+            return sFront;
+        }
+        float line = lineOf(bottom, w, h);
+        if (line < 0f) {
+            return null;
+        }
+        Bitmap out = cache && sFront != null && sFront.getWidth() == w && sFront.getHeight() == h ? sFront
+                : Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        out.eraseColor(0);
+        Canvas oc = new Canvas(out);
+        Drawable bc = copy(base);
+        bc.setBounds(0, 0, w, h);
+        bc.draw(oc);
+        Paint fade = new Paint();
+        fade.setShader(new LinearGradient(0f, line - ramp, 0f, line + ramp, 0x00000000, 0xFF000000, Shader.TileMode.CLAMP));
+        fade.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+        oc.drawRect(0, 0, w, h, fade);
+        if (cache) {
+            sFront = out;
+            sFrontKey = key;
+        }
+        return out;
+    }
+
+    /** A copy to draw at other bounds without touching the editor's drawable (same colour filter). */
+    static Drawable copy(Drawable d) {
+        Drawable.ConstantState cs = d.getConstantState();
+        Drawable c = cs != null ? cs.newDrawable().mutate() : d;
+        if (c != d) {
+            c.setColorFilter(d.getColorFilter());
+            c.setAlpha(d.getAlpha());
+        }
+        return c;
+    }
+
+    /** Samsung's straight line in the front plate (w x h): the first opaque row most columns share, or -1 if none. */
+    private static final WeakHashMap<Object, float[]> sLines = new WeakHashMap<>();
+
+    static float lineOf(Drawable bottom, int w, int h) {
+        Object id = bottom.getConstantState() != null ? bottom.getConstantState() : bottom;
+        float[] c = sLines.get(id);
+        if (c != null && c[1] == w && c[2] == h) {
+            return c[0];
+        }
+        int sw = Math.max(1, w / 4), sh = Math.max(1, h / 4);
+        Bitmap px = Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888);
+        Canvas pc = new Canvas(px);
+        pc.scale(sw / (float) w, sh / (float) h);
+        Drawable bc = copy(bottom);
+        bc.setBounds(0, 0, w, h);
+        bc.draw(pc);
+        int[] count = new int[sh + 1];
+        int[] row = new int[sw];
+        int cols = 0;
+        int[] first = new int[sw];
+        java.util.Arrays.fill(first, -1);
+        for (int y = 0; y < sh; y++) {
+            px.getPixels(row, 0, sw, 0, y, sw, 1);
+            for (int x = 0; x < sw; x++) {
+                if (first[x] < 0 && (row[x] >>> 24) > 128) {
+                    first[x] = y;
+                }
+            }
+        }
+        for (int f : first) {
+            if (f >= 0) {
+                count[f]++;
+                cols++;
+            }
+        }
+        int best = -1;
+        for (int y = 0; y < sh; y++) {
+            if (best < 0 || count[y] > count[best]) {
+                best = y;
+            }
+        }
+        px.recycle();
+        float line = best >= 0 && cols > 0 && count[best] * 10 >= sw * 3 ? (best + 0.5f) * h / (float) sh : -1f;
+        sLines.put(id, new float[] {line, w, h});
+        return line;
+    }
+
+    /**
+     * Save of the front plate (FRAME_BOTTOM task, right before SaveImageMaker.g, with that plate's copy and its (port,
+     * land) margins): below Samsung's size the faded base plate instead, so the home screen shows the editor's pop-out.
+     */
+    public static Drawable saveFront(Drawable bottom, Object pair) {
+        float k = sScale;
+        if (bottom == null || !HomeClock.active || k >= 1f) {
+            return bottom;
+        }
+        try {
+            View bv = sBaseView.get();
+            Drawable live = bv instanceof ImageView ? ((ImageView) bv).getDrawable() : null;
+            Drawable base = live != null && live.getConstantState() != null ? live.getConstantState().newDrawable() : null;
+            int w = bottom.getIntrinsicWidth(), h = bottom.getIntrinsicHeight();
+            if (base == null || w <= 0 || h <= 0) {
+                Log.w(TAG, "frame size: no base plate for the saved front plate, Samsung's kept");
+                return bottom;
+            }
+            base.setColorFilter(bottom.getColorFilter());
+            // plate pixels per screen pixel for the saved portrait crop (Samsung's margins, hole k times as big)
+            RectF port = (RectF) HomeClock.field(pair, "a");
+            android.util.DisplayMetrics dm = android.content.res.Resources.getSystem().getDisplayMetrics();
+            float sw = Math.min(dm.widthPixels, dm.heightPixels), sh = Math.max(dm.widthPixels, dm.heightPixels);
+            float perScreen = port != null ? (1f - port.left - port.right) * w / k / sw : 1f;
+            Bitmap front = frontPlate(base, bottom, w, h, FADE * sh * perScreen, false);
+            if (front == null) {
+                return bottom;
+            }
+            front.setDensity(Bitmap.DENSITY_NONE);
+            Log.i(TAG, String.format(java.util.Locale.US, "frame size: saved front plate faded (%dx%d, fade %.0f px)", w, h, FADE * sh * perScreen));
+            return new BitmapDrawable(null, front);
+        } catch (Throwable t) {
+            Log.e(TAG, "frame size: saved front plate", t);
+            return bottom;
+        }
     }
 
     /**

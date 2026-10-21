@@ -393,6 +393,23 @@ else:
     assert b5.count("    .locals %d\n\n" % nlocals(b5)) == 1
     open(f, "w").write(s5.replace(b5, xpatch_fs(b5), 1))
     print("  - SaveImageMaker.g -> FrameSize.saveRatios")
+# the saved front plate (FRAME_BOTTOM task: the plate copy just before SaveImageMaker.g) below Samsung's size: the faded
+# base plate (FrameSize.saveFront), so the pop-out fades into the frame on the home screen as in the editor
+f = by_text('"frame_bottom.png"')
+s6 = open(f).read()
+assert '"frame_base.png"' in s6, "frame plate save task: frame_base.png"
+b6 = method(s6, "public final run()V")
+gcall = "    invoke-virtual {v0, v1, p0}, Ld7/z;->g(Landroid/graphics/drawable/Drawable;Lva/p;)Lva/p;\n"
+if FS + "->saveFront" in b6:
+    print("  - frame_bottom save already hooked")
+else:
+    i = b6.index(gcall)
+    assert i < b6.index('"frame_bottom.png"') < b6.index('"frame_base.png"'), "frame plate save task: branch order"
+    hook = ("    invoke-static {v1, p0}, %s->saveFront(Landroid/graphics/drawable/Drawable;Ljava/lang/Object;)Landroid/graphics/drawable/Drawable;\n\n"
+            "    move-result-object v1\n\n" % FS)
+    nb = b6[:i] + hook + b6[i:]
+    open(f, "w").write(s6.replace(b6, nb, 1))
+    print("  - frame_bottom save -> FrameSize.saveFront")
 # the frame paths of the clock fit (EditorStretchAreaMediatorImpl.updateCroppedFramePath, p8.h0.o) at the frame size
 f = one("p8/h0.smali")
 assert '"updateCroppedFramePath: "' in open(f).read(), "p8.h0 updateCroppedFramePath"
