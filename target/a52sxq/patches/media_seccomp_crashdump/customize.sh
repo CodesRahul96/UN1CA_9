@@ -8,6 +8,10 @@
 python3 - "$WORK_DIR" << 'PYEOF' || ABORT "Failed to update the codec HAL seccomp policies"
 import os, re, sys
 wd = sys.argv[1]
+# The crash_dump policy allows setsockopt unconditionally; the only caller on the stack dump path is liblog's LogdRead
+# (tombstone log section): setsockopt(fd, SOL_SOCKET=1, SO_RCVTIMEO_OLD=20 / SO_SNDTIMEO_OLD=21), on arm and arm64 alike.
+# Numbers, not names: the 32-bit VNDK libminijail does not know SO_SNDTIMEO.
+NARROW = {"setsockopt": "setsockopt: arg1 == 1 && arg2 == 20 || arg1 == 1 && arg2 == 21"}
 crash = {a: os.path.join(wd, "system/system/etc/seccomp_policy/crash_dump.%s.policy" % a) for a in ("arm", "arm64")}
 # policy file -> (binary using it, arch of that binary)
 targets = [
@@ -43,7 +47,7 @@ for pol, binary, arch in targets:
     with open(pol_p, "a") as f:
         f.write("\n# Android 17 crash_dump additions (a52sxq media_seccomp_crashdump)\n")
         for n in missing:
-            f.write(want[n] + "\n")
+            f.write(NARROW.get(n, want[n]) + "\n")
     print("%s: added %s" % (pol, " ".join(missing)))
 PYEOF
 LOG "- Codec2 HAL seccomp policies allow the Android 17 crash_dump syscalls"
@@ -54,6 +58,10 @@ LOG "- Codec2 HAL seccomp policies allow the Android 17 crash_dump syscalls"
 python3 - "$WORK_DIR" << 'PYEOF' || ABORT "Failed to update the vendor seccomp policies"
 import glob, os, sys
 wd = sys.argv[1]
+# The crash_dump policy allows setsockopt unconditionally; the only caller on the stack dump path is liblog's LogdRead
+# (tombstone log section): setsockopt(fd, SOL_SOCKET=1, SO_RCVTIMEO_OLD=20 / SO_SNDTIMEO_OLD=21), on arm and arm64 alike.
+# Numbers, not names: the 32-bit VNDK libminijail does not know SO_SNDTIMEO.
+NARROW = {"setsockopt": "setsockopt: arg1 == 1 && arg2 == 20 || arg1 == 1 && arg2 == 21"}
 crash = {a: os.path.join(wd, "system/system/etc/seccomp_policy/crash_dump.%s.policy" % a) for a in ("arm", "arm64")}
 def rules(path):
     out = {}
@@ -80,7 +88,7 @@ for pol_p in sorted(glob.glob(os.path.join(wd, "vendor/etc/seccomp_policy/*"))):
     with open(pol_p, "a") as f:
         f.write("\n# Android 17 crash_dump additions (a52sxq media_seccomp_crashdump)\n")
         for n in missing:
-            f.write(want[n] + "\n")
+            f.write(NARROW.get(n, want[n]) + "\n")
     print("%s (%s): added %s" % (name, arch, " ".join(missing)))
 PYEOF
 LOG "- Vendor HAL seccomp policies allow the Android 17 crash_dump syscalls"
