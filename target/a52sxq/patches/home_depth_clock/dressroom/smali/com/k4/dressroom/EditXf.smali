@@ -2674,15 +2674,15 @@
 .end method
 
 .method static drawFramed(Landroid/view/View;Landroid/graphics/Canvas;)Z
-    .locals 3
+    .locals 4
 
     sget-boolean v0, Lcom/k4/dressroom/HomeClock;->active:Z
 
     const/4 v1, 0x0
 
-    if-eqz v0, :cond_3
+    if-eqz v0, :cond_4
 
-    if-eqz p0, :cond_3
+    if-eqz p0, :cond_4
 
     invoke-virtual {p0}, Ljava/lang/Object;->getClass()Ljava/lang/Class;
 
@@ -2703,27 +2703,36 @@
     goto :goto_0
 
     :cond_0
-    invoke-static {p0, p1}, Lcom/k4/dressroom/FrameSize;->drawPlate(Landroid/view/View;Landroid/graphics/Canvas;)Z
+    invoke-static {p0, p1}, Lcom/k4/dressroom/FrameSize;->drawPlate(Landroid/view/View;Landroid/graphics/Canvas;)I
 
     move-result v0
 
-    if-nez v0, :cond_3
+    const/4 v2, 0x2
+
+    const/4 v3, 0x1
+
+    if-ne v0, v2, :cond_1
+
+    return v3
+
+    :cond_1
+    if-eq v0, v3, :cond_4
 
     invoke-static {}, Lcom/k4/dressroom/EditXf;->identity()Z
 
     move-result v0
 
-    if-nez v0, :cond_3
+    if-nez v0, :cond_4
 
     invoke-static {p0}, Lcom/k4/dressroom/EditXf;->frameTarget(Landroid/view/View;)Z
 
     move-result v0
 
-    if-nez v0, :cond_1
+    if-nez v0, :cond_2
 
     goto :goto_0
 
-    :cond_1
+    :cond_2
     :try_start_0
     const-string v0, "FRAME_BACKGROUND"
 
@@ -2735,7 +2744,7 @@
 
     move-result v0
 
-    if-eqz v0, :cond_2
+    if-eqz v0, :cond_3
 
     invoke-static {p0}, Lcom/k4/dressroom/EditXf;->picture(Landroid/view/View;)Landroid/graphics/Bitmap;
 
@@ -2743,7 +2752,7 @@
 
     invoke-static {p0, p1, v0}, Lcom/k4/dressroom/EditXf;->frameFill(Landroid/view/View;Landroid/graphics/Canvas;Landroid/graphics/Bitmap;)V
 
-    :cond_2
+    :cond_3
     invoke-static {p0}, Lcom/k4/dressroom/EditXf;->matrix(Landroid/view/View;)Landroid/graphics/Matrix;
 
     move-result-object p0
@@ -2763,7 +2772,7 @@
 
     invoke-static {p1, v0, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    :cond_3
+    :cond_4
     :goto_0
     return v1
 .end method

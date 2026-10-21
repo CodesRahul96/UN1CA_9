@@ -377,8 +377,14 @@ xpatch(f, "public final j(Landroid/graphics/Region;)V", at_start(
 # kept frame size; the hole / minimum zoom / picture bounds of the frame views are set through CropImageView's own setters
 FS = "Lcom/k4/dressroom/FrameSize;"
 f = by_text('"makeBackgroundImage"')
-xpatch_fs = lambda body: body.replace("    .locals %d\n\n" % nlocals(body), "    .locals %d\n\n    invoke-static {p2}, %s->saveRatios(Ljava/lang/Object;)Ljava/lang/Object;\n\n"
-                                     "    move-result-object p2\n\n    check-cast p2, Lva/p;\n\n" % (nlocals(body), FS), 1)
+def xpatch_fs(body):
+    body = body.replace("    .locals %d\n\n" % nlocals(body), "    .locals %d\n\n    invoke-static {p2}, %s->saveRatios(Ljava/lang/Object;)Ljava/lang/Object;\n\n"
+                        "    move-result-object p2\n\n    check-cast p2, Lva/p;\n\n" % (nlocals(body), FS), 1)
+    # the result too: a frame smaller than the plate covers gets its plate bitmap padded (FrameSize.saveResult)
+    ret = "    invoke-direct {p2, p1, p0}, Lva/p;-><init>(Ljava/lang/Object;Ljava/lang/Object;)V\n\n    return-object p2\n"
+    assert body.count(ret) == 1, "SaveImageMaker.g: result"
+    return body.replace(ret, ret.replace("    return-object p2\n", "    invoke-static {p2}, %s->saveResult(Ljava/lang/Object;)Ljava/lang/Object;\n\n"
+                                         "    move-result-object p2\n\n    check-cast p2, Lva/p;\n\n    return-object p2\n" % FS), 1)
 s5 = open(f).read()
 b5 = method(s5, "public final g(Landroid/graphics/drawable/Drawable;Lva/p;)Lva/p;")
 if FS in b5:

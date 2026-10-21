@@ -24,14 +24,6 @@
 # direct methods
 .method constructor <init>(Lcom/k4/dressroom/EditXf$Guide;)V
     .locals 0
-    .annotation system Ldalvik/annotation/MethodParameters;
-        accessFlags = {
-            0x8010
-        }
-        names = {
-            null
-        }
-    .end annotation
 
     iput-object p1, p0, Lcom/k4/dressroom/EditXf$Guide$1;->this$0:Lcom/k4/dressroom/EditXf$Guide;
 

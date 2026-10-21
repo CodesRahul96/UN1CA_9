@@ -1,11 +1,15 @@
 package com.k4.dressroom;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -33,11 +37,24 @@ import java.util.WeakHashMap;
  * when the size changes.</li>
  * </ul>
  * A frame change (another frame, or a new editor) starts from Samsung's size again ({@link #reset}).
+ * <p>
+ * Grabbing: a gesture starting on a plate or anywhere outside the hole sizes the frame at once; a pinch whose second
+ * finger lands while either finger is on the frame or within {@link #BAND_DP} inside the hole's edge takes over too (a
+ * one-finger drag there still moves the picture). The hole never grows so far that less than {@link #EDGE} of the screen's
+ * shorter side (at least {@link #EDGE_DP}) of frame stays visible around it, so there is always frame left to pinch.
+ * Smaller than Samsung's plates allow (the base plate no longer covering the screen): the plates are drawn and saved
+ * with their edge pixels extended ({@link #drawPlate}, {@link #saveResult}), down to {@link #MIN} of Samsung's size.
  */
 public final class FrameSize {
     static final String TAG = HomeClock.TAG;
-    /** Largest hole, against Samsung's size (smallest: as long as the base plate still covers the screen). */
+    /** Largest and smallest hole, against Samsung's size. */
     static final float MAX = 1.6f;
+    static final float MIN = 0.35f;
+    /** Frame that stays visible around the biggest hole: share of the screen's shorter side, and at least this many dp. */
+    static final float EDGE = 0.08f;
+    static final float EDGE_DP = 40f;
+    /** Band inside the hole's edge where a pinch still grabs the frame. */
+    static final float BAND_DP = 36f;
 
     /** Kept size (1 = Samsung's), and the extra factor while the fingers move. */
     private static volatile float sScale = 1f;
@@ -47,6 +64,8 @@ public final class FrameSize {
     private static float sMin, sMax, sBase, sSpan0;
     private static int sCount;
     private static boolean sGesture;
+    /** The first finger is in the band inside the hole's edge: a second finger makes the gesture size the frame. */
+    private static boolean sMaybe;
     /** Samsung's hole per view, and the scaled hole last set on it. */
     private static final WeakHashMap<View, RectF[]> sHoles = new WeakHashMap<>();
 
@@ -78,11 +97,19 @@ public final class FrameSize {
         try {
             if (act == MotionEvent.ACTION_DOWN) {
                 applyHole(v); // Samsung may have set the hole again (colour, alpha)
-                boolean plate = onPlate(v, e.getX(), e.getY());
-                sGesture = plate && begin(v);
+                int zone = zone(v, e.getX(), e.getY());
+                sGesture = zone == 2 && begin(v);
+                sMaybe = zone == 1;
                 sCount = 0;
                 Log.i(TAG, String.format(java.util.Locale.US, "frame size: touch at %.0f,%.0f on the %s", e.getX(), e.getY(),
-                        plate ? (sGesture ? "frame" : "frame (cannot size it)") : "picture"));
+                        zone == 2 ? (sGesture ? "frame" : "frame (cannot size it)") : zone == 1 ? "hole's edge" : "picture"));
+            } else if (!sGesture && act == MotionEvent.ACTION_POINTER_DOWN && e.getPointerCount() == 2) {
+                int i = e.getActionIndex();
+                if ((sMaybe || zone(v, e.getX(i), e.getY(i)) >= 1) && begin(v)) {
+                    sGesture = true; // Samsung's picture handling sees the gesture cancelled from here on
+                    sCount = 0;
+                    Log.i(TAG, "frame size: pinch at the frame's edge sizes the frame");
+                }
             }
             if (!sGesture) {
                 return false;
@@ -147,50 +174,50 @@ public final class FrameSize {
         return false;
     }
 
+    /** Where a touch at (x, y) of v lands: 2 on the frame (a plate, or outside the hole), 1 just inside the hole's edge, 0 picture. */
+    static int zone(View v, float x, float y) {
+        RectF hole = EditXf.frameRect(v);
+        if (onPlate(v, x, y) || (hole != null && !hole.contains(x, y))) {
+            return 2;
+        }
+        if (hole == null) {
+            return 0;
+        }
+        float band = BAND_DP * v.getResources().getDisplayMetrics().density;
+        RectF inner = new RectF(hole);
+        inner.inset(Math.min(band, hole.width() / 4f), Math.min(band, hole.height() / 4f));
+        return inner.contains(x, y) ? 0 : 1;
+    }
+
     static boolean plate(View p) {
         String t = EditXf.viewType(p);
         return "FRAME_BASE".equals(t) || "FRAME_BOTTOM".equals(t);
     }
 
-    /** Gesture start on the frame: how far this frame can be sized (the base plate must keep covering the screen). */
+    /**
+     * Gesture start on the frame: how far this frame can be sized. Bigger: up to {@link #MAX} of Samsung's, keeping
+     * {@link #EDGE} of frame visible around the hole; smaller: down to {@link #MIN} (the plates' edges are extended).
+     */
     static boolean begin(View v) {
         RectF hole = EditXf.frameRect(v);
-        View base = EditXf.frameView(v, "FRAME_BASE");
-        if (hole == null || base == null || v.getWidth() == 0 || v.getHeight() == 0) {
+        if (hole == null || v.getWidth() == 0 || v.getHeight() == 0 || EditXf.frameView(v, "FRAME_BASE") == null) {
             Log.w(TAG, "frame size: no frame bounds / base plate");
             return false;
         }
         float hx = hole.centerX(), hy = hole.centerY(), w = v.getWidth(), h = v.getHeight();
-        // the base plate as drawn now (view coordinates of v), and the smallest factor that keeps it over the screen
-        Drawable d = ((ImageView) base).getDrawable();
-        if (d == null) {
-            return false;
-        }
-        RectF p = new RectF(d.getBounds());
-        EditXf.imageMatrix((ImageView) base).mapRect(p);
-        p.offset(base.getLeft() - v.getLeft(), base.getTop() - v.getTop());
-        float now = scaled();
-        // p is drawn scaled by `now` about the hole's middle
-        float l = hx + (p.left - hx) * now, r = hx + (p.right - hx) * now, t = hy + (p.top - hy) * now, b = hy + (p.bottom - hy) * now;
-        float kmin = 0f;
-        if (hx > l) {
-            kmin = Math.max(kmin, hx / (hx - l));
-        }
-        if (r > hx) {
-            kmin = Math.max(kmin, (w - hx) / (r - hx));
-        }
-        if (hy > t) {
-            kmin = Math.max(kmin, hy / (hy - t));
-        }
-        if (b > hy) {
-            kmin = Math.max(kmin, (h - hy) / (b - hy));
-        }
+        float m = Math.max(EDGE * Math.min(w, h), EDGE_DP * v.getResources().getDisplayMetrics().density);
+        // hole is drawn at scaled(); the factor (against now) that puts each side at the margin
+        float kmax = MAX / sScale;
+        if (hole.left < hx) kmax = Math.min(kmax, (hx - m) / (hx - hole.left));
+        if (hole.right > hx) kmax = Math.min(kmax, (w - m - hx) / (hole.right - hx));
+        if (hole.top < hy) kmax = Math.min(kmax, (hy - m) / (hy - hole.top));
+        if (hole.bottom > hy) kmax = Math.min(kmax, (h - m - hy) / (hole.bottom - hy));
         sHx = hx;
         sHy = hy;
         sVw = w;
         sVh = h;
-        sMin = Math.max(kmin, 0.3f / sScale);
-        sMax = MAX / sScale;
+        sMin = MIN / sScale;
+        sMax = Math.max(1f, kmax); // already bigger than the margin allows (older size): it can still be made smaller
         sLive = 1f;
         Log.i(TAG, String.format(java.util.Locale.US, "frame size: %.3f now, this gesture %.3f..%.3f", sScale, sMin, sMax));
         return sMin < sMax;
@@ -198,19 +225,63 @@ public final class FrameSize {
 
     // ---- editor ----
 
-    /** MaskImageView.onDraw of a frame layout view: plates drawn at the frame size (true = a plate view). */
-    static boolean drawPlate(View v, Canvas c) {
+    /**
+     * MaskImageView.onDraw of a frame layout view: plates drawn at the frame size. 0 = not a plate view, 1 = a plate
+     * view, canvas scaled for Samsung's own draw, 2 = drawn here (smaller than the plate covers: edges extended).
+     */
+    static int drawPlate(View v, Canvas c) {
         if (!plate(v)) {
-            return false;
+            return 0;
         }
         float k = scaled();
-        if (k != 1f) {
-            RectF hole = EditXf.frameRect(v);
-            if (hole != null) {
-                c.scale(k, k, hole.centerX(), hole.centerY());
+        if (k == 1f) {
+            return 1;
+        }
+        RectF hole = EditXf.frameRect(v);
+        if (hole == null) {
+            return 1;
+        }
+        Drawable d = ((ImageView) v).getDrawable();
+        if (d != null && d.getBounds().width() > 0 && d.getBounds().height() > 0) {
+            Matrix m = EditXf.imageMatrix((ImageView) v);
+            m.postScale(k, k, hole.centerX(), hole.centerY());
+            RectF p = new RectF(d.getBounds());
+            m.mapRect(p);
+            if (p.left > 0.5f || p.top > 0.5f || p.right < v.getWidth() - 0.5f || p.bottom < v.getHeight() - 0.5f) {
+                try {
+                    drawClamped(v, c, d, m);
+                    return 2;
+                } catch (Throwable t) {
+                    Log.e(TAG, "frame size: plate", t);
+                }
             }
         }
-        return true;
+        c.scale(k, k, hole.centerX(), hole.centerY());
+        return 1;
+    }
+
+    /** The plate (with Samsung's colour filter / alpha, as its drawable draws) over the whole view, edge pixels extended. */
+    private static final WeakHashMap<View, Bitmap> sPlateBmp = new WeakHashMap<>();
+
+    static void drawClamped(View v, Canvas c, Drawable d, Matrix toView) {
+        Rect b = d.getBounds();
+        Bitmap bmp = sPlateBmp.get(v);
+        if (bmp == null || bmp.getWidth() != b.width() || bmp.getHeight() != b.height()) {
+            bmp = Bitmap.createBitmap(b.width(), b.height(), Bitmap.Config.ARGB_8888);
+            sPlateBmp.put(v, bmp);
+        }
+        bmp.eraseColor(0);
+        Canvas bc = new Canvas(bmp);
+        bc.translate(-b.left, -b.top);
+        d.draw(bc);
+        BitmapShader sh = new BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+        Matrix lm = new Matrix();
+        lm.setTranslate(b.left, b.top);
+        lm.postConcat(toView);
+        sh.setLocalMatrix(lm);
+        Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+        paint.setShader(sh);
+        c.drawRect(0, 0, v.getWidth(), v.getHeight(), paint);
     }
 
     /**
@@ -370,6 +441,60 @@ public final class FrameSize {
             return pair.getClass().getConstructor(Object.class, Object.class).newInstance(p, l);
         } catch (Throwable t) {
             Log.e(TAG, "frame size: save", t);
+            return pair;
+        }
+    }
+
+    /**
+     * SaveImageMaker.g end ((plate bitmap, (port, land) layers)): when the frame is smaller than the plate covers, the
+     * layers' showing rects reach past the plate bitmap; the bitmap is padded with its edge pixels extended and the
+     * rects moved onto it, so the home screen draws the frame edge to edge like the editor.
+     */
+    public static Object saveResult(Object pair) {
+        if (pair == null || !HomeClock.active || sScale >= 1f) {
+            return pair;
+        }
+        try {
+            Bitmap bmp = (Bitmap) HomeClock.field(pair, "a");
+            Object layers = HomeClock.field(pair, "b");
+            if (bmp == null || layers == null) {
+                return pair;
+            }
+            RectF[] rs = {(RectF) HomeClock.field(HomeClock.field(layers, "a"), "b"), (RectF) HomeClock.field(HomeClock.field(layers, "b"), "b")};
+            float w = bmp.getWidth(), h = bmp.getHeight(), l = 0f, t = 0f, r = 0f, b = 0f;
+            for (RectF x : rs) {
+                if (x == null) {
+                    return pair;
+                }
+                l = Math.max(l, -x.left);
+                t = Math.max(t, -x.top);
+                r = Math.max(r, x.right - w);
+                b = Math.max(b, x.bottom - h);
+            }
+            if (l < 0.5f && t < 0.5f && r < 0.5f && b < 0.5f) {
+                return pair;
+            }
+            int pl = (int) Math.ceil(l), pt = (int) Math.ceil(t), nw = pl + (int) w + (int) Math.ceil(r), nh = pt + (int) h + (int) Math.ceil(b);
+            if ((long) nw * nh > 64L * 1024 * 1024) {
+                Log.w(TAG, "frame size: padded plate would be " + nw + "x" + nh + ", saved without");
+                return pair;
+            }
+            Bitmap out = Bitmap.createBitmap(nw, nh, Bitmap.Config.ARGB_8888);
+            BitmapShader sh = new BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            Matrix lm = new Matrix();
+            lm.setTranslate(pl, pt);
+            sh.setLocalMatrix(lm);
+            Paint paint = new Paint();
+            paint.setShader(sh);
+            new Canvas(out).drawRect(0, 0, nw, nh, paint);
+            for (RectF x : rs) {
+                x.offset(pl, pt);
+            }
+            Log.i(TAG, "frame size: saved plate " + bmp.getWidth() + "x" + bmp.getHeight() + " padded to " + nw + "x" + nh
+                    + " (edges extended), port " + rs[0] + ", land " + rs[1]);
+            return pair.getClass().getConstructor(Object.class, Object.class).newInstance(out, layers);
+        } catch (Throwable t) {
+            Log.e(TAG, "frame size: save padding", t);
             return pair;
         }
     }

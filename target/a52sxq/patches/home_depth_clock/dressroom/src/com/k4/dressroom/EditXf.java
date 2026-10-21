@@ -950,7 +950,11 @@ public final class EditXf {
         if (!HomeClock.active || v == null || !CROP.equals(v.getClass().getName())) {
             return false;
         }
-        if (FrameSize.drawPlate(v, c) || identity() || !frameTarget(v)) {
+        int plate = FrameSize.drawPlate(v, c);
+        if (plate == 2) {
+            return true; // plate drawn here (edges extended)
+        }
+        if (plate == 1 || identity() || !frameTarget(v)) {
             return false;
         }
         try {
