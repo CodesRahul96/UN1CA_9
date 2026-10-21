@@ -70,4 +70,14 @@
     <string name="unica_updates_title">K4_UN1CA Updates</string>
     <string name="unica_vulkan_summary">This is unstable and might cause issues!</string>
     <string name="unica_vulkan_title">Enable Vulkan renderer</string>
+    <string name="k4_gpu_driver_active_title">GPU driver in use</string>
+    <string name="k4_gpu_driver_title">GPU driver</string>
+    <string name="k4_gpu_driver_selected_active">%1$s (active)</string>
+    <string name="k4_gpu_driver_selected_pending">%1$s selected. Restart to use it.</string>
+    <string name="k4_gpu_driver_restart_title">Restart required</string>
+    <string name="k4_gpu_driver_restart_summary">%1$s will be used after a restart. Until then %2$s stays active.</string>
+    <string name="k4_gpu_driver_restart_button">Restart now</string>
+    <string name="k4_gpu_driver_failed_title">GPU driver change undone</string>
+    <string name="k4_gpu_driver_failed_summary">The phone did not finish starting with %1$s, so it went back to %2$s.</string>
+    <string name="k4_gpu_driver_failed_button">OK</string>
 </resources>

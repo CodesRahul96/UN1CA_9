@@ -253,6 +253,43 @@ while IFS= read -r f; do
     fi
 done < <(find "$MODPATH/SecSettings.apk" -type f)
 
+# The hand-written controllers (src/, compiled by src/build.sh against stubs of this SecSettings build) call methods of
+# a minified app: if a source firmware renames one, Settings would crash when the page opens. Check every reference now.
+python3 - "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk" "$MODPATH/SecSettings.apk" \
+    $(find "$MODPATH/SecSettings.apk" -path "*io/mesalabs/unica/settings/ui/GpuDriverPreferenceController*.smali") << 'PYEOF' \
+    || ABORT "SecSettings: a UN1CA controller references a method this SecSettings build does not have"
+import glob, os, re, sys
+apk, mod, files = sys.argv[1], sys.argv[2], sys.argv[3:]
+idx = {}
+for root in (apk, mod):
+    for p in glob.glob(root + "/smali*/**/*.smali", recursive=True):
+        cls = p.split("/smali", 1)[1].split("/", 1)[1][:-6]
+        idx.setdefault(cls, p)
+def info(cls):
+    s = open(idx[cls]).read()
+    sup = re.search(r"^\.super L([^;]+);", s, re.M)
+    meths = set(m.group(1) + m.group(2) for m in re.finditer(r"^\.method [^\n]*? ([^ (]+)(\([^\n]*)$", s, re.M))
+    fields = set(m.group(1) for m in re.finditer(r"^\.field [^\n]*? ([^ :]+):", s, re.M))
+    return (sup.group(1) if sup else None), meths, fields
+bad = 0
+refs = set()
+for f in files:
+    refs |= set(re.findall(r"L([^;\s]+);->([^\s]+)", open(f).read()))
+for cls, mem in sorted(refs):
+    if cls.startswith(("android/", "java/", "dalvik/")) or cls.startswith("io/mesalabs/unica/settings/ui/GpuDriver"):
+        continue
+    c, ok, chain = cls, False, []
+    while c and c in idx:
+        sup, meths, fields = info(c)
+        if ("(" in mem and mem in meths) or ("(" not in mem and mem.split(":")[0] in fields):
+            ok = True; break
+        chain.append(c); c = sup
+    fw = c and not c in idx  # walked into a framework superclass
+    print(("OK   " if ok else ("FW?  " if fw else "MISS ")) + cls + "->" + mem + ("" if ok else "  (chain: %s -> %s)" % (" > ".join(chain), c)))
+    bad += 0 if ok or fw else 1
+sys.exit(1 if bad else 0)
+PYEOF
+
 # The SecDisplayUtils refresh-rate helpers take a Context on some One UI 9 builds (Fold8)
 # but not on others (S25): match the ForceMaxRefreshRate controller calls to the source.
 SEC_DISPLAY_UTILS="$(cd "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk" && \
