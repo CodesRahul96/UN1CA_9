@@ -15,10 +15,12 @@
 # in builds up to 9.3.30. The default comes from persist.sys.unica.vulkan=true + the rc below (debug.hwui.renderer
 # overrides ro.hwui.use_vulkan in libhwui and is set from the persistent prop before apps start).
 sed -i "/^ro\.hwui\.use_vulkan=/d" "$WORK_DIR/vendor/build.prop"
-SET_PROP "system" "persist.sys.unica.vulkan" "true"
+# 2026-10-21 (owner): default back to OpenGL (skiagl) together with the stock V@0530 driver, as testers asked; the
+# toggle (and the GPU driver selector) let users switch. Known: the GL path showed green tiles in Instagram/Facebook video.
+SET_PROP "system" "persist.sys.unica.vulkan" "false"
 RC="$WORK_DIR/system/system/etc/init/a52sxq_hwui_renderer.rc"
 cat > "$RC" << 'RCEOF'
-# UN1CA "Vulkan renderer" toggle for the a52sxq port (Vulkan is the default). See patches/hwui_vulkan_default.
+# UN1CA "Vulkan renderer" toggle for the a52sxq port (OpenGL is the default). See patches/hwui_vulkan_default.
 on property:persist.sys.unica.vulkan=true
     setprop debug.hwui.renderer skiavk
 
@@ -26,5 +28,5 @@ on property:persist.sys.unica.vulkan=false
     setprop debug.hwui.renderer skiagl
 RCEOF
 SET_METADATA "system" "system/etc/init/a52sxq_hwui_renderer.rc" 0 0 644 "u:object_r:system_file:s0"
-LOG "- UI renderer defaults to Vulkan; UN1CA toggle switches skiavk/skiagl"
+LOG "- UI renderer defaults to OpenGL; UN1CA toggle switches skiavk/skiagl"
 unset RC
