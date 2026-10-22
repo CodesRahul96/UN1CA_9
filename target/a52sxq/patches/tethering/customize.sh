@@ -69,6 +69,10 @@ TETH_RESIGN="${TARGET_TETHERING_RESIGN_APEX:-false}"
 TETH_SRC="$FW_DIR/$SOURCE_FIRMWARE_PATH/system/system/apex/com.google.android.tethering_compressed.apex"
 [ "$(sha256sum "$TETH_SRC" | cut -d " " -f 1)" = "540ee27099939f2d1e698228ced265b2505dca1f82af2d785c43b37e0c2b652d" ] || \
     ABORT "tethering: source Tethering APEX changed - regenerate netbpfload_a52*, lib*B.so, netd_a52*.o and the re-signed APEX from it"
+# The regenerated files themselves are pinned too (SHA256SUMS; after regen.py: sha256sum <files> > SHA256SUMS): they run as bpfloader (root) and
+# define every BPF program, so a hand-edited or stale copy must not ship.
+(cd "$SRC_DIR/target/a52sxq/patches/tethering" && sha256sum --quiet --strict -c SHA256SUMS) || \
+    ABORT "tethering: netbpfload_a52*, lib*B.so, netd_a52*.o or the re-signed APEX differ from SHA256SUMS - rerun regen.py"
 unset TETH_SRC
 EVAL "cp -a \"$SRC_DIR/target/a52sxq/patches/tethering/netbpfload_a52\" \"$WORK_DIR/system/system/bin/netbpfload_a52\""
 SET_METADATA "system" "system/bin/netbpfload_a52" 0 2000 755 "u:object_r:bpfloader_exec:s0"
