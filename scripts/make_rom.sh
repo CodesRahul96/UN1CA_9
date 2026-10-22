@@ -142,6 +142,10 @@ if $BUILD_ROM; then
         LOG_STEP_OUT
     fi
 
+    LOG_STEP_IN true "Checking the SELinux policy"
+    "$SRC_DIR/scripts/internal/check_sepolicy.sh" || exit 1
+    LOG_STEP_OUT
+
     if [ -d "$APKTOOL_DIR" ]; then
         LOG_STEP_IN true "Building APKs/JARs"
 
