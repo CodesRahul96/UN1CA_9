@@ -39,3 +39,14 @@ Signer:   same as 35203, cert SHA-256 d3469712b6214462764a1d8d3e5cbe1d6819a0b629
 File:     bone-machine_k4btf_ringbuf_su_a52sxq.zip
 SHA-256:  885b9b082e747d3470ea6eaed25c6781edadb3d3e3b26134afa2d627951caee2
 Verified on R5CTA0ESFTF: boots, Wi-Fi/NFC/cameras/audio/touch/FP, rbtest 24/24 PASS, su -c id -> uid=0 (ksu:s0), BTF timeInState loads.
+
+2026-10-18: kernel used by every build since 9.3.4x (kernel_bone_machine pins it): k4 patches 0001-0016
+  0008 battery pass_through node (One UI "pause USB PD" charging)
+  0009-0016 USB gadget UVC webcam (function + format enumeration, stream stop/unbind fixes, dwc3 missed-isoc reporting,
+       idle-endpoint start, dbm lookup, close-before-unbind, whole 1080p frames with 128 requests, in-band lost payload flag)
+File:     bone-machine_k4btf_ringbuf_su_pt_uvc8_test_a52sxq.zip ("_test" is only the name of the build series)
+SHA-256:  af1e005a6855b634670d93f9564271c795524233da5ad55e6d401eacfd4a99a4
+Image:    2d015a7a15d08ecac112a779349e97198c63270d807fae7deada1e75c278559b   config: d911857299e72f2d8d329dc0dedee03e494d76b77325cddbfe52a5446aeab9bb
+Recipe:   k4-source/k4_build.sh (SRC_COMMIT 93b49d0ccd89, clang r530567 tarball sha256 8527a2d3...) + k4-source/k4-patches/0001-0016;
+          the resulting .config is k4-source/uvc8.config. Verified 2026-10-22 (hardening part 5): the zip is byte-identical to the
+          build output ~/git/kernel_a52sxq_bone/k4-out/uvc8, and that build's patch snapshot equals k4-patches/0009-0016.

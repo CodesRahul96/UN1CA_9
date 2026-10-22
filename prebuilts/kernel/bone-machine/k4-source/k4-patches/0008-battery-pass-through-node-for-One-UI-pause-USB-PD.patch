@@ -1,0 +1,186 @@
+From: k4 <k4@local>
+Date: Sun, 11 Oct 2026 12:00:00 +0300
+Subject: [PATCH] battery: add pass_through node for One UI "Pause USB Power Delivery"
+
+One UI's BatteryService enables pass-through by writing "1"/"0" to
+/sys/class/power_supply/battery/pass_through. The A52s battery driver had
+no such node, so the feature could not work. Add it to the full-SOC
+attribute group: while set, a new VOTER_PASS_THROUGH holds the charger in
+SEC_BAT_CHG_MODE_CHARGING_OFF (powered from the charger, battery not
+charged - the same state the battery protection limit uses), the status
+reads NOT_CHARGING and the capacity-limit logic is skipped. The flag is
+cleared when the charger is removed and defaults to off at boot, so a
+stale request can never stop the next charge.
+---
+diff --git a/drivers/battery/common/sb_full_soc.c b/drivers/battery/common/sb_full_soc.c
+index f82e8aba7..738d10721 100755
+--- a/drivers/battery/common/sb_full_soc.c
++++ b/drivers/battery/common/sb_full_soc.c
+@@ -31,6 +31,9 @@ struct sb_full_soc {
+ 
+ 	bool eu_eco_chg_done;
+ 
++	/* k4: One UI "Pause USB Power Delivery": run from the charger, battery not charged */
++	bool pass_through;
++
+ 	struct mutex lock;
+ 	struct wakeup_source *ws;
+ 	struct delayed_work eu_eco_work;
+@@ -251,6 +254,59 @@ end_work:
+ 	__pm_relax(fs->ws);
+ }
+ 
++bool is_pass_through(struct sb_full_soc *fs)
++{
++	if (!fs)
++		return false;
++
++	return fs->pass_through;
++}
++EXPORT_SYMBOL(is_pass_through);
++
++/*
++ * Pass-through: keep the charger powering the phone but stop charging the battery
++ * (SEC_BAT_CHG_MODE_CHARGING_OFF, the same charger state the battery protection limit holds).
++ * Written by One UI's BatteryService via /sys/class/power_supply/battery/pass_through ("1"/"0").
++ */
++static void set_pass_through(struct sec_battery_info *battery, bool enable)
++{
++	struct sb_full_soc *fs = battery->fs;
++
++	fs->pass_through = enable;
++	sec_vote(battery->chgen_vote, VOTER_PASS_THROUGH, enable, SEC_BAT_CHG_MODE_CHARGING_OFF);
++
++	if (enable) {
++		if (battery->status == POWER_SUPPLY_STATUS_CHARGING)
++			sec_bat_set_charging_status(battery, POWER_SUPPLY_STATUS_NOT_CHARGING);
++	} else if (battery->status == POWER_SUPPLY_STATUS_NOT_CHARGING &&
++		battery->health == POWER_SUPPLY_HEALTH_GOOD &&
++		!(battery->misc_event & BATT_MISC_EVENT_FULL_CAPACITY)) {
++		sec_bat_set_charging_status(battery, POWER_SUPPLY_STATUS_CHARGING);
++	}
++
++	pr_info("%s: pass through %s (status %d)\n", __func__,
++		enable ? "on" : "off", battery->status);
++	__pm_stay_awake(battery->monitor_ws);
++	queue_delayed_work(battery->monitor_wqueue, &battery->monitor_work, 0);
++}
++
++/*
++ * Called when the charger is removed: never let a stale pass-through request keep the
++ * phone from charging on the next plug-in (the chgen vote itself is cleared by the detach path).
++ */
++void sb_pass_through_cable_removed(struct sec_battery_info *battery)
++{
++	struct sb_full_soc *fs = battery->fs;
++
++	if (!fs || !fs->pass_through)
++		return;
++
++	fs->pass_through = false;
++	sec_vote(battery->chgen_vote, VOTER_PASS_THROUGH, false, 0);
++	pr_info("%s: charger removed, pass through off\n", __func__);
++}
++EXPORT_SYMBOL(sb_pass_through_cable_removed);
++
+ static ssize_t
+ sb_full_soc_show_attrs(struct device *, struct device_attribute *, char *);
+ static ssize_t
+@@ -266,6 +322,7 @@ sb_full_soc_store_attrs(struct device *, struct device_attribute *, const char *
+ enum sec_bat_attrs {
+ 	BATT_FULL_CAPACITY = 0,
+ 	BATT_SOC_RECHG,
++	PASS_THROUGH,
+ #if defined(CONFIG_ENG_BATTERY_CONCEPT)
+ 	BATT_FULL_CAP_EVENT,
+ 	BATT_FULL_SOC_TEST,
+@@ -275,6 +332,7 @@ enum sec_bat_attrs {
+ static struct device_attribute sb_full_soc_attrs[] = {
+ 	SB_FULL_SOC_ATTR(batt_full_capacity),
+ 	SB_FULL_SOC_ATTR(batt_soc_rechg),
++	SB_FULL_SOC_ATTR(pass_through),
+ #if defined(CONFIG_ENG_BATTERY_CONCEPT)
+ 	SB_FULL_SOC_ATTR(batt_full_cap_event),
+ 	SB_FULL_SOC_ATTR(batt_full_soc_test),
+@@ -297,6 +355,9 @@ static ssize_t sb_full_soc_show_attrs(struct device *dev,
+ 	case BATT_SOC_RECHG:
+ 		i += scnprintf(buf, PAGE_SIZE, "%d\n", is_eu_eco_rechg(battery->fs));
+ 		break;
++	case PASS_THROUGH:
++		i += scnprintf(buf, PAGE_SIZE, "%d\n", is_pass_through(battery->fs));
++		break;
+ #if defined(CONFIG_ENG_BATTERY_CONCEPT)
+ 	case BATT_FULL_CAP_EVENT:
+ 		i += scnprintf(buf, PAGE_SIZE, "%s\n",
+@@ -388,6 +449,21 @@ static ssize_t sb_full_soc_store_attrs(struct device *dev,
+ 			__func__, is_eu_eco_rechg(battery->fs));
+ 	}
+ 		break;
++	case PASS_THROUGH:
++	{
++		int x = 0;
++
++		if (sscanf(buf, "%10d\n", &x) != 1) {
++			pr_info("%s: invalid arguments\n", __func__);
++			return -EINVAL;
++		}
++
++		mutex_lock(&battery->fs->lock);
++		if (is_pass_through(battery->fs) != !!x)
++			set_pass_through(battery, !!x);
++		mutex_unlock(&battery->fs->lock);
++	}
++		break;
+ #if defined(CONFIG_ENG_BATTERY_CONCEPT)
+ 	case BATT_FULL_CAP_EVENT:
+ 		break;
+@@ -463,6 +539,12 @@ void sec_bat_check_full_capacity(struct sec_battery_info *battery)
+ 	int now_full_capacity = get_full_capacity(battery->fs);
+ 	int rechg_capacity = now_full_capacity - DEF_RECHG_SOC_DIF;
+ 
++	if (is_pass_through(battery->fs)) {
++		if (battery->status == POWER_SUPPLY_STATUS_CHARGING)
++			sec_bat_set_charging_status(battery, POWER_SUPPLY_STATUS_NOT_CHARGING);
++		return;
++	}
++
+ 	if (is_full_cap_event_highsoc(battery->fs) &&
+ 		(battery->capacity <= now_full_capacity)) {
+ 		set_full_cap_event(battery->fs, SB_FULL_CAP_EVENT_NONE);
+diff --git a/drivers/battery/common/sb_full_soc.h b/drivers/battery/common/sb_full_soc.h
+index 4dc66eeec..adef17d40 100755
+--- a/drivers/battery/common/sb_full_soc.h
++++ b/drivers/battery/common/sb_full_soc.h
+@@ -32,5 +32,7 @@ void sec_bat_recov_full_capacity(struct sec_battery_info *battery);
+ void sec_bat_check_full_capacity(struct sec_battery_info *battery);
+ 
+ int sb_full_soc_init(struct sec_battery_info *battery);
++bool is_pass_through(struct sb_full_soc *fs);
++void sb_pass_through_cable_removed(struct sec_battery_info *battery);
+ 
+ #endif /* __SB_FULL_SOC_H */
+diff --git a/drivers/battery/common/sec_battery.c b/drivers/battery/common/sec_battery.c
+index c09835241..1f890f1d6 100755
+--- a/drivers/battery/common/sec_battery.c
++++ b/drivers/battery/common/sec_battery.c
+@@ -4145,6 +4145,8 @@ static void cw_slate_mode(struct sec_battery_info *battery)
+ 	battery->is_vbatovlo = false;
+ 	battery->is_abnormal_temp = false;
+ 
++	sb_pass_through_cable_removed(battery);
++
+ 	for (j = 0; j < VOTER_MAX; j++) {
+ 		sec_vote(battery->iv_vote, j, false, 0);
+ 		if (j == VOTER_SIOP ||
+diff --git a/drivers/battery/common/sec_battery.h b/drivers/battery/common/sec_battery.h
+index f6af7e14b..70027b4cc 100755
+--- a/drivers/battery/common/sec_battery.h
++++ b/drivers/battery/common/sec_battery.h
+@@ -190,6 +190,7 @@ enum misc_battery_health {
+ 	GENERATE(VOTER_BATTERY)	\
+ 	GENERATE(VOTER_CHANGE_CHGMODE)	\
+ 	GENERATE(VOTER_FW)	\
++	GENERATE(VOTER_PASS_THROUGH)	\
+ 	GENERATE(VOTER_MAX)
+ 
+ #define GENERATE_ENUM(ENUM) ENUM,
