@@ -1,0 +1,41 @@
+#!/system/bin/sh
+# k4-apex-dm-relabel - give every APEX dm block device its apex_dm_device label back before system_server scans them.
+# Installed by target/a52sxq/patches/apex_dm_relabel, run once by init at post-fs-data (after apexd.status=activated).
+#
+# On kernels <= 5.10 the dm "add" uevent fires at DM_DEV_CREATE, before the device is in the dm hash, so ueventd's
+# name lookup can fail ("ueventd: Failed to find device dev: 253:N: No such device or address"). ueventd then labels
+# /dev/block/dm-N by its plain path (dm_device) and relabels the node apexd already made as apex_dm_device.
+# system_server may not read dm_device, so PackageManager cannot parse that Play-updated APEX ("Failed to load asset
+# path /dev/block/dm-N") and Samsung's InstallPackageHelper.tryToRecover reboots (reboot,recoverydecompressedapex).
+# Re-sending "add" for that node makes ueventd look it up again, now with its /dev/block/mapper/<name>.apex link, and
+# set apex_dm_device. Only nodes listed as APEX module paths in /apex/apex-info-list.xml and labelled wrongly are touched.
+LIST=/apex/apex-info-list.xml
+log() { echo "k4-apex-dm-relabel: $*" > /dev/kmsg; }
+[ -f "$LIST" ] || { log "no $LIST"; exit 0; }
+NODES="$(grep -o 'modulePath="/dev/block/dm-[0-9]*"' "$LIST" | sed 's/^modulePath="//; s/"$//' | sort -u)"
+[ -n "$NODES" ] || exit 0
+# one ls for all nodes: "<label> <path>" per line; print the paths whose label is wrong
+wrong() { ls -Z $NODES 2> /dev/null | grep -v "^u:object_r:apex_dm_device:s0 " | sed 's/^[^ ]* //'; }
+# A ueventd event still in flight can land after a check, so stop only after two clean checks 100 ms apart
+# (a normal boot: two checks, ~0.15 s; at most ~2 s).
+fixed=""; clean=0; i=0
+while [ $i -lt 20 ] && [ $clean -lt 2 ]; do
+    W="$(wrong)"
+    if [ -z "$W" ]; then
+        clean=$((clean + 1))
+    else
+        clean=0
+        for n in $W; do
+            echo add > "/sys/devices/virtual/block/${n#/dev/block/}/uevent" && fixed="$fixed ${n#/dev/block/}"
+        done
+    fi
+    i=$((i + 1))
+    [ $clean -lt 2 ] && sleep 0.1
+done
+W="$(wrong)"
+if [ -n "$W" ]; then
+    log "still not apex_dm_device:$(echo $W)"
+elif [ -n "$fixed" ]; then
+    log "relabelled by ueventd:$fixed"
+fi
+exit 0
