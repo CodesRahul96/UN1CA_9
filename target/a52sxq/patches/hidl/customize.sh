@@ -4,6 +4,12 @@
 ICHTHYS32="$SRC_DIR/prebuilts/ichthys32"
 SYS_EXT="$WORK_DIR/system/system/system_ext"
 $TARGET_OS_BUILD_SYSTEM_EXT_PARTITION && SYS_EXT="$WORK_DIR/system_ext"
+# pinned: every file and symlink exactly as reviewed (prebuilts/ichthys32/SHA256SUMS + SYMLINKS), nothing else
+(cd "$ICHTHYS32" && sha256sum --quiet --strict -c SHA256SUMS) || ABORT "ichthys32 does not match prebuilts/ichthys32/SHA256SUMS"
+[ "$(cd "$ICHTHYS32" && find . -type f ! -name SOURCE.txt ! -name SHA256SUMS ! -name SYMLINKS | sed 's|^\./||' | LC_ALL=C sort)" = \
+    "$(sed 's/^[0-9a-f]*  //' "$ICHTHYS32/SHA256SUMS" | LC_ALL=C sort)" ] || ABORT "ichthys32 has files that are not in SHA256SUMS"
+[ "$(cd "$ICHTHYS32" && find . -type l -printf "%P -> %l\n" | LC_ALL=C sort)" = "$(LC_ALL=C sort "$ICHTHYS32/SYMLINKS")" ] || \
+    ABORT "ichthys32 symlinks differ from prebuilts/ichthys32/SYMLINKS"
 
 ADD_TO_WORK_DIR "$ICHTHYS32" "system_ext" "bin/hwservicemanager" 0 2000 755 "u:object_r:hwservicemanager_exec:s0"
 ADD_TO_WORK_DIR "$ICHTHYS32" "system_ext" "etc/init/hwservicemanager.rc" 0 0 644 "u:object_r:system_file:s0"

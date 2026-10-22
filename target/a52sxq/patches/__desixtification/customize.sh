@@ -97,6 +97,12 @@ SIGN_APEX()
 if [ ! -d "$ICHTHYS32/system/lib" ] || [ ! -d "$ICHTHYS32/runtime/lib" ]; then
     ABORT "Missing 32-bit prebuilts in ${ICHTHYS32//$SRC_DIR\//}"
 fi
+# pinned: every file and symlink exactly as reviewed (prebuilts/ichthys32/SHA256SUMS + SYMLINKS), nothing else
+(cd "$ICHTHYS32" && sha256sum --quiet --strict -c SHA256SUMS) || ABORT "ichthys32 does not match prebuilts/ichthys32/SHA256SUMS"
+[ "$(cd "$ICHTHYS32" && find . -type f ! -name SOURCE.txt ! -name SHA256SUMS ! -name SYMLINKS | sed 's|^\./||' | LC_ALL=C sort)" = \
+    "$(sed 's/^[0-9a-f]*  //' "$ICHTHYS32/SHA256SUMS" | LC_ALL=C sort)" ] || ABORT "ichthys32 has files that are not in SHA256SUMS"
+[ "$(cd "$ICHTHYS32" && find . -type l -printf "%P -> %l\n" | LC_ALL=C sort)" = "$(LC_ALL=C sort "$ICHTHYS32/SYMLINKS")" ] || \
+    ABORT "ichthys32 symlinks differ from prebuilts/ichthys32/SYMLINKS"
 
 RUNTIME_APEX="$WORK_DIR/system/system/apex/com.android.runtime.apex"
 if [ -f "$WORK_DIR/system/system/bin/bootstrap/linker" ]; then

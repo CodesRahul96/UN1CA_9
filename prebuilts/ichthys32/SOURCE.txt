@@ -5,3 +5,6 @@ IchthysOS out/target/product/a52sxq snapshot, cp2a SDK37
 2026-10-01T20:54:26+03:00 system/apex/com.android.virt.apex from IchthysOS out (minimal AVF: framework/service-virtualization jars only, erofs mountable on 5.4)
 2026-10-01T21:13:25+03:00 removed system/apex/com.android.virt.apex again (Baklava min_sdk in bootclasspath.pb)
 2026-10-02T06:05:53+03:00 removed com.android.tethering.capex (Baklava SDK -> ServiceConnectivityResources rejected); using patched netbpfload instead
+2026-10-22 SHA256SUMS (every regular file) + SYMLINKS written from the shipped set; both are checked by
+target/a52sxq/patches/__desixtification and hidl before anything is copied. All 451 shipped files were byte-identical to
+~/git/android/out/target/product/a52sxq (IchthysOS, CP2A.260605.016) at that point (hardening part 5 audit).

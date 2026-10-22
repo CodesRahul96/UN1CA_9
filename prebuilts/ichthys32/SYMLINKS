@@ -1,0 +1,5 @@
+system/bin/bootstrap/linker_asan -> linker
+system/lib/libc.so -> /apex/com.android.runtime/lib/bionic/libc.so
+system/lib/libdl.so -> /apex/com.android.runtime/lib/bionic/libdl.so
+system/lib/libdl_android.so -> /apex/com.android.runtime/lib/bionic/libdl_android.so
+system/lib/libm.so -> /apex/com.android.runtime/lib/bionic/libm.so
