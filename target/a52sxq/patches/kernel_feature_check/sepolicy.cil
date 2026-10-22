@@ -3,6 +3,7 @@
 (type k4kcheck)
 (roletype r k4kcheck)
 (allow init k4kcheck (process (transition rlimitinh siginh)))
+(dontaudit init k4kcheck (process (noatsecure)))
 (allow k4kcheck shell_exec (file (read getattr map execute open entrypoint)))
 (allow k4kcheck toolbox_exec (file (read getattr map execute open execute_no_trans)))
 (allow k4kcheck system_file (file (read getattr map execute open execute_no_trans)))
