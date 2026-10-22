@@ -1,6 +1,6 @@
 # prebuilt/k4neuralmpp
 
-Our own binary (plain C, NDK binder; no third-party code): the neural MPP front store.
+Our own binary (its sha256 is pinned in ../customize.sh: a rebuilt copy must update that line) (plain C, NDK binder; no third-party code): the neural MPP front store.
 
 - Source: `../src/{k4neuralmpp.c,k4n_engine.c,k4n.h}`; rebuild with `../src/build.sh` (AOSP prebuilt clang r596125,
   NDK sysroot API 30 and bionic crt objects of an AOSP tree; C only, no libc++). Working copy and test tools:

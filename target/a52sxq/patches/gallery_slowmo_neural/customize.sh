@@ -21,6 +21,20 @@ for f in libSNPE.so libSnpeHtpV68Stub.so libSnpeHtpV68Skel.so NOTICE.txt; do
     [ -f "$QAIRT/$f" ] || ABORT "gallery_slowmo_neural: prebuilts/qairt/2.46.0/$f is missing. Copy it from your own Qualcomm AI Runtime SDK 2.46.0 download (lib/aarch64-android/libSNPE.so, lib/aarch64-android/libSnpeHtpV68Stub.so, lib/hexagon-v68/unsigned/libSnpeHtpV68Skel.so, NOTICE.txt); these files are not kept in git"
 done
 [ -f "$MODEL" ] || ABORT "gallery_slowmo_neural: prebuilts/k4neural/k4n_v3_htp.dlc is missing (not kept in git)"
+# Pinned: these run in the daemon every system MPP client talks to (and libSnpeHtpV68Skel.so on the cDSP), and the SDK
+# and models are not in git, so only the exact reviewed files may ship. QAIRT = qairt/2.46.0.260424 (SDK zip
+# v2.46.0.260424.zip, sha256 2db536ea...); a rebuilt k4neuralmpp or model needs its new hash here (prebuilt/README.md).
+K4N_PIN()
+{
+    [ "$(sha256sum "$1" | cut -d " " -f 1)" = "$2" ] || ABORT "gallery_slowmo_neural: ${1//$SRC_DIR\//} is not the pinned file (sha256 $2)"
+}
+K4N_PIN "$QAIRT/libSNPE.so" "0253749c60b8763b2092970b12a28e5af21df7903f339be69b3a7d9ed5438379"
+K4N_PIN "$QAIRT/libSnpeHtpV68Stub.so" "ada618eeb7025b406a8f52010f2014fff0b221f02552adde80125d4bf42ddc0c"
+K4N_PIN "$QAIRT/libSnpeHtpV68Skel.so" "d43309a79b5a5c0f6a05b1ab044bef8c22adb508f33d36a54748198e85d616ec"
+K4N_PIN "$QAIRT/NOTICE.txt" "c8a22fa8b9ed3e9266c4a3366965474cef5cb147ee2a1f33e488bbb24a071c09"
+K4N_PIN "$MODEL" "cef4cf3b9677ef4c6317015f9c50a7b33b583eb3240a26d06ed82afba71914cb"
+[ ! -f "$FILM_MODEL" ] || K4N_PIN "$FILM_MODEL" "c51bc44c7ed6d63a15e2b1a491fe70411c7cf94106419509a9db5d67daa87757"
+K4N_PIN "$SRC/prebuilt/k4neuralmpp" "a7fb6df755ecf547cbdb47a5e250ccec3ee2ff1dbedd46870ec737c2198ecdda"
 [ -f "$WORK_DIR/vendor/bin/hw/mppserver" ] || ABORT "gallery_slowmo_neural: the vendor has no stock MPP store (mppserver)"
 grep -q -F "ISehMppStore/default" "$WORK_DIR/vendor/etc/vintf/manifest/mppserver.xml" 2> /dev/null || \
     ABORT "gallery_slowmo_neural: the stock VINTF manifest does not declare ISehMppStore/default"
@@ -105,5 +119,5 @@ else:
 PYEOF
 
 LOG_STEP_OUT
-unset SRC QAIRT MODEL MPP_STORE SEPOL MPPCLIENT f
-unset -f K4N_INSTALL K4N_APPEND_LINE
+unset SRC QAIRT MODEL FILM_MODEL MPP_STORE SEPOL MPPCLIENT f
+unset -f K4N_INSTALL K4N_APPEND_LINE K4N_PIN
