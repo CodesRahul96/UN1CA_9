@@ -29,6 +29,10 @@ SET_METADATA "vendor" "k4gpu" 0 2000 755 "u:object_r:vendor_file:s0"
 for v in $GPU_SETS; do
     SRC="$MODPATH/v$v/vendor"
     [ -f "$SRC/lib64/egl/libGLESv2_adreno.so" ] || ABORT "adreno_driver: no driver set v$v"
+    # pinned: every file of the set exactly as reviewed (v$v/SHA256SUMS), and nothing else
+    (cd "$MODPATH/v$v" && sha256sum --quiet --strict -c SHA256SUMS) || ABORT "adreno_driver: v$v does not match v$v/SHA256SUMS"
+    [ "$(cd "$MODPATH/v$v" && find vendor -type f | LC_ALL=C sort)" = "$(sed 's/^[0-9a-f]*  //' "$MODPATH/v$v/SHA256SUMS" | LC_ALL=C sort)" ] || \
+        ABORT "adreno_driver: v$v has files that are not in v$v/SHA256SUMS"
     grep -q -a -F "V@0$v." "$SRC/lib64/egl/libGLESv2_adreno.so" || ABORT "adreno_driver: v$v/libGLESv2_adreno.so is not V@0$v"
     [ -f "$SRC/firmware/a660_sqe.fw" ] || ABORT "adreno_driver: v$v has no a660_sqe.fw"
     DST="$WORK_DIR/vendor/k4gpu/v$v"

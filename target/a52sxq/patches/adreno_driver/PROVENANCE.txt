@@ -1,0 +1,20 @@
+Where the two optional Adreno driver sets come from (checked 2026-10-22, hardening part 5)
+
+Both are community Magisk modules shared on Telegram; neither is signed. The build pins every file (v<ver>/SHA256SUMS,
+checked in customize.sh, extra files rejected). The original zips are archived on the build PC in
+/mnt/B1/OneUi9/adreno_sources/.
+
+v849  "Qualcomm Adreno Drivers", versionCode 849, author @sudami (module.prop: id=adreno_gpu_driver)
+      zip v@0849-{kernel 5.4+}-[MKSU].zip, 45552330 bytes,
+      sha256 3fd5b5070fc7d0a7bb7b7435e37fcb1ecdc13eb2c39e045780d4cad709cf3331
+      all 23 files of v849/ are byte-identical to the zip's system/vendor/ copies (the zip also carries other GPUs'
+      SQE files and permission xmls that are not used)
+v863  "Adreno GPU Driver 863.1 From RayBan Meta", versionCode 863, author @Joshaby
+      zip v@863.zip, 46789501 bytes, sha256 2c8aaf96460281c1df222c620371a4206eb9f0193cec5ebfd90d9ab1501fa0e0
+      all 23 files of v863/ are byte-identical to the zip
+
+GPU microcode (firmware/a660_sqe.fw, the same file in both sets, sha256 01cacafc...): it runs on the GPU's command
+processor, so it is the most trusted file here. It matches no file we can check against: stock A52s f911a4ba...
+(header version 0x016dc094), linux-firmware qcom/a660_sqe.fw d222f3fe... (0x016dc112), this one 0x016dc109 - a release
+between the two, consistent with a genuine Qualcomm build, but not provable. Nothing from these sets is used unless the
+owner of the phone picks V@0849 or V@0863 in Settings > K4_UN1CA > UI (default: stock V@0530 untouched).
