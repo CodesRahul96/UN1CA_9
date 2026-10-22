@@ -40,7 +40,8 @@ import java.util.WeakHashMap;
  * <li>the frame paths Samsung fits the clock to are scaled ({@link #framePath}), and sent again with the subject region
  * when the size changes.</li>
  * </ul>
- * A frame change (another frame, or a new editor) starts from Samsung's size again ({@link #reset}).
+ * A frame change (another frame, or a new editor) starts from Samsung's size again ({@link #reset}); the re-edit of a
+ * wallpaper saved with a frame size gets it back ({@link SavedFrame}, {@link #restore}).
  * <p>
  * Grabbing: a gesture starting on a plate or anywhere outside the hole sizes the frame at once; a pinch whose second
  * finger lands while either finger is on the frame or within {@link #BAND_DP} inside the hole's edge takes over too (a
@@ -99,6 +100,88 @@ public final class FrameSize {
 
     static float scaled() {
         return sScale * sLive;
+    }
+
+    /** The kept size (saved with the wallpaper, {@link SavedFrame}). */
+    static float kept() {
+        return sScale;
+    }
+
+    /**
+     * A saved frame size put back ({@link SavedFrame}, UI thread, frame views of a re-edit): the hole k times Samsung's,
+     * and the hole's middle and the views' size the save and the clock fit use (else set by a gesture's {@link #begin}).
+     */
+    static void restore(View bg, float k) {
+        sScale = Math.max(MIN, Math.min(MAX, k));
+        sLive = 1f;
+        sGesture = false;
+        applyHole(bg);
+        RectF hole = EditXf.frameRect(bg);
+        if (hole != null) {
+            sHx = hole.centerX();
+            sHy = hole.centerY();
+        }
+        sVw = bg.getWidth();
+        sVh = bg.getHeight();
+        Log.i(TAG, String.format(java.util.Locale.US, "frame size: %.3f of Samsung's (saved), hole %s", sScale, hole));
+    }
+
+    /**
+     * Samsung's own hole of a frame view (its mFrameBounds before {@link #applyHole} scaled it; the current one when
+     * Samsung set it again since), in view coordinates. Null when there is none.
+     */
+    static RectF samsungHole(View f) {
+        try {
+            RectF cur = (RectF) EditXf.call(f, "getMFrameBounds");
+            if (cur == null || cur.isEmpty()) {
+                return null;
+            }
+            RectF base = cur;
+            synchronized (sHoles) {
+                RectF[] st = sHoles.get(f);
+                if (st != null && cur.equals(st[1])) {
+                    base = st[0];
+                }
+            }
+            RectF r = new RectF(base);
+            EditXf.imageMatrix((ImageView) f).mapRect(r);
+            return r;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** At a kept size other than Samsung's: Samsung set this view's hole again since {@link #applyHole}. */
+    static boolean holeStale(View f) {
+        if (sScale == 1f) {
+            return false;
+        }
+        try {
+            RectF cur = (RectF) EditXf.call(f, "getMFrameBounds");
+            if (cur == null || cur.isEmpty()) {
+                return false;
+            }
+            synchronized (sHoles) {
+                RectF[] st = sHoles.get(f);
+                return st == null || !cur.equals(st[1]);
+            }
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** The picture bounds of the frame layout's picture and subject views (Samsung keeps the two on the same bounds). */
+    static void pictureBounds(View v, RectF nb) throws Exception {
+        if (!(v.getParent() instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup g = (ViewGroup) v.getParent();
+        for (int i = 0; i < g.getChildCount(); i++) {
+            View f = g.getChildAt(i);
+            if (EditXf.CROP.equals(f.getClass().getName()) && EditXf.frameTarget(f)) {
+                f.getClass().getMethod("setDrawableBoundsExternal", RectF.class).invoke(f, new RectF(nb));
+            }
+        }
     }
 
     // ---- gesture ----
@@ -518,12 +601,7 @@ public final class FrameSize {
             RectF nb = new RectF(cx + (b.left - cx) * s, cy + (b.top - cy) * s, cx + (b.right - cx) * s, cy + (b.bottom - cy) * s);
             nb.offset(nb.left > cover.left ? cover.left - nb.left : nb.right < cover.right ? cover.right - nb.right : 0f,
                     nb.top > cover.top ? cover.top - nb.top : nb.bottom < cover.bottom ? cover.bottom - nb.bottom : 0f);
-            for (int i = 0; i < g.getChildCount(); i++) {
-                View f = g.getChildAt(i);
-                if (EditXf.CROP.equals(f.getClass().getName()) && EditXf.frameTarget(f)) {
-                    f.getClass().getMethod("setDrawableBoundsExternal", RectF.class).invoke(f, new RectF(nb));
-                }
-            }
+            pictureBounds(v, nb);
             Log.i(TAG, "frame size: picture " + b + " -> " + nb + " to cover the hole " + cover);
         } catch (Throwable t) {
             Log.e(TAG, "frame size: hole", t);
@@ -565,6 +643,7 @@ public final class FrameSize {
     static void refit(View v) {
         Object m = sPathMediator.get();
         if (m == null) {
+            EditXf.refit(); // no frame paths yet (they come scaled through framePath): the subject region still goes again
             return;
         }
         try {

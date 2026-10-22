@@ -326,6 +326,15 @@ for fld in (".field public final f:Landroid/util/Size;", ".field public h:Landro
             ".field public final v:Landroid/graphics/RectF;", ".field public w:Landroid/graphics/RectF;"):
     assert fld in s, "SaveImageMaker " + fld
 assert re.search(r"^\.field private a:Ljava/util/ArrayList;$", open(one("c7/c0.smali")).read(), re.M), "c7.c0.a (expand offsets)"
+# the frame edit kept for a re-edit (SavedFrame, from bakeBackground): next to Samsung's layer files, the directory
+# SaveImageMaker.a() creates and returns; a re-edit names that wallpaper's bg_region there in its intent (f6.d)
+assert '"createDirectory "' in method(s, "public final a()Ljava/lang/String;"), "SaveImageMaker.a (layer directory)"
+hits = []
+for x in glob.glob(root + "/smali*/**/*.smali", recursive=True):
+    t = open(x).read()
+    if '"saved_bg_region_path_list"' in t and '"re_edit_screen"' in t and '"bg_region"' in t and "Landroid/content/Intent;->putStringArrayListExtra(" in t:
+        hits.append(x)
+assert len(hits) == 1, "re-edit intent with saved_bg_region_path_list: %d classes" % len(hits)
 for name, typ in (("preview_switch_title_layout", "id"), ("set_wallpaper_btn_bg", "drawable"), ("preview_selector_text_set", "drawable"),
                   ("edit_switch_preview_title_text_size", "dimen"), ("tab_color", "string"), ("style_item_blur", "string"),
                   ("align_assist_line", "drawable"), ("guide_box_white", "color"), ("align_assist_line_width", "dimen")):
