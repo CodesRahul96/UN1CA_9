@@ -18,6 +18,11 @@ if [ -f "$SUSPEND_SVC" ] && ! grep -q "suspend@1.0" "$SUSPEND_SVC"; then
     for f in android.system.suspend-hidl-shim android.system.suspend@1.0.so android.system.suspend-hidl-shim.rc android.system.suspend-hidl-shim.xml; do
         [ -f "$SRC/$f" ] || ABORT "suspend_hidl: $f missing from the patch dir"
     done
+    # pinned: IchthysOS build of vendor/k4/suspend-hidl-shim (update after a rebuild)
+    [ "$(sha256sum "$SRC/android.system.suspend-hidl-shim" | cut -d " " -f 1)" = "a1630460e0acf80785c214b8b38e2be9e9a736d7be011071d63ee6f7bb5c166b" ] || \
+        ABORT "suspend_hidl: android.system.suspend-hidl-shim is not the reviewed build"
+    [ "$(sha256sum "$SRC/android.system.suspend@1.0.so" | cut -d " " -f 1)" = "2bbc13d5ec2298216cd18a736a9f8aba2c830909b7294d435d09329d8133dfaf" ] || \
+        ABORT "suspend_hidl: android.system.suspend@1.0.so is not the reviewed build"
 
     EVAL "cp -a \"$SRC/android.system.suspend-hidl-shim\" \"$WORK_DIR/system/system/bin/hw/android.system.suspend-hidl-shim\""
     SET_METADATA "system" "system/bin/hw/android.system.suspend-hidl-shim" 0 2000 755 "u:object_r:system_suspend_exec:s0"

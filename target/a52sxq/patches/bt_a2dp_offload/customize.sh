@@ -26,6 +26,10 @@ if [ ! -f "$BT_A2DP_SOURCE_APEX" ] || \
     ABORT "bt_a2dp_offload: source com.android.bt.apex is not the S948BXXS4BZIG one the prebuilt was made from; run rebuild_apex.sh for this source"
 fi
 unset BT_A2DP_SOURCE_APEX_SHA256 BT_A2DP_SOURCE_APEX
+# the shipped APEX itself is pinned too (rebuild_apex.sh output for that source)
+[ "$(sha256sum "$SRC_DIR/target/a52sxq/patches/bt_a2dp_offload/com.android.bt.apex" | cut -d " " -f 1)" = \
+    "18c418195763a872121f747f73607535b1615efa52fbe313eedc2003a9caa933" ] || \
+    ABORT "bt_a2dp_offload: com.android.bt.apex is not the reviewed rebuild_apex.sh output (update the sha256 after a rebuild)"
 DELETE_FROM_WORK_DIR "system" "system/apex/com.android.bt.apex"
 EVAL "cp -a \"$SRC_DIR/target/a52sxq/patches/bt_a2dp_offload/com.android.bt.apex\" \"$WORK_DIR/system/system/apex/com.android.bt.apex\""
 SET_METADATA "system" "system/apex/com.android.bt.apex" 0 0 644 "u:object_r:system_file:s0"
