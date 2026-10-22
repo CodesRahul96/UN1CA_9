@@ -58,6 +58,17 @@
 
 .field private static volatile sHy:F = 0.0f
 
+.field private static final sLastHole:Ljava/util/WeakHashMap;
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/util/WeakHashMap<",
+            "Landroid/view/View;",
+            "Landroid/graphics/RectF;",
+            ">;"
+        }
+    .end annotation
+.end field
+
 .field private static final sLines:Ljava/util/WeakHashMap;
     .annotation system Ldalvik/annotation/Signature;
         value = {
@@ -115,6 +126,12 @@
     invoke-direct {v0}, Ljava/util/WeakHashMap;-><init>()V
 
     sput-object v0, Lcom/k4/dressroom/FrameSize;->sHoles:Ljava/util/WeakHashMap;
+
+    new-instance v0, Ljava/util/WeakHashMap;
+
+    invoke-direct {v0}, Ljava/util/WeakHashMap;-><init>()V
+
+    sput-object v0, Lcom/k4/dressroom/FrameSize;->sLastHole:Ljava/util/WeakHashMap;
 
     new-instance v0, Ljava/util/WeakHashMap;
 
@@ -1873,6 +1890,48 @@
     return v0
 .end method
 
+.method static lastSamsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+    .locals 2
+
+    sget-object v0, Lcom/k4/dressroom/FrameSize;->sLastHole:Ljava/util/WeakHashMap;
+
+    monitor-enter v0
+
+    :try_start_0
+    invoke-virtual {v0, p0}, Ljava/util/WeakHashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object p0
+
+    check-cast p0, Landroid/graphics/RectF;
+
+    if-nez p0, :cond_0
+
+    const/4 p0, 0x0
+
+    goto :goto_0
+
+    :cond_0
+    new-instance v1, Landroid/graphics/RectF;
+
+    invoke-direct {v1, p0}, Landroid/graphics/RectF;-><init>(Landroid/graphics/RectF;)V
+
+    move-object p0, v1
+
+    :goto_0
+    monitor-exit v0
+
+    return-object p0
+
+    :catchall_0
+    move-exception p0
+
+    monitor-exit v0
+    :try_end_0
+    .catchall {:try_start_0 .. :try_end_0} :catchall_0
+
+    throw p0
+.end method
+
 .method static lineOf(Landroid/graphics/drawable/Drawable;II)F
     .locals 19
 
@@ -2763,7 +2822,7 @@
 
     monitor-enter v2
     :try_end_0
-    .catchall {:try_start_0 .. :try_end_0} :catchall_1
+    .catchall {:try_start_0 .. :try_end_0} :catchall_2
 
     :try_start_1
     invoke-virtual {v2, p0}, Ljava/util/WeakHashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;
@@ -2791,42 +2850,172 @@
     :cond_1
     monitor-exit v2
     :try_end_1
-    .catchall {:try_start_1 .. :try_end_1} :catchall_0
+    .catchall {:try_start_1 .. :try_end_1} :catchall_1
 
     :try_start_2
     new-instance v2, Landroid/graphics/RectF;
 
     invoke-direct {v2, v1}, Landroid/graphics/RectF;-><init>(Landroid/graphics/RectF;)V
 
-    check-cast p0, Landroid/widget/ImageView;
+    move-object v1, p0
 
-    invoke-static {p0}, Lcom/k4/dressroom/EditXf;->imageMatrix(Landroid/widget/ImageView;)Landroid/graphics/Matrix;
+    check-cast v1, Landroid/widget/ImageView;
 
-    move-result-object p0
+    invoke-static {v1}, Lcom/k4/dressroom/EditXf;->imageMatrix(Landroid/widget/ImageView;)Landroid/graphics/Matrix;
 
-    invoke-virtual {p0, v2}, Landroid/graphics/Matrix;->mapRect(Landroid/graphics/RectF;)Z
+    move-result-object v1
+
+    invoke-virtual {v1, v2}, Landroid/graphics/Matrix;->mapRect(Landroid/graphics/RectF;)Z
+
+    sget-object v1, Lcom/k4/dressroom/FrameSize;->sLastHole:Ljava/util/WeakHashMap;
+
+    monitor-enter v1
     :try_end_2
-    .catchall {:try_start_2 .. :try_end_2} :catchall_1
+    .catchall {:try_start_2 .. :try_end_2} :catchall_2
+
+    :try_start_3
+    new-instance v3, Landroid/graphics/RectF;
+
+    invoke-direct {v3, v2}, Landroid/graphics/RectF;-><init>(Landroid/graphics/RectF;)V
+
+    invoke-virtual {v1, p0, v3}, Ljava/util/WeakHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    monitor-exit v1
 
     return-object v2
 
     :catchall_0
     move-exception p0
 
-    :try_start_3
-    monitor-exit v2
+    monitor-exit v1
     :try_end_3
     .catchall {:try_start_3 .. :try_end_3} :catchall_0
 
     :try_start_4
     throw p0
     :try_end_4
-    .catchall {:try_start_4 .. :try_end_4} :catchall_1
+    .catchall {:try_start_4 .. :try_end_4} :catchall_2
 
     :catchall_1
+    move-exception p0
+
+    :try_start_5
+    monitor-exit v2
+    :try_end_5
+    .catchall {:try_start_5 .. :try_end_5} :catchall_1
+
+    :try_start_6
+    throw p0
+    :try_end_6
+    .catchall {:try_start_6 .. :try_end_6} :catchall_2
+
+    :catchall_2
     :cond_2
     :goto_0
     return-object v0
+.end method
+
+.method static samsungHoleAny(Landroid/view/View;)Landroid/graphics/RectF;
+    .locals 4
+
+    invoke-static {p0}, Lcom/k4/dressroom/FrameSize;->samsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_0
+
+    invoke-virtual {v0}, Landroid/graphics/RectF;->isEmpty()Z
+
+    move-result v1
+
+    if-nez v1, :cond_0
+
+    return-object v0
+
+    :cond_0
+    const-string v0, "OBJECT"
+
+    invoke-static {p0, v0}, Lcom/k4/dressroom/EditXf;->frameView(Landroid/view/View;Ljava/lang/String;)Landroid/view/View;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_3
+
+    if-eq v0, p0, :cond_3
+
+    invoke-static {v0}, Lcom/k4/dressroom/FrameSize;->samsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+
+    move-result-object v1
+
+    if-eqz v1, :cond_1
+
+    invoke-virtual {v1}, Landroid/graphics/RectF;->isEmpty()Z
+
+    move-result v2
+
+    if-eqz v2, :cond_2
+
+    :cond_1
+    invoke-static {v0}, Lcom/k4/dressroom/FrameSize;->lastSamsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+
+    move-result-object v1
+
+    :cond_2
+    if-eqz v1, :cond_3
+
+    invoke-virtual {v1}, Landroid/graphics/RectF;->isEmpty()Z
+
+    move-result v2
+
+    if-nez v2, :cond_3
+
+    invoke-virtual {v0}, Landroid/view/View;->getLeft()I
+
+    move-result v2
+
+    invoke-virtual {p0}, Landroid/view/View;->getLeft()I
+
+    move-result v3
+
+    sub-int/2addr v2, v3
+
+    int-to-float v2, v2
+
+    invoke-virtual {v0}, Landroid/view/View;->getTop()I
+
+    move-result v0
+
+    invoke-virtual {p0}, Landroid/view/View;->getTop()I
+
+    move-result p0
+
+    sub-int/2addr v0, p0
+
+    int-to-float p0, v0
+
+    invoke-virtual {v1, v2, p0}, Landroid/graphics/RectF;->offset(FF)V
+
+    return-object v1
+
+    :cond_3
+    invoke-static {p0}, Lcom/k4/dressroom/FrameSize;->lastSamsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+
+    move-result-object p0
+
+    if-eqz p0, :cond_4
+
+    invoke-virtual {p0}, Landroid/graphics/RectF;->isEmpty()Z
+
+    move-result v0
+
+    if-nez v0, :cond_4
+
+    return-object p0
+
+    :cond_4
+    const/4 p0, 0x0
+
+    return-object p0
 .end method
 
 .method public static saveFront(Landroid/graphics/drawable/Drawable;Ljava/lang/Object;)Landroid/graphics/drawable/Drawable;

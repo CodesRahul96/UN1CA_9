@@ -132,7 +132,7 @@ final class SavedFrame {
             return null;
         }
         float vw = bg.getWidth(), vh = bg.getHeight();
-        RectF hole = FrameSize.samsungHole(bg);
+        RectF hole = FrameSize.samsungHoleAny(bg); // also after Samsung cleared the bounds for the save
         RectF b = EditXf.bounds(bg);
         float asp = EditXf.aspect(bg);
         int[] fp = EditXf.fingerprint(bg);
@@ -235,6 +235,15 @@ final class SavedFrame {
 
     /** MaskImageView.onDraw of a CropImageView in the Home editor (UI thread). */
     static void tick(View v) {
+        if (EditXf.sFrameLayout) {
+            try {
+                String t = EditXf.viewType(v);
+                if ("FRAME_BACKGROUND".equals(t) || "OBJECT".equals(t)) {
+                    FrameSize.samsungHole(v); // keeps FrameSize.lastSamsungHole current for save()
+                }
+            } catch (Throwable ignored) {
+            }
+        }
         if (sDone) {
             return;
         }
@@ -266,7 +275,7 @@ final class SavedFrame {
             JSONObject o = sRec;
             RectF b = EditXf.bounds(v);
             float asp = EditXf.aspect(v);
-            RectF hole = FrameSize.samsungHole(v);
+            RectF hole = FrameSize.samsungHoleAny(v);
             if (((ImageView) v).getDrawable() == null || b == null || b.isEmpty() || asp == 0f || hole == null || hole.isEmpty()) {
                 return; // not set up yet
             }

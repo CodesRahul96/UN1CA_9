@@ -1031,7 +1031,7 @@
 
     int-to-float v5, v5
 
-    invoke-static {v1}, Lcom/k4/dressroom/FrameSize;->samsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+    invoke-static {v1}, Lcom/k4/dressroom/FrameSize;->samsungHoleAny(Landroid/view/View;)Landroid/graphics/RectF;
 
     move-result-object v6
 
@@ -1885,17 +1885,49 @@
 .method static tick(Landroid/view/View;)V
     .locals 8
 
+    sget-boolean v0, Lcom/k4/dressroom/EditXf;->sFrameLayout:Z
+
+    const-string v1, "FRAME_BACKGROUND"
+
+    if-eqz v0, :cond_1
+
+    :try_start_0
+    invoke-static {p0}, Lcom/k4/dressroom/EditXf;->viewType(Landroid/view/View;)Ljava/lang/String;
+
+    move-result-object v0
+
+    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v2
+
+    if-nez v2, :cond_0
+
+    const-string v2, "OBJECT"
+
+    invoke-virtual {v2, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_1
+
+    :cond_0
+    invoke-static {p0}, Lcom/k4/dressroom/FrameSize;->samsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+    :try_end_0
+    .catchall {:try_start_0 .. :try_end_0} :catchall_0
+
+    :catchall_0
+    :cond_1
     sget-boolean v0, Lcom/k4/dressroom/SavedFrame;->sDone:Z
 
-    if-eqz v0, :cond_0
+    if-eqz v0, :cond_2
 
     goto/16 :goto_2
 
-    :cond_0
-    :try_start_0
+    :cond_2
+    :try_start_1
     sget-boolean v0, Lcom/k4/dressroom/SavedFrame;->sRead:Z
 
-    if-nez v0, :cond_1
+    if-nez v0, :cond_3
 
     const/4 v0, 0x1
 
@@ -1903,107 +1935,105 @@
 
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->load(Landroid/view/View;)Z
 
-    move-result v1
+    move-result v2
 
-    if-nez v1, :cond_1
+    if-nez v2, :cond_3
 
     sput-boolean v0, Lcom/k4/dressroom/SavedFrame;->sDone:Z
 
-    return-void
+    goto/16 :goto_2
 
-    :cond_1
+    :cond_3
     invoke-static {}, Landroid/os/SystemClock;->uptimeMillis()J
 
-    move-result-wide v0
+    move-result-wide v2
 
-    sget-wide v2, Lcom/k4/dressroom/SavedFrame;->sUntil:J
+    sget-wide v4, Lcom/k4/dressroom/SavedFrame;->sUntil:J
 
-    cmp-long v0, v0, v2
+    cmp-long v0, v2, v4
 
-    if-lez v0, :cond_3
+    if-lez v0, :cond_5
 
     sget p0, Lcom/k4/dressroom/SavedFrame;->sApplies:I
 
-    if-lez p0, :cond_2
+    if-lez p0, :cond_4
 
     const-string p0, "restore window over"
 
     goto :goto_0
 
-    :cond_2
+    :cond_4
     const-string p0, "not restored: the saved frame never showed"
 
     :goto_0
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->done(Ljava/lang/String;)V
 
-    return-void
+    goto/16 :goto_2
 
-    :cond_3
+    :cond_5
     sget-boolean v0, Lcom/k4/dressroom/EditXf;->sFrameLayout:Z
 
-    if-nez v0, :cond_4
+    if-nez v0, :cond_6
 
     sget p0, Lcom/k4/dressroom/SavedFrame;->sApplies:I
 
-    if-lez p0, :cond_d
+    if-lez p0, :cond_f
 
     const-string p0, "the frame was taken off"
 
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->done(Ljava/lang/String;)V
 
-    return-void
+    goto/16 :goto_2
 
-    :cond_4
+    :cond_6
     sget-boolean v0, Lcom/k4/dressroom/SavedFrame;->sPosted:Z
 
-    if-nez v0, :cond_d
-
-    const-string v0, "FRAME_BACKGROUND"
+    if-nez v0, :cond_f
 
     invoke-static {p0}, Lcom/k4/dressroom/EditXf;->viewType(Landroid/view/View;)Ljava/lang/String;
 
-    move-result-object v1
+    move-result-object v0
 
-    invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
     move-result v0
 
-    if-eqz v0, :cond_d
+    if-eqz v0, :cond_f
 
     invoke-virtual {p0}, Landroid/view/View;->isShown()Z
 
     move-result v0
 
-    if-eqz v0, :cond_d
+    if-eqz v0, :cond_f
 
     invoke-virtual {p0}, Landroid/view/View;->getWidth()I
 
     move-result v0
 
-    if-eqz v0, :cond_d
+    if-eqz v0, :cond_f
 
     invoke-virtual {p0}, Landroid/view/View;->getHeight()I
 
     move-result v0
 
-    if-nez v0, :cond_5
+    if-nez v0, :cond_7
 
     goto/16 :goto_2
 
-    :cond_5
+    :cond_7
     sget-object v0, Lcom/k4/dressroom/SavedFrame;->sApplied:Ljava/lang/ref/WeakReference;
 
     invoke-virtual {v0}, Ljava/lang/ref/WeakReference;->get()Ljava/lang/Object;
 
     move-result-object v0
 
-    if-ne v0, p0, :cond_6
+    if-ne v0, p0, :cond_8
 
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->drift(Landroid/view/View;)V
 
-    return-void
+    goto/16 :goto_2
 
-    :cond_6
+    :cond_8
     sget-object v0, Lcom/k4/dressroom/SavedFrame;->sRec:Lorg/json/JSONObject;
 
     invoke-static {p0}, Lcom/k4/dressroom/EditXf;->bounds(Landroid/view/View;)Landroid/graphics/RectF;
@@ -2014,7 +2044,7 @@
 
     move-result v2
 
-    invoke-static {p0}, Lcom/k4/dressroom/FrameSize;->samsungHole(Landroid/view/View;)Landroid/graphics/RectF;
+    invoke-static {p0}, Lcom/k4/dressroom/FrameSize;->samsungHoleAny(Landroid/view/View;)Landroid/graphics/RectF;
 
     move-result-object v3
 
@@ -2026,33 +2056,33 @@
 
     move-result-object v4
 
-    if-eqz v4, :cond_d
+    if-eqz v4, :cond_f
 
-    if-eqz v1, :cond_d
+    if-eqz v1, :cond_f
 
     invoke-virtual {v1}, Landroid/graphics/RectF;->isEmpty()Z
 
     move-result v1
 
-    if-nez v1, :cond_d
+    if-nez v1, :cond_f
 
     const/4 v1, 0x0
 
     cmpl-float v1, v2, v1
 
-    if-eqz v1, :cond_d
+    if-eqz v1, :cond_f
 
-    if-eqz v3, :cond_d
+    if-eqz v3, :cond_f
 
     invoke-virtual {v3}, Landroid/graphics/RectF;->isEmpty()Z
 
     move-result v1
 
-    if-eqz v1, :cond_7
+    if-eqz v1, :cond_9
 
     goto :goto_2
 
-    :cond_7
+    :cond_9
     float-to-double v1, v2
 
     const-string v4, "aspect"
@@ -2073,16 +2103,16 @@
 
     cmpl-double v1, v4, v1
 
-    if-lez v1, :cond_8
+    if-lez v1, :cond_a
 
     goto :goto_2
 
-    :cond_8
+    :cond_a
     invoke-static {p0, v3, v0}, Lcom/k4/dressroom/SavedFrame;->otherFrame(Landroid/view/View;Landroid/graphics/RectF;Lorg/json/JSONObject;)Ljava/lang/String;
 
     move-result-object v1
 
-    if-nez v1, :cond_9
+    if-nez v1, :cond_b
 
     const-string v1, "fp"
 
@@ -2094,18 +2124,18 @@
 
     move-result-object v1
 
-    :cond_9
-    if-eqz v1, :cond_b
+    :cond_b
+    if-eqz v1, :cond_d
 
     sget p0, Lcom/k4/dressroom/SavedFrame;->sApplies:I
 
-    if-lez p0, :cond_a
+    if-lez p0, :cond_c
 
     const-string p0, "frame changed ("
 
     goto :goto_1
 
-    :cond_a
+    :cond_c
     const-string p0, "not restored ("
 
     :goto_1
@@ -2127,29 +2157,29 @@
 
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->done(Ljava/lang/String;)V
 
-    return-void
+    goto :goto_2
 
-    :cond_b
+    :cond_d
     sget v0, Lcom/k4/dressroom/SavedFrame;->sApplies:I
 
     const/4 v1, 0x4
 
-    if-lt v0, v1, :cond_c
+    if-lt v0, v1, :cond_e
 
     const-string p0, "Samsung keeps rebuilding the frame, left as it is"
 
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->done(Ljava/lang/String;)V
 
-    return-void
+    goto :goto_2
 
-    :cond_c
+    :cond_e
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->apply(Landroid/view/View;)V
-    :try_end_0
-    .catchall {:try_start_0 .. :try_end_0} :catchall_0
+    :try_end_1
+    .catchall {:try_start_1 .. :try_end_1} :catchall_1
 
-    return-void
+    goto :goto_2
 
-    :catchall_0
+    :catchall_1
     move-exception p0
 
     const-string v0, "K4HomeClock"
@@ -2162,7 +2192,7 @@
 
     invoke-static {p0}, Lcom/k4/dressroom/SavedFrame;->done(Ljava/lang/String;)V
 
-    :cond_d
+    :cond_f
     :goto_2
     return-void
 .end method

@@ -81,6 +81,8 @@ public final class FrameSize {
     private static boolean sMaybe;
     /** Samsung's hole per view, and the scaled hole last set on it. */
     private static final WeakHashMap<View, RectF[]> sHoles = new WeakHashMap<>();
+    /** Last Samsung hole each frame view showed (UI thread); Samsung clears the view's frame bounds when the save starts. */
+    private static final WeakHashMap<View, RectF> sLastHole = new WeakHashMap<>();
 
     private FrameSize() {}
 
@@ -145,9 +147,45 @@ public final class FrameSize {
             }
             RectF r = new RectF(base);
             EditXf.imageMatrix((ImageView) f).mapRect(r);
+            synchronized (sLastHole) {
+                sLastHole.put(f, new RectF(r));
+            }
             return r;
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /**
+     * Samsung's hole in the frame picture view's coordinates: from that view, else from the subject (OBJECT) view next to
+     * it (Samsung may set the hole on only one of them), else the last one either showed (the save runs after Samsung
+     * cleared the bounds). Null when no frame hole was ever seen.
+     */
+    static RectF samsungHoleAny(View bg) {
+        RectF r = samsungHole(bg);
+        if (r != null && !r.isEmpty()) {
+            return r;
+        }
+        View obj = EditXf.frameView(bg, "OBJECT");
+        if (obj != null && obj != bg) {
+            RectF o = samsungHole(obj);
+            if (o == null || o.isEmpty()) {
+                o = lastSamsungHole(obj);
+            }
+            if (o != null && !o.isEmpty()) {
+                o.offset(obj.getLeft() - bg.getLeft(), obj.getTop() - bg.getTop());
+                return o;
+            }
+        }
+        r = lastSamsungHole(bg);
+        return r != null && !r.isEmpty() ? r : null;
+    }
+
+    /** {@link #samsungHole} as this view last showed it, or null (the save thread reads it after Samsung cleared the bounds). */
+    static RectF lastSamsungHole(View f) {
+        synchronized (sLastHole) {
+            RectF r = sLastHole.get(f);
+            return r == null ? null : new RectF(r);
         }
     }
 
