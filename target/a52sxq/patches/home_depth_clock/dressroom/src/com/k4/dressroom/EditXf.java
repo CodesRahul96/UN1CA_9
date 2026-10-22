@@ -66,7 +66,8 @@ import java.util.ArrayList;
  * stay put. Both are drawn through T in MaskImageView.onDraw, so everything Samsung composes by drawing those views (the
  * editor, its stacked preview bitmap, HomeClock.SubjectView's front layers) follows; the save bakes the picture and the
  * subject like the plain layout's, and the plates are saved by Samsung as they are. T is dropped whenever the layout
- * changes ({@link #layout}); a frame transform is not kept for a re-edit.
+ * changes ({@link #layout}); a frame layout's T (with the frame size and the picture's place) is saved next to Samsung's
+ * layer files and comes back when that wallpaper is edited again in the same frame ({@link SavedFrame}).
  * <p>
  * A saved transform comes back when the same wallpaper is edited again ({@link #saveRecord}, {@link #tryRestore}):
  * Samsung re-opens its own copy of the original picture at the crop it saved, so T (and the fill) are stored next to
@@ -115,6 +116,8 @@ public final class EditXf {
         sFixedColor = null;
         sFixedStyle = null;
         sLastFillColor = null;
+        sFrameBg = new WeakReference<>(null);
+        SavedFrame.reset();
     }
 
     /** The angle shown and saved: level within {@link #SNAP_DEG}. */
@@ -448,6 +451,55 @@ public final class EditXf {
         }
     }
 
+    /** Why v does not show the picture of a saved fingerprint (coarse: re-encoding, scaling and blur pass), or null. */
+    static String otherPicture(org.json.JSONArray fp, View v) throws org.json.JSONException {
+        int[] now = fingerprint(v);
+        if (fp == null || now == null || fp.length() != now.length) {
+            return "no picture fingerprint";
+        }
+        long sum = 0;
+        int max = 0;
+        for (int i = 0; i < now.length; i++) {
+            int d = Math.abs(now[i] - fp.getInt(i));
+            sum += d;
+            max = Math.max(max, d);
+        }
+        if (sum > 8L * now.length || max > 48) {
+            return "another picture (fingerprint mean " + (sum / now.length) + ", max " + max + ")";
+        }
+        return null;
+    }
+
+    /** The frame layout's picture view (FRAME_BACKGROUND) last drawn, or the one next to this editor's crop views. */
+    private static WeakReference<View> sFrameBg = new WeakReference<>(null);
+
+    static View frameBackground() {
+        View v = sFrameBg.get();
+        if (v != null && v.isAttachedToWindow() && "FRAME_BACKGROUND".equals(viewType(v))) {
+            return v;
+        }
+        return frameView(anyCrop(), "FRAME_BACKGROUND");
+    }
+
+    /**
+     * A frame layout's saved T and fill put back ({@link SavedFrame}, UI thread): T belongs to the frame's picture view,
+     * offsets per view size (vw x vh now).
+     */
+    static void restoreFrame(View bg, org.json.JSONObject o, float vw, float vh) throws org.json.JSONException {
+        sPending = null;
+        sView = new WeakReference<>(bg);
+        s = Math.max(MIN_S, Math.min(1f, (float) o.optDouble("s", 1)));
+        deg = Math.max(-MAX_DEG, Math.min(MAX_DEG, (float) o.optDouble("deg", 0)));
+        tx = s < 1f ? (float) o.optDouble("tx", 0) * vw : 0f;
+        ty = s < 1f ? (float) o.optDouble("ty", 0) * vh : 0f;
+        sFill = o.optInt("fill", FILL_COLOR) == FILL_BLUR ? FILL_BLUR : FILL_COLOR;
+        sFixedColor = o.has("color") ? Integer.valueOf(o.getInt("color")) : null;
+        sFixedStyle = o.has("style") ? o.getString("style") : null;
+        if (sSwitch.get() != null) {
+            select(sFill, bg);
+        }
+    }
+
     static boolean near(org.json.JSONArray a, RectF b, float tol) throws org.json.JSONException {
         return Math.abs(a.getDouble(0) - b.left) <= tol && Math.abs(a.getDouble(1) - b.top) <= tol
                 && Math.abs(a.getDouble(2) - b.right) <= tol && Math.abs(a.getDouble(3) - b.bottom) <= tol;
@@ -498,23 +550,10 @@ public final class EditXf {
                 return;
             }
             // the same picture (a re-edit decodes Samsung's own copy of it: compared coarsely)
-            org.json.JSONArray fp = o.optJSONArray("fp");
-            int[] now = fingerprint(v);
-            if (fp == null || now == null || fp.length() != now.length) {
+            String other = otherPicture(o.optJSONArray("fp"), v);
+            if (other != null) {
                 sPending = null;
-                Log.i(TAG, "saved home picture transform not restored: no picture fingerprint");
-                return;
-            }
-            long sum = 0;
-            int max = 0;
-            for (int i = 0; i < now.length; i++) {
-                int d = Math.abs(now[i] - fp.getInt(i));
-                sum += d;
-                max = Math.max(max, d);
-            }
-            if (sum > 8L * now.length || max > 48) {
-                sPending = null;
-                Log.i(TAG, "saved home picture transform not restored: another picture (fingerprint mean " + (sum / now.length) + ", max " + max + ")");
+                Log.i(TAG, "saved home picture transform not restored: " + other);
                 return;
             }
             float kx = v.getWidth() / (float) o.getInt("vw"), ky = v.getHeight() / (float) o.getInt("vh");
@@ -621,6 +660,7 @@ public final class EditXf {
                     Log.i(TAG, "saved home picture transform not restored: the picture was touched first");
                     sPending = null;
                 }
+                SavedFrame.touched();
             }
             if (!(sFrameLayout ? frameTarget(v) : isMain(v)) || !handles(v)) {
                 return e; // frame plates, and views Samsung does not let move: stock
@@ -638,7 +678,9 @@ public final class EditXf {
             }
             noStretch(v);
             if (sView.get() != v) {
-                if (sView.get() != null && !identity()) {
+                View owner = sView.get();
+                // the frame layout's picture and subject share T (either may take the touches)
+                if (owner != null && !identity() && !(sFrameLayout && frameTarget(owner) && owner.getParent() == v.getParent())) {
                     return e; // another crop view owns the transform
                 }
                 sView = new WeakReference<>(v);
@@ -926,6 +968,9 @@ public final class EditXf {
         if (HomeClock.active && (sPending != null || !sPendingRead) && v != null && CROP.equals(v.getClass().getName())) {
             tryRestore(v);
         }
+        if (HomeClock.active && v != null && CROP.equals(v.getClass().getName())) {
+            SavedFrame.tick(v); // a frame edit saved with this wallpaper (no-op once settled)
+        }
         if (sFrameLayout) {
             return drawFramed(v, c);
         }
@@ -949,6 +994,9 @@ public final class EditXf {
     static boolean drawFramed(View v, Canvas c) {
         if (!HomeClock.active || v == null || !CROP.equals(v.getClass().getName())) {
             return false;
+        }
+        if ("FRAME_BACKGROUND".equals(viewType(v))) {
+            sFrameBg = new WeakReference<>(v);
         }
         int plate = FrameSize.drawPlate(v, c);
         if (plate == 2) {
@@ -1278,6 +1326,7 @@ public final class EditXf {
         if (!HomeClock.active || maker == null) {
             return;
         }
+        SavedFrame.save(maker); // frame size, T and the picture's place for a re-edit, next to Samsung's layer files
         if (identity()) {
             if (sFrameLayout) {
                 Log.i(TAG, "home save: frame layout, saved as Samsung composed it");
