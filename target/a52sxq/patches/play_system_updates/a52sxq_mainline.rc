@@ -1,38 +1,74 @@
 # Google Play system update evidence (target/a52sxq/patches/play_system_updates). Only init builtins, no new domain.
 #
 # A failed update boot is rolled back by apexd/vold: /data returns to its pre-boot checkpoint, so its logs, tombstones
-# and the updated APEX files are gone afterwards. /cache is not checkpointed, so keep the evidence there (root only):
-#   staged_tethering_netd.o       the netd.o of the Tethering APEX that update boot activated (regen.py input)
-#   staged_tethering_<obj>.o      its offload/test/clatd/dscpPolicy.o (tethering_trains/known inputs)
-#   staged_apex-info-list.xml     every module version active during that boot
-#   staged_apex-updated-list.xml  what apexd updated in that boot
-#   failed_staged_boot_kmsg.txt   kernel log of the last update boot that never reached boot_completed
-# k4-mainline-diag -v reads them.
+# and the updated APEX files are gone afterwards. /cache is not checkpointed, so keep the evidence there (root only).
+# During an update boot it is collected in the marker dir /cache/k4_mainline/staged_boot_running/; the dir only
+# survives that boot if the boot never reached boot_completed, and then the next boot promotes it to the files
+# k4-mainline-diag -v reads (always all of them together, so they never mix two update boots):
+#   failed_staged_tethering_netd.o      the netd.o of the Tethering APEX that update boot activated (regen.py input)
+#   failed_staged_tethering_<obj>.o     its offload/test/clatd/dscpPolicy.o (tethering_trains/known inputs)
+#   failed_staged_apex-info-list.xml    every module version active during that boot
+#   failed_staged_apex-updated-list.xml what apexd updated in that boot
+#   failed_staged_boot_kmsg.txt         its kernel log (pstore)
+# An empty file = that boot had no such file. A later update boot that completes leaves them alone, so the evidence of
+# a failed train is kept until the next failed update boot replaces it.
 
 # apexd sets apexd.packages.updated=true at the end of its start when it activated new APEXes in this boot (it resets
 # it to false once boot completes), i.e. before load-bpf-programs, and this file sorts before netbpfload.rc, so this
-# runs before the loader that could fail and reboot.
+# runs before the loader that could fail and reboot. The post-fs-data action below has already removed any marker of
+# an earlier boot (post-fs-data is triggered before load-bpf-programs), so the dir starts empty. `write ... ""` first
+# makes every file exist even when its source does not.
 on load-bpf-programs && property:apexd.packages.updated=true
     mkdir /cache/k4_mainline 0700 root root
     mkdir /cache/k4_mainline/staged_boot_running 0700 root root
-    copy /apex/apex-info-list.xml /cache/k4_mainline/staged_apex-info-list.xml
-    copy /apex/apex-updated-list.xml /cache/k4_mainline/staged_apex-updated-list.xml
-    copy /apex/com.android.tethering/etc/bpf/mainline/netd.o /cache/k4_mainline/staged_tethering_netd.o
-    copy /apex/com.android.tethering/etc/bpf/mainline/offload.o /cache/k4_mainline/staged_tethering_offload.o
-    copy /apex/com.android.tethering/etc/bpf/mainline/test.o /cache/k4_mainline/staged_tethering_test.o
-    copy /apex/com.android.tethering/etc/bpf/mainline/clatd.o /cache/k4_mainline/staged_tethering_clatd.o
-    copy /apex/com.android.tethering/etc/bpf/mainline/dscpPolicy.o /cache/k4_mainline/staged_tethering_dscpPolicy.o
+    write /cache/k4_mainline/staged_boot_running/apex-info-list.xml ""
+    copy /apex/apex-info-list.xml /cache/k4_mainline/staged_boot_running/apex-info-list.xml
+    write /cache/k4_mainline/staged_boot_running/apex-updated-list.xml ""
+    copy /apex/apex-updated-list.xml /cache/k4_mainline/staged_boot_running/apex-updated-list.xml
+    write /cache/k4_mainline/staged_boot_running/tethering_netd.o ""
+    copy /apex/com.android.tethering/etc/bpf/mainline/netd.o /cache/k4_mainline/staged_boot_running/tethering_netd.o
+    write /cache/k4_mainline/staged_boot_running/tethering_offload.o ""
+    copy /apex/com.android.tethering/etc/bpf/mainline/offload.o /cache/k4_mainline/staged_boot_running/tethering_offload.o
+    write /cache/k4_mainline/staged_boot_running/tethering_test.o ""
+    copy /apex/com.android.tethering/etc/bpf/mainline/test.o /cache/k4_mainline/staged_boot_running/tethering_test.o
+    write /cache/k4_mainline/staged_boot_running/tethering_clatd.o ""
+    copy /apex/com.android.tethering/etc/bpf/mainline/clatd.o /cache/k4_mainline/staged_boot_running/tethering_clatd.o
+    write /cache/k4_mainline/staged_boot_running/tethering_dscpPolicy.o ""
+    copy /apex/com.android.tethering/etc/bpf/mainline/dscpPolicy.o /cache/k4_mainline/staged_boot_running/tethering_dscpPolicy.o
     setprop sys.k4.mainline.staged_boot 1
 
-# The update boot finished: nothing to keep from it.
+# The update boot finished: nothing to keep from it (the failed_staged_* files of an earlier failure stay).
 on property:sys.boot_completed=1 && property:sys.k4.mainline.staged_boot=1
+    rm /cache/k4_mainline/staged_boot_running/apex-info-list.xml
+    rm /cache/k4_mainline/staged_boot_running/apex-updated-list.xml
+    rm /cache/k4_mainline/staged_boot_running/tethering_netd.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_offload.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_test.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_clatd.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_dscpPolicy.o
     rmdir /cache/k4_mainline/staged_boot_running
 
-# The previous boot was an update boot that never finished (staged_boot_running is still there): pstore holds its
-# kernel log. Keep a copy outside the marker dir and drop the marker. On a normal boot the marker dir does not exist,
-# so these four commands fail with ENOENT and do nothing (init logs one line each).
+# The previous boot was an update boot that never finished (staged_boot_running is still there): add its kernel log
+# from pstore, promote the whole set to failed_staged_* and drop the marker. On a normal boot the marker dir does not
+# exist, so every command here fails with ENOENT and changes nothing (init logs one line each) - in particular the
+# failed_staged_* files are only ever overwritten by copies out of an existing marker dir.
 on post-fs-data
+    write /cache/k4_mainline/staged_boot_running/kmsg ""
     copy /sys/fs/pstore/console-ramoops-0 /cache/k4_mainline/staged_boot_running/kmsg
+    copy /cache/k4_mainline/staged_boot_running/apex-info-list.xml /cache/k4_mainline/failed_staged_apex-info-list.xml
+    copy /cache/k4_mainline/staged_boot_running/apex-updated-list.xml /cache/k4_mainline/failed_staged_apex-updated-list.xml
+    copy /cache/k4_mainline/staged_boot_running/tethering_netd.o /cache/k4_mainline/failed_staged_tethering_netd.o
+    copy /cache/k4_mainline/staged_boot_running/tethering_offload.o /cache/k4_mainline/failed_staged_tethering_offload.o
+    copy /cache/k4_mainline/staged_boot_running/tethering_test.o /cache/k4_mainline/failed_staged_tethering_test.o
+    copy /cache/k4_mainline/staged_boot_running/tethering_clatd.o /cache/k4_mainline/failed_staged_tethering_clatd.o
+    copy /cache/k4_mainline/staged_boot_running/tethering_dscpPolicy.o /cache/k4_mainline/failed_staged_tethering_dscpPolicy.o
     copy /cache/k4_mainline/staged_boot_running/kmsg /cache/k4_mainline/failed_staged_boot_kmsg.txt
+    rm /cache/k4_mainline/staged_boot_running/apex-info-list.xml
+    rm /cache/k4_mainline/staged_boot_running/apex-updated-list.xml
+    rm /cache/k4_mainline/staged_boot_running/tethering_netd.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_offload.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_test.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_clatd.o
+    rm /cache/k4_mainline/staged_boot_running/tethering_dscpPolicy.o
     rm /cache/k4_mainline/staged_boot_running/kmsg
     rmdir /cache/k4_mainline/staged_boot_running

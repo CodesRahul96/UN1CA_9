@@ -15,7 +15,7 @@
 #     regen.py does that on purpose; maps both sides only create on >= 5.10, e.g. sk_storage, may differ), and
 #   * every program pin a known netd.o would pin on this kernel at API 37.
 # Known objects live in known/ as <versionCode>_<label>_netd.o (the factory one and each Play train's, pulled from
-# /apex/com.android.tethering/etc/bpf/mainline/netd.o or /cache/k4_mainline/staged_tethering_netd.o).
+# /apex/com.android.tethering/etc/bpf/mainline/netd.o or /cache/k4_mainline/failed_staged_tethering_netd.o).
 #
 # The other objects the frozen loader loads come from the ACTIVE APEX itself (loadAllObjects in netbpfload 371021120,
 # same order: offload.o test.o clatd.o dscpPolicy.o netd.o; the @funcs.o variants only on >= 6.6.118 kernels). Each
@@ -263,7 +263,7 @@ for ver, lab in factory + sorted(set(known) - set(factory)):
         p = os.path.join(known[(ver, lab)], f"{ver}_{lab}_{obj}.o")
         if not os.path.exists(p):
             print(f"Tethering {ver} ({lab}): known/{os.path.basename(p)} missing - copy it from that APEX's "
-                  f"etc/bpf/mainline/{obj}.o (or /cache/k4_mainline/staged_tethering_{obj}.o)"); bad += 1; continue
+                  f"etc/bpf/mainline/{obj}.o (or /cache/k4_mainline/failed_staged_tethering_{obj}.o)"); bad += 1; continue
         probs, req, made = parse_obj(p)
         missing = req - made
         if lab == "factory": base[obj] = missing

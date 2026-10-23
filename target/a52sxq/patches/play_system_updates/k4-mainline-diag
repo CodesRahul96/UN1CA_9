@@ -7,7 +7,7 @@
 #   adb shell k4-mainline-diag -s     + saves everything under /data/local/tmp/k4-mainline-<time>/ (adb pull it)
 #
 # Works as the adb shell user; as root (su -c k4-mainline-diag -v) it also reads the apexd state in /metadata/apex,
-# the SELinux denials, and what the ROM captured in /cache/k4_mainline during the last update boot.
+# the SELinux denials, and what the ROM kept in /cache/k4_mainline of the last update boot that did not finish.
 
 VERBOSE=0
 SAVE=0
@@ -142,14 +142,19 @@ LIVE_SET="$(for o in netd offload test clatd dscpPolicy; do sha256sum "$LIVE_DIR
 LIVE_ALL="$(printf '%s\n' "$LIVE_SET" | sha256sum | cut -d ' ' -f 1)"
 LIVE_KNOWN="$(grep "^$LIVE_ALL " "$KNOWN" 2> /dev/null | head -n 1 | cut -d ' ' -f 3-)"
 LIVE_NETD_KNOWN="$(awk -v s="$LIVE_SHA" '$2 == s { sub(/^[^ ]* [^ ]* /, ""); print; exit }' "$KNOWN" 2> /dev/null)"
-CAP_MISSING=""; CAP_VER=""
-if [ "$ROOT" = 1 ] && [ -f "$CAP/staged_tethering_netd.o" ]; then
-    pins "$CAP/staged_tethering_netd.o" > "$T/staged.pins"
+# What the ROM kept of the last update boot that never finished (a52sxq_mainline.rc; an empty file = absent then)
+CAPF="$CAP/failed_staged_tethering"
+CAP_MISSING=""; CAP_VER=""; CAP_KNOWN=""
+if [ "$ROOT" = 1 ] && [ -s "${CAPF}_netd.o" ]; then
+    pins "${CAPF}_netd.o" > "$T/staged.pins"
     CAP_MISSING="$(comm -23 "$T/staged.pins" "$T/ours.pins" | sed 's|.*/map_netd_||; s|.*/map_||' | tr '\n' ' ')"
     CAP_VER="$(grep -o '<apex-info [^>]*moduleName="com.android.tethering"[^>]*isActive="true"[^>]*>' \
-        "$CAP/staged_apex-info-list.xml" 2> /dev/null | sed -n 's/.*versionCode="\([0-9]*\)".*/\1/p' | head -n 1)"
+        "$CAP/failed_staged_apex-info-list.xml" 2> /dev/null | sed -n 's/.*versionCode="\([0-9]*\)".*/\1/p' | head -n 1)"
+    CAP_SET="$(for o in netd offload test clatd dscpPolicy; do sha256sum "${CAPF}_$o.o" 2> /dev/null | cut -d ' ' -f 1; done)"
+    CAP_ALL="$(printf '%s\n' "$CAP_SET" | sha256sum | cut -d ' ' -f 1)"
+    CAP_KNOWN="$(grep "^$CAP_ALL " "$KNOWN" 2> /dev/null | head -n 1 | cut -d ' ' -f 3-)"
 fi
-DEV_HINT="developer: add that netd.o + offload/test/clatd/dscpPolicy.o (root: /cache/k4_mainline/staged_tethering_*.o) to tethering_trains/known and rerun tethering/regen.py --train-progs"
+DEV_HINT="developer: copy /cache/k4_mainline/failed_staged_tethering_<obj>.o for obj = netd offload test clatd dscpPolicy (root) to tethering_trains/known/<versionCode>_train_<obj>.o and rerun tethering/regen.py --train-progs with that netd.o"
 
 # --- the one line ---------------------------------------------------------------------------------------------------
 explain() {
@@ -280,10 +285,12 @@ echo "  ROM a52_netd.o: $(wc -l < "$T/ours.pins") maps; active netd.o: $(wc -l <
 grep -q "netbpfload_a52" /system/etc/init/netbpfload.rc 2> /dev/null && echo "  bpfloader runs /system/bin/netbpfload_a52* (frozen loader)" || \
     echo "  WARNING: /system/etc/init/netbpfload.rc does not run netbpfload_a52*"
 if [ "$ROOT" = 1 ]; then
-    if [ -f "$CAP/staged_tethering_netd.o" ]; then
-        echo "  captured at the last update boot ($(stat -c %y "$CAP/staged_tethering_netd.o" | cut -c 1-16)): Tethering ${CAP_VER:-?}, missing maps: ${CAP_MISSING:-none}"
+    if [ -s "${CAPF}_netd.o" ]; then
+        echo "  last update boot that did not finish ($(stat -c %y "${CAPF}_netd.o" | cut -c 1-16)): Tethering ${CAP_VER:-?}${CAP_KNOWN:+ (BPF objects = verified $CAP_KNOWN)}, maps a52_netd.o lacks: ${CAP_MISSING:-none}"
+        [ -n "$CAP_VER" ] && [ "$CAP_VER" = "$TETH_VER" ] && echo "    (that is the Tethering active now)"
+        for o in netd offload test clatd dscpPolicy; do [ -s "${CAPF}_$o.o" ] || echo "    ($o.o was not in that APEX)"; done
     else
-        echo "  nothing captured in $CAP yet (filled at the next update boot)"
+        echo "  no unfinished update boot captured in $CAP (filled when one does not reach boot_completed)"
     fi
     if [ -f "$CAP/failed_staged_boot_kmsg.txt" ]; then
         echo "  kernel log of the last update boot that did not finish ($(stat -c %y "$CAP/failed_staged_boot_kmsg.txt" | cut -c 1-16)):"

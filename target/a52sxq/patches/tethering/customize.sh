@@ -50,7 +50,7 @@
 # pin path) and a newer object may need a newer loader (bpfloader_min_ver). After every Tethering train: check
 # `logcat -b all | grep -iE "netbpfload|LibBpfLoader|bpf map|ringbuf"` and the stats/maps pins; when Google's netd.o
 # changes, rerun regen.py on the updated APEX's netd.o (Android 17 keeps updated APEXes as pinned images that cannot be
-# copied as files: pull /apex/com.android.tethering/etc/bpf/mainline/netd.o, or /cache/k4_mainline/staged_tethering_netd.o
+# copied as files: pull /apex/com.android.tethering/etc/bpf/mainline/netd.o, or /cache/k4_mainline/failed_staged_tethering_netd.o
 # after a rolled-back update boot, see play_system_updates), add it to tethering_trains/known/ and rebuild; the
 # tethering_trains patch aborts the build while a52_netd.o does not cover every known train.
 # Recovery if a Tethering train breaks boot. A fresh update boot is reverted automatically (netd is `updatable`, so
