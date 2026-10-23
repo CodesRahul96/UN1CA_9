@@ -4,39 +4,56 @@
 
 
 # instance fields
+.field final gated:Z
+
 .field volatile lastDrawn:Ljava/lang/String;
 
-.field final owner:Lh3/a;
+.field private final owner:Ljava/lang/ref/WeakReference;
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/lang/ref/WeakReference<",
+            "Lh3/a;",
+            ">;"
+        }
+    .end annotation
+.end field
 
 .field final scaleRef:Li3/c;
 
 
 # direct methods
-.method constructor <init>(Landroid/content/Context;Ljava/lang/String;Li3/c;Lh3/a;)V
-    .registers 5
+.method constructor <init>(Landroid/content/Context;Ljava/lang/String;Li3/c;Lh3/a;Z)V
+    .registers 6
 
-    .line 25
+    .line 30
     invoke-direct {p0, p1, p2}, Li3/j;-><init>(Landroid/content/Context;Ljava/lang/String;)V
 
-    .line 22
+    .line 27
     const-string p1, ""
 
     iput-object p1, p0, Lcom/k4/homeclock/DepthClock;->lastDrawn:Ljava/lang/String;
 
-    .line 26
+    .line 31
     iput-object p3, p0, Lcom/k4/homeclock/DepthClock;->scaleRef:Li3/c;
 
-    .line 27
-    iput-object p4, p0, Lcom/k4/homeclock/DepthClock;->owner:Lh3/a;
+    .line 32
+    new-instance p1, Ljava/lang/ref/WeakReference;
 
-    .line 28
+    invoke-direct {p1, p4}, Ljava/lang/ref/WeakReference;-><init>(Ljava/lang/Object;)V
+
+    iput-object p1, p0, Lcom/k4/homeclock/DepthClock;->owner:Ljava/lang/ref/WeakReference;
+
+    .line 33
+    iput-boolean p5, p0, Lcom/k4/homeclock/DepthClock;->gated:Z
+
+    .line 34
     return-void
 .end method
 
 .method static luminance(Landroid/graphics/Bitmap;IIII)F
     .registers 15
 
-    .line 73
+    .line 91
     const/high16 v0, -0x40800000    # -1.0f
 
     if-eqz p0, :cond_81
@@ -57,7 +74,7 @@
 
     goto/16 :goto_81
 
-    .line 76
+    .line 94
     :cond_14
     const/4 v1, 0x0
 
@@ -65,12 +82,12 @@
 
     move-result p1
 
-    .line 77
+    .line 95
     invoke-static {v1, p2}, Ljava/lang/Math;->max(II)I
 
     move-result p2
 
-    .line 78
+    .line 96
     invoke-virtual {p0}, Landroid/graphics/Bitmap;->getWidth()I
 
     move-result v2
@@ -81,7 +98,7 @@
 
     move-result p3
 
-    .line 79
+    .line 97
     invoke-virtual {p0}, Landroid/graphics/Bitmap;->getHeight()I
 
     move-result v2
@@ -92,21 +109,21 @@
 
     move-result p4
 
-    .line 80
+    .line 98
     if-le p3, p1, :cond_80
 
     if-gt p4, p2, :cond_36
 
     goto :goto_80
 
-    .line 83
+    .line 101
     :cond_36
     nop
 
-    .line 84
+    .line 102
     nop
 
-    .line 85
+    .line 103
     const/4 v0, 0x0
 
     move v2, v1
@@ -118,7 +135,7 @@
 
     if-ge v2, v4, :cond_7d
 
-    .line 86
+    .line 104
     sub-int v4, p4, p2
 
     mul-int/2addr v4, v2
@@ -127,7 +144,7 @@
 
     add-int/2addr v4, p2
 
-    .line 87
+    .line 105
     move v5, v1
 
     :goto_46
@@ -135,7 +152,7 @@
 
     if-ge v5, v6, :cond_7a
 
-    .line 88
+    .line 106
     sub-int v6, p3, p1
 
     mul-int/2addr v6, v5
@@ -148,7 +165,7 @@
 
     move-result v6
 
-    .line 89
+    .line 107
     invoke-static {v6}, Landroid/graphics/Color;->red(I)I
 
     move-result v7
@@ -189,21 +206,21 @@
 
     add-float/2addr v0, v7
 
-    .line 90
+    .line 108
     add-int/lit8 v3, v3, 0x1
 
-    .line 87
+    .line 105
     add-int/lit8 v5, v5, 0x1
 
     goto :goto_46
 
-    .line 85
+    .line 103
     :cond_7a
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_3b
 
-    .line 93
+    .line 111
     :cond_7d
     int-to-float p0, v3
 
@@ -211,12 +228,12 @@
 
     return v0
 
-    .line 81
+    .line 99
     :cond_80
     :goto_80
     return v0
 
-    .line 74
+    .line 92
     :cond_81
     :goto_81
     return v0
@@ -225,7 +242,7 @@
 .method static meanColor(Landroid/graphics/Bitmap;IIII)I
     .registers 22
 
-    .line 98
+    .line 116
     move-object/from16 v0, p0
 
     const/4 v1, 0x0
@@ -250,7 +267,7 @@
 
     goto/16 :goto_9a
 
-    .line 101
+    .line 119
     :cond_17
     move/from16 v2, p1
 
@@ -258,14 +275,14 @@
 
     move-result v2
 
-    .line 102
+    .line 120
     move/from16 v3, p2
 
     invoke-static {v1, v3}, Ljava/lang/Math;->max(II)I
 
     move-result v3
 
-    .line 103
+    .line 121
     invoke-virtual {v0}, Landroid/graphics/Bitmap;->getWidth()I
 
     move-result v4
@@ -278,7 +295,7 @@
 
     move-result v4
 
-    .line 104
+    .line 122
     invoke-virtual {v0}, Landroid/graphics/Bitmap;->getHeight()I
 
     move-result v5
@@ -291,7 +308,7 @@
 
     move-result v5
 
-    .line 105
+    .line 123
     if-le v4, v2, :cond_95
 
     if-gt v5, v3, :cond_42
@@ -300,14 +317,14 @@
 
     goto :goto_97
 
-    .line 108
+    .line 126
     :cond_42
     nop
 
-    .line 109
+    .line 127
     nop
 
-    .line 110
+    .line 128
     const-wide/16 v6, 0x0
 
     move v12, v1
@@ -323,7 +340,7 @@
 
     if-ge v12, v14, :cond_89
 
-    .line 111
+    .line 129
     sub-int v14, v5, v3
 
     mul-int/2addr v14, v12
@@ -332,7 +349,7 @@
 
     add-int/2addr v14, v3
 
-    .line 112
+    .line 130
     move v15, v1
 
     :goto_55
@@ -342,7 +359,7 @@
 
     if-ge v15, v1, :cond_82
 
-    .line 113
+    .line 131
     sub-int v1, v4, v2
 
     mul-int/2addr v1, v15
@@ -355,7 +372,7 @@
 
     move-result v1
 
-    .line 114
+    .line 132
     invoke-static {v1}, Landroid/graphics/Color;->red(I)I
 
     move-result v0
@@ -366,7 +383,7 @@
 
     add-long/2addr v6, v0
 
-    .line 115
+    .line 133
     invoke-static/range {p1 .. p1}, Landroid/graphics/Color;->green(I)I
 
     move-result v0
@@ -375,7 +392,7 @@
 
     add-long/2addr v8, v0
 
-    .line 116
+    .line 134
     invoke-static/range {p1 .. p1}, Landroid/graphics/Color;->blue(I)I
 
     move-result v0
@@ -384,10 +401,10 @@
 
     add-long/2addr v10, v0
 
-    .line 117
+    .line 135
     add-int/lit8 v13, v13, 0x1
 
-    .line 112
+    .line 130
     add-int/lit8 v15, v15, 0x1
 
     move-object/from16 v0, p0
@@ -396,7 +413,7 @@
 
     goto :goto_55
 
-    .line 110
+    .line 128
     :cond_82
     add-int/lit8 v12, v12, 0x1
 
@@ -406,7 +423,7 @@
 
     goto :goto_4a
 
-    .line 120
+    .line 138
     :cond_89
     int-to-long v0, v13
 
@@ -428,19 +445,19 @@
 
     return v0
 
-    .line 105
+    .line 123
     :cond_95
     move/from16 v16, v1
 
-    .line 106
+    .line 124
     :goto_97
     return v16
 
-    .line 98
+    .line 116
     :cond_98
     move/from16 v16, v1
 
-    .line 99
+    .line 117
     :goto_9a
     return v16
 .end method
@@ -450,7 +467,7 @@
 .method expected()Ljava/lang/String;
     .registers 2
 
-    .line 54
+    .line 72
     invoke-virtual {p0}, Lcom/k4/homeclock/DepthClock;->showing()Z
 
     move-result v0
@@ -473,100 +490,159 @@
 .method release()V
     .registers 1
 
-    .line 63
+    .line 81
     return-void
 .end method
 
 .method retryWeather(Ljava/lang/String;)V
     .registers 2
 
-    .line 59
+    .line 77
     return-void
 .end method
 
 .method showing()Z
     .registers 5
 
-    .line 38
-    iget-object v0, p0, Lcom/k4/homeclock/DepthClock;->owner:Lh3/a;
+    .line 55
+    const/4 v0, 0x1
 
-    const/4 v1, 0x1
+    :try_start_1
+    iget-object v1, p0, Lcom/k4/homeclock/DepthClock;->owner:Ljava/lang/ref/WeakReference;
 
-    if-nez v0, :cond_6
+    invoke-virtual {v1}, Ljava/lang/ref/WeakReference;->get()Ljava/lang/Object;
 
-    .line 39
-    return v1
+    move-result-object v1
 
-    .line 41
-    :cond_6
-    sget-boolean v0, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
+    check-cast v1, Lh3/a;
 
-    const/4 v2, 0x0
+    .line 56
+    if-nez v1, :cond_d
 
-    if-eqz v0, :cond_c
+    const/4 v1, 0x0
 
-    .line 42
-    return v2
+    goto :goto_11
 
-    .line 44
-    :cond_c
-    iget-object v0, p0, Lcom/k4/homeclock/DepthClock;->owner:Lh3/a;
+    :cond_d
+    invoke-static {v1}, Lcom/k4/homeclock/HomeDepthClock;->engineOf(Lh3/a;)Lf3/a;
 
-    invoke-static {v0}, Lcom/k4/homeclock/HomeDepthClock;->engineOf(Lh3/a;)Lf3/a;
+    move-result-object v1
 
-    move-result-object v0
+    .line 57
+    :goto_11
+    iget-boolean v2, p0, Lcom/k4/homeclock/DepthClock;->gated:Z
 
-    .line 45
-    if-nez v0, :cond_15
+    const/4 v3, 0x0
 
-    .line 46
-    return v2
+    if-nez v2, :cond_23
 
-    .line 48
-    :cond_15
-    invoke-virtual {v0}, Lf3/a;->getDisplayState()LB2/a;
+    .line 58
+    if-eqz v1, :cond_22
 
-    move-result-object v0
+    invoke-virtual {v1}, Lf3/a;->getWhich()I
 
-    .line 49
-    instance-of v3, v0, Ljava/lang/Enum;
+    move-result v1
 
-    if-eqz v3, :cond_2c
+    and-int/lit8 v1, v1, 0x3
 
-    check-cast v0, Ljava/lang/Enum;
+    if-ne v1, v0, :cond_21
 
-    invoke-virtual {v0}, Ljava/lang/Enum;->name()Ljava/lang/String;
+    goto :goto_22
 
-    move-result-object v0
+    :cond_21
+    move v0, v3
 
-    const-string v3, "ON"
+    :cond_22
+    :goto_22
+    return v0
 
-    invoke-virtual {v3, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    .line 60
+    :cond_23
+    sget-boolean v2, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
 
-    move-result v0
+    if-nez v2, :cond_50
 
-    if-eqz v0, :cond_2c
+    if-eqz v1, :cond_50
 
-    goto :goto_2d
+    invoke-virtual {v1}, Lf3/a;->isPreview()Z
 
-    :cond_2c
-    move v1, v2
+    move-result v2
 
-    :goto_2d
-    return v1
+    if-nez v2, :cond_50
+
+    invoke-virtual {v1}, Lf3/a;->getWhich()I
+
+    move-result v2
+
+    and-int/2addr v2, v0
+
+    if-nez v2, :cond_37
+
+    goto :goto_50
+
+    .line 63
+    :cond_37
+    invoke-virtual {v1}, Lf3/a;->getDisplayState()LB2/a;
+
+    move-result-object v1
+
+    .line 64
+    instance-of v2, v1, Ljava/lang/Enum;
+
+    if-eqz v2, :cond_4e
+
+    const-string v2, "ON"
+
+    check-cast v1, Ljava/lang/Enum;
+
+    invoke-virtual {v1}, Ljava/lang/Enum;->name()Ljava/lang/String;
+
+    move-result-object v1
+
+    invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v1
+    :try_end_4b
+    .catchall {:try_start_1 .. :try_end_4b} :catchall_51
+
+    if-eqz v1, :cond_4e
+
+    goto :goto_4f
+
+    :cond_4e
+    move v0, v3
+
+    :goto_4f
+    return v0
+
+    .line 61
+    :cond_50
+    :goto_50
+    return v3
+
+    .line 65
+    :catchall_51
+    move-exception v1
+
+    .line 66
+    iget-boolean v1, p0, Lcom/k4/homeclock/DepthClock;->gated:Z
+
+    xor-int/2addr v0, v1
+
+    return v0
 .end method
 
 .method text()Ljava/lang/String;
     .registers 4
 
-    .line 32
+    .line 38
     iget-object v0, p0, Lcom/k4/homeclock/DepthClock;->a:Landroid/content/Context;
 
     invoke-static {v0}, Landroid/text/format/DateFormat;->is24HourFormat(Landroid/content/Context;)Z
 
     move-result v0
 
-    .line 33
+    .line 39
     new-instance v1, Ljava/text/SimpleDateFormat;
 
     if-eqz v0, :cond_d
@@ -599,7 +675,7 @@
 .method zoom()F
     .registers 4
 
-    .line 67
+    .line 85
     iget-object v0, p0, Lcom/k4/homeclock/DepthClock;->scaleRef:Li3/c;
 
     const/high16 v1, 0x3f800000    # 1.0f
@@ -615,7 +691,7 @@
     :cond_b
     move v0, v1
 
-    .line 68
+    .line 86
     :goto_c
     const/4 v2, 0x0
 

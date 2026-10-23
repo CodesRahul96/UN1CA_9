@@ -69,7 +69,7 @@ final class HomeClockPresenter extends h3.a {
 
             Rect full = new Rect(0, 0, w, h);
             i3.c backNode = new i3.c(this.a, new i3.b(back, full, full, null), this.c);
-            DepthClock clockNode = HomeDepthClock.makeClock(this.a, w, h, subjectTop, back, null, null);
+            DepthClock clockNode = HomeDepthClock.makeClock(this.a, w, h, subjectTop, back, null, this, false);
             HomeDepthClock.setClock(this, clockNode); // also releases it if the rest of the build fails
             data.c = backNode;
             group.c.add(backNode);
