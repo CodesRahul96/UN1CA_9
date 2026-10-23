@@ -1,6 +1,6 @@
 # Samsung Internet Browser
 # https://play.google.com/store/apps/details?id=com.sec.android.app.sbrowser
-SBROWSER_SHA256="7cb6a12122398801353e26ef94aed6fb6058bef307664f35e1010e3fea35e53c"
+SBROWSER_SHA256="b0196949a20e4e323995a2026bfaeb0ca29264517ab249bc84818bd491eb46c6"
 LOG "- Downloading Samsung Internet app"
 DOWNLOAD_FILE "$(GET_GALAXY_STORE_DOWNLOAD_URL "com.sec.android.app.sbrowser")" \
     "$WORK_DIR/system/system/preload/SBrowser/SBrowser.apk"
