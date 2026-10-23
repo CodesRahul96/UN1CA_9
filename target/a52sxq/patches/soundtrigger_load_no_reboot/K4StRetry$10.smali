@@ -30,7 +30,7 @@
         }
     .end annotation
 
-    .line 550
+    .line 558
     iput p1, p0, Lcom/k4/soundtrigger/K4StRetry$10;->val$mode:I
 
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
@@ -43,11 +43,11 @@
 .method public run()V
     .registers 2
 
-    .line 553
+    .line 561
     iget v0, p0, Lcom/k4/soundtrigger/K4StRetry$10;->val$mode:I
 
     invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonMode(I)V
 
-    .line 554
+    .line 562
     return-void
 .end method

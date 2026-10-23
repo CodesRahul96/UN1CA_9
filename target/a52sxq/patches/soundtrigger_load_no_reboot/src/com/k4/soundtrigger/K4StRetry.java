@@ -88,11 +88,11 @@ import java.util.concurrent.Executor;
  *       events) runs inside AudioService.setMode, ~0.2-0.5 s before the mode change reaches mode listeners; the
  *       grace keeps an error from that window from rebooting the HAL just as the call connects. At decision time
  *       the mode is read again from AudioService (currentMode()); a call then -> owed as below.
- *     - the listener says call / VoIP / ringing: the reboot runs once the mode is NORMAL again (+5 s, cancelled if
- *       a call starts again), however long that mode lasts (a VoIP app keeps IN_COMMUNICATION only while it plays
+ *     - a call (see above): the reboot runs once there is no call any more (+30 s, cancelled if a call starts again), however long that mode lasts (a VoIP app keeps IN_COMMUNICATION only while it plays
  *       or records: AudioService drops an inactive mode owner after 6 s). Not needed any more if that HAL stack
  *       dies on its own before (detached()).
  *     - AudioService not published yet (boot): polled every 5 s; stock after 15 min of that.
+ *    The +30 s after a call keeps a quick redial / call-back from meeting a restarting audio HAL.
  *    The 3 s grace, the screen-off retry and the after-call resync hold a short partial wakelock (Handler delays
  *    are uptime and would otherwise wait for the next wakeup).
  *
@@ -107,7 +107,7 @@ import java.util.concurrent.Executor;
  *       returns late (watchdogClosed()), nothing is rebooted: the result went through the enforcer as usual (an
  *       error there owes its own resync reboot). A call that returns right at the deadline, while the deadline is
  *       already running, is seen by both sides under sLock (sClosed): no stale hung entry. If it is still hung
- *       when the mode is NORMAL again (+5 s), or for 45 s past the deadline during the call (a dead HAL; 48 s in
+ *       when there is no call any more (+30 s), or for 45 s past the deadline during the call (a dead HAL; 48 s in
  *       all stays below the system_server Watchdog's 60 s, so blocked system_server threads can never get
  *       system_server killed), the HAL is rebooted.
  */
@@ -119,7 +119,15 @@ public final class K4StRetry {
     private static final int INTERNAL_ERROR = 5;
     private static final long AUDIO_IDLE_DELAY_MS = 5000;
     private static final long SCREEN_OFF_DELAY_MS = 2000;
-    private static final long CALL_END_DELAY_MS = 5000;
+    /**
+     * After the last call signal ended, owed reboots wait this long (cancelled when a call starts again). A redial or
+     * call-back within half a minute (dropped call, voicemail, "call me back") is common and must not meet a
+     * restarting audio HAL; the cost is that Hey Google / Bixby wake-up, already desynced since the HAL error during
+     * the call, stays so ~25 s longer (DeviceStateHandler re-enables recognition 1 s after the call anyway).
+     */
+    private static final long CALL_END_DELAY_MS = 30000;
+    /** Polls while only the live mode or an unknown signal says call (no event will report its end). */
+    private static final long POLL_MS = 5000;
     private static final long NORMAL_GRACE_MS = 3000;
     private static final long WATCHDOG_MS = 3000; // SoundTriggerHalWatchdog deadline (0xbb8)
     /**
@@ -480,7 +488,7 @@ public final class K4StRetry {
             if (!sHandler.hasCallbacks(CHECK_HUNG_MAX)) sHandler.postDelayed(CHECK_HUNG_MAX, HUNG_IN_CALL_MAX_MS);
             // only the live mode (or an unknown signal) says call: resync() polls until it agrees
             if (!listenerSaysCall() && !signalWillReport() && !sHandler.hasCallbacks(RESYNC)) {
-                sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+                sHandler.postDelayed(RESYNC, POLL_MS);
             }
         }
         if (!reboot.isEmpty()) {
@@ -807,7 +815,7 @@ public final class K4StRetry {
         if (listenerSaysCall() || callBySignals()) {
             sHandler.removeCallbacks(RESYNC);
             if (owed && !signalWillReport() && !listenerSaysCall()) {
-                sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS); // only an unknown signal: poll
+                sHandler.postDelayed(RESYNC, POLL_MS); // only an unknown signal: poll
             }
         } else if (owed) {
             sHandler.removeCallbacks(RESYNC);
@@ -824,7 +832,7 @@ public final class K4StRetry {
             long now = SystemClock.uptimeMillis();
             if (sUnknownSince == 0) sUnknownSince = now;
             if (now - sUnknownSince < UNKNOWN_FALLBACK_MS) {
-                sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+                sHandler.postDelayed(RESYNC, POLL_MS);
                 return;
             }
             Slog.w(TAG, "audio mode still unknown after " + (UNKNOWN_FALLBACK_MS / 60000) + " min: owed sound"
@@ -840,7 +848,7 @@ public final class K4StRetry {
             if (!free) {
                 // still a call. The listener / a known signal reports its end and posts this again; otherwise (only the
                 // live mode lagging the listener, or an unknown signal) poll
-                if (!listenerSaysCall() && !signalWillReport()) sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+                if (!listenerSaysCall() && !signalWillReport()) sHandler.postDelayed(RESYNC, POLL_MS);
                 return;
             }
             owed = new ArrayList<>(sOwed.keySet());
@@ -854,8 +862,25 @@ public final class K4StRetry {
         rebootAll(owed, hung);
     }
 
-    /** Handler thread: one reboot per HAL stack (each reboot is a setprop that restarts the audio HAL). */
+    /**
+     * Handler thread: one reboot per HAL stack (each reboot is a setprop that restarts the audio HAL). A reboot resyncs
+     * everything on that stack, so whatever else it still owes (an owed error with a hung call, or the other way
+     * round) is settled with it instead of costing a second audio HAL restart later.
+     */
     private static void rebootAll(List<SoundTriggerHalEnforcer> owed, List<Hung> hung) {
+        IdentityHashMap<SoundTriggerHalWatchdog, Boolean> stacks = new IdentityHashMap<>();
+        for (SoundTriggerHalEnforcer enforcer : owed) {
+            if (enforcer.mUnderlying != null) stacks.put(enforcer.mUnderlying, Boolean.TRUE);
+        }
+        for (Hung h : hung) stacks.put(h.hal, Boolean.TRUE);
+        synchronized (sLock) {
+            for (Iterator<SoundTriggerHalEnforcer> it = sOwed.keySet().iterator(); it.hasNext(); ) {
+                if (stacks.containsKey(it.next().mUnderlying)) it.remove();
+            }
+            for (Iterator<Hung> it = sHung.values().iterator(); it.hasNext(); ) {
+                if (stacks.containsKey(it.next().hal)) it.remove();
+            }
+        }
         IdentityHashMap<SoundTriggerHalWatchdog, Boolean> done = new IdentityHashMap<>();
         for (SoundTriggerHalEnforcer enforcer : owed) {
             SoundTriggerHalWatchdog hal = enforcer.mUnderlying;
