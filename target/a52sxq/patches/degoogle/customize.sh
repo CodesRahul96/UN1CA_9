@@ -1,4 +1,5 @@
-# De-Googled variant: strip the Google services stack from the global Fold8 base. The China (CHC) firmware was
+# De-Googled variant: strip the Google services stack from the global source base (S26 Ultra; written for the
+# Fold8). The Fold8 China (CHC) firmware was
 # checked as an alternative base on 2026-10-04 and ships the very same GSF/Play Store/GmsCore APEX, so removing them
 # here gives the same result without re-matching every binary patch against different F9760 binaries.
 # Folder names do not reveal ownership: the list below was made from the manifest package names of every APK in the

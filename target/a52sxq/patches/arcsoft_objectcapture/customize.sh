@@ -1,7 +1,7 @@
 SKIPUNZIP=1
 
 # Sources that ship the engine themselves (S25: lib64 + public.libraries-arcsoft.txt entries) keep their own copy,
-# which matches their DressRoom/deepsky SDK; only sources without it (Fold8) get the S22 one.
+# which matches their DressRoom/deepsky SDK; only sources without it (Fold8, S26 Ultra) get the S22 one.
 SOURCE_LIB64="$FW_DIR/$SOURCE_FIRMWARE_PATH/system/system/lib64"
 if [ -f "$SOURCE_LIB64/libobjectcapture.arcsoft.so" ] && [ -f "$SOURCE_LIB64/libobjectcapture_jni.arcsoft.so" ]; then
     LOG "- Source already ships the ArcSoft object capture libraries, skipping"

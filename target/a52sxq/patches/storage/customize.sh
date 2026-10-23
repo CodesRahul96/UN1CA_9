@@ -169,7 +169,7 @@ print("  - helper %s" % os.path.relpath(dst, root))
 PYEOF
 
 # Samsung LockSettingsService passes the Gatekeeper auth token (HAT) to vold's unlockCeStorage when
-# ro.product.first_api_level <= 30 (legacy auth-bound CE keys). The A52s launched on R, but Fold8's vold rejects
+# ro.product.first_api_level <= 30 (legacy auth-bound CE keys). The A52s launched on R, but the One UI 9 vold (found on the Fold8 base) rejects
 # tokens ("Vold doesn't use auth tokens, but non-empty token passed") -> EINVAL -> user 0 never unlocks after a
 # reboot with a PIN ("Phone is starting..."). Take the token-less path regardless of first API level.
 SMALI_PATCH "system" "system/framework/services.jar" \
