@@ -154,7 +154,7 @@ explain() {
         *"container signature"*|*"not compatible with the one currently installed"*)
             echo "an APEX in the ROM is re-signed with our own key, so Google's update for it is rejected before the reboot - ROM bug (Tethering must ship Google's original APEX)" ;;
         *"Build fingerprint has changed"*)
-            echo "a new ROM build was flashed while the update was waiting for its reboot; Android drops it by design and Play downloads it again (harmless)" ;;
+            echo "a new ROM build was flashed while the update was waiting for its reboot; Android drops it by design and Play downloads it again (harmless) - next time: when Play says an update is waiting for a restart, reboot once before flashing a new build" ;;
         *"crashing native process"*)
             echo "a native service crashed right after the update and apexd rolled it back (${1##*process: }) - if that is netd: Tethering needs newer BPF maps; $DEV_HINT" ;;
         *"Found both applied and failed apex sessions"*)
