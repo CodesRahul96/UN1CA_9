@@ -29,6 +29,9 @@
 #     without libbpf on 5.4 (loadObject(offload.o, libbpf = kernel >= 5.10)), which is skipped and stays unpinned,
 #   * no in-window program of a libbpf-loaded object (test/clatd/dscpPolicy.o, a52_netd.o) is optional: the frozen
 #     loader's libbpf path refuses those ("Optional program cannot be loaded by libbpf") and fails the object,
+#   * every map an in-window program references (its .rel<section> relocations into .maps) is created on 5.4.302:
+#     otherwise libbpf (autocreate off) / the legacy relocation (fd -1) leaves the program without its map and the
+#     verifier rejects it (load fails) - checked before, and independent of, the tolerated.txt pin filter below,
 #   * every map/program pin it defines for API 37 (on any kernel) is created on 5.4.302 - unless the factory object
 #     of the same name does not create it on 5.4.302 either (the factory userspace runs without it: e.g. dscpPolicy's
 #     5.15+ program) or known/tolerated.txt lists it ("<obj> <pin>  # why", for a reviewed 5.10+-only addition).
@@ -100,6 +103,17 @@ def insn_problems(code):
     return sorted(bad)
 
 
+def relocs(e, syms, si):
+    """(insn offset, symbol name, symbol's section name) of the relocations of code section si"""
+    out = []
+    for ri in e.rels_for(si):
+        d = e.sh[ri]["data"]
+        for i in range(0, len(d), 16):
+            off, info = struct.unpack_from("<QQ", d, i); sym = syms[info >> 32]
+            out.append((off, sym[1], e.names[sym[4]] if 0 < sym[4] < len(e.names) else ""))
+    return out
+
+
 def parse_obj(path):
     """what the frozen loader does with this object on KERNEL at API: (problems, required pins, created pins)"""
     e = Elf(open(path, "rb").read()); probs = []
@@ -110,6 +124,7 @@ def parse_obj(path):
         si = e.idx(sec)
         return {s[6] for s in syms if s[4] == si and s[1].endswith("_def")}
     req, made = set(), set()
+    maps_made, maps_all = set(), set()                   # map names (the .maps symbol / pin suffix)
     if e.has(".android_maps"):
         d = e.sh[e.idx(".android_maps")]["data"]
         if len(d) % M_SZ or def_sizes(".android_maps") - {M_SZ}:
@@ -117,11 +132,12 @@ def parse_obj(path):
         for o in range(0, len(d), M_SZ):
             r = bytes(d[o:o + M_SZ]); typ, = struct.unpack_from("<I", r, 0)
             mina, maxa = struct.unpack_from("<2i", r, 32); mink, maxk = struct.unpack_from("<2I", r, 40)
-            pin = r[118:188].split(b"\0")[0].decode()
+            pin = r[118:188].split(b"\0")[0].decode(); name = pin[struct.unpack_from("<I", r, 188)[0]:]
+            maps_all.add(name)
             if mina <= API < maxa: req.add(pin)
             if not in_window(mink, maxk, mina, maxa): continue
             if typ not in MAP_TYPES: probs.append(f"map {pin}: type {typ} cannot be created on 5.4 (load fails)")
-            else: made.add(pin)
+            else: made.add(pin); maps_made.add(name)
     if e.has(".android_progs"):
         pi = e.idx(".android_progs"); d = e.sh[pi]["data"]
         if len(d) % P_SZ or def_sizes(".android_progs") - {P_SZ}:
@@ -132,7 +148,7 @@ def parse_obj(path):
             if n.startswith(".") or "/" not in n or not e.sh[si]["size"]: continue
             f = [s[1] for s in syms if s[4] == si and s[2] & 0xF == 2]
             assert f and f[0] + "_def" in defs, (path, n, "no program definition")
-            code[defs[f[0] + "_def"]] = (n, bytes(e.sh[si]["data"]))
+            code[defs[f[0] + "_def"]] = (n, bytes(e.sh[si]["data"]), si)
         for o in range(0, len(d), P_SZ):
             r = bytes(d[o:o + P_SZ]); typ, = struct.unpack_from("<I", r, 0); opt = r[24]
             mink, maxk = struct.unpack_from("<2I", r, 16); mina, maxa = struct.unpack_from("<2i", r, 28)
@@ -140,6 +156,10 @@ def parse_obj(path):
             if mina <= API < maxa: req.add(pin)
             if not in_window(mink, maxk, mina, maxa) or o not in code: continue
             why = ([f"program type {typ}"] if typ > MAX_PROG_TYPE else []) + insn_problems(code[o][1])
+            for _, sym, sec in relocs(e, syms, code[o][2]):
+                if sec == ".maps" and sym not in maps_made:
+                    why.append(f"uses map {sym}, which " + ("is not created on 5.4.302" if sym in maps_all
+                                                            else "has no .android_maps definition"))
             if libbpf and opt:
                 probs.append(f"program {pin} ({code[o][0]}) is optional: the frozen loader's libbpf path refuses "
                              f"optional programs (load fails)")
