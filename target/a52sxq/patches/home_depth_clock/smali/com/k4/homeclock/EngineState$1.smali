@@ -44,7 +44,7 @@
 
 # virtual methods
 .method public run()V
-    .registers 7
+    .registers 9
 
     .line 34
     iget-object v0, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
@@ -67,101 +67,109 @@
 
     .line 38
     :cond_f
-    invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->enabled()Z
-
-    move-result v1
-
-    const/4 v2, 0x0
-
-    const/4 v3, 0x1
-
-    if-eqz v1, :cond_27
-
     invoke-virtual {v0}, Lf3/a;->getWhich()I
 
     move-result v1
 
-    and-int/lit8 v1, v1, 0x3
+    .line 39
+    invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->enabled()Z
 
-    if-eq v1, v3, :cond_25
+    move-result v2
 
+    .line 40
     invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->sharedEnabled()Z
 
-    move-result v1
+    move-result v3
 
-    if-eqz v1, :cond_27
+    .line 41
+    const/4 v4, 0x0
+
+    const/4 v5, 0x1
+
+    if-eqz v2, :cond_27
+
+    and-int/lit8 v6, v1, 0x3
+
+    if-eq v6, v5, :cond_25
+
+    if-eqz v3, :cond_27
 
     :cond_25
-    move v1, v3
+    move v6, v5
 
     goto :goto_28
 
     :cond_27
-    move v1, v2
+    move v6, v4
 
-    .line 39
+    .line 42
     :goto_28
     invoke-static {v0}, Lcom/k4/homeclock/HomeDepthClock;->clockOf(Lf3/a;)Lcom/k4/homeclock/DepthClock;
 
-    move-result-object v4
+    move-result-object v7
 
-    if-nez v4, :cond_34
+    if-nez v7, :cond_34
 
-    iget-object v4, v0, Lf3/a;->g:Lh3/a;
+    iget-object v7, v0, Lf3/a;->g:Lh3/a;
 
-    instance-of v4, v4, Lcom/k4/homeclock/HomeClockPresenter;
+    instance-of v7, v7, Lcom/k4/homeclock/HomeClockPresenter;
 
-    if-eqz v4, :cond_35
+    if-eqz v7, :cond_35
 
     :cond_34
-    move v2, v3
-
-    .line 40
-    :cond_35
-    if-nez v1, :cond_3a
-
-    if-nez v2, :cond_3a
-
-    .line 41
-    return-void
+    move v4, v5
 
     .line 43
-    :cond_3a
+    :cond_35
+    if-nez v6, :cond_3f
+
+    if-nez v4, :cond_3f
+
+    .line 44
+    iget-object v0, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
+
+    invoke-static {v0, v1, v2, v3}, Lcom/k4/homeclock/EngineState;->-$$Nest$mlogNothingToDo(Lcom/k4/homeclock/EngineState;IZZ)V
+
+    .line 45
+    return-void
+
+    .line 47
+    :cond_3f
     invoke-virtual {v0}, Lf3/a;->getWhich()I
 
-    move-result v3
+    move-result v1
 
-    new-instance v4, Ljava/lang/StringBuilder;
+    new-instance v2, Ljava/lang/StringBuilder;
 
-    invoke-direct {v4}, Ljava/lang/StringBuilder;-><init>()V
+    invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
 
-    const-string v5, "reload (which="
-
-    invoke-virtual {v4, v5}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    move-result-object v4
-
-    invoke-virtual {v4, v3}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
-
-    move-result-object v3
-
-    const-string v4, ", clock "
-
-    invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    move-result-object v3
-
-    invoke-virtual {v3, v2}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;
-
-    move-result-object v2
-
-    const-string v3, " -> "
+    const-string v3, "reload (which="
 
     invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
     move-result-object v2
 
-    invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;
+    invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    const-string v2, ", clock "
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    invoke-virtual {v1, v4}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    const-string v2, " -> "
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    invoke-virtual {v1, v6}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;
 
     move-result-object v1
 
@@ -179,9 +187,9 @@
 
     invoke-static {v2, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 44
+    .line 48
     invoke-virtual {v0}, Lf3/a;->stopSelf()V
 
-    .line 45
+    .line 49
     return-void
 .end method

@@ -30,7 +30,7 @@
         }
     .end annotation
 
-    .line 51
+    .line 75
     iput-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
@@ -43,7 +43,7 @@
 .method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
     .registers 5
 
-    .line 54
+    .line 78
     iget-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {p1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetmain(Lcom/k4/homeclock/EngineState;)Landroid/os/Handler;
@@ -58,7 +58,7 @@
 
     invoke-virtual {p1, v0}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 59
+    .line 83
     iget-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     const-string v0, "com.k4.homeclock.extra.WALLPAPER_PENDING"
@@ -71,7 +71,7 @@
 
     invoke-static {p1, p2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputreloadAwaitsWallpaper(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 60
+    .line 84
     iget-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {p1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetmain(Lcom/k4/homeclock/EngineState;)Landroid/os/Handler;
@@ -102,6 +102,6 @@
     :goto_34
     invoke-virtual {p1, p2, v0, v1}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 61
+    .line 85
     return-void
 .end method

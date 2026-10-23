@@ -35,15 +35,39 @@ final class EngineState {
             if (e == null) {
                 return;
             }
-            boolean want = HomeDepthClock.enabled() && ((e.getWhich() & 3) == 1 || HomeDepthClock.sharedEnabled());
+            int which = e.getWhich();
+            boolean enabled = HomeDepthClock.enabled();
+            boolean shared = HomeDepthClock.sharedEnabled();
+            boolean want = enabled && ((which & 3) == 1 || shared);
             boolean have = HomeDepthClock.clockOf(e) != null || e.g instanceof HomeClockPresenter;
             if (!want && !have) {
+                logNothingToDo(which, enabled, shared);
                 return;
             }
             Log.i(HomeDepthClock.TAG, "reload (which=" + e.getWhich() + ", clock " + have + " -> " + want + "): rebuilding the engine");
             e.stopSelf();
         }
     };
+
+    private String lastSkip;
+    private long lastSkipAt;
+
+    /** Why a reload left this engine alone: once per reason, again after a minute (a Settings toggle can repeat it). */
+    private void logNothingToDo(int which, boolean enabled, boolean shared) {
+        String why = !enabled ? "switch off"
+                : (which & 1) == 0 ? "not a home screen wallpaper"
+                : (which & 3) == 3 && !shared ? "home+lock wallpaper, " + HomeDepthClock.PROP + "_shared=0"
+                : "no clock for this wallpaper";
+        String key = which + "/" + enabled + "/" + shared;
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (key.equals(lastSkip) && now - lastSkipAt < 60_000) {
+            return;
+        }
+        lastSkip = key;
+        lastSkipAt = now;
+        Log.i(HomeDepthClock.TAG, "reload (which=" + which + ", enabled=" + enabled + ", shared=" + shared
+                + "): no clock wanted or shown, nothing to rebuild (" + why + ")");
+    }
 
     /** A queued reload waits for a new wallpaper the sender is applying (see {@link #newEngine}). */
     private boolean reloadAwaitsWallpaper;
