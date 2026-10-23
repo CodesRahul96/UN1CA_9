@@ -1,0 +1,4 @@
+id=a52sxq_battery_scaling_fix
+name=Galaxy A52s 5G: Battery scaling and capacity fix
+author=CodesRahul
+description=Ensures /sys/class/power_supply/battery/batt_capacity_max is set to 1000 so scaled battery capacity matches raw SoC 1:1 instead of staying clamped at 100% due to EFS battery aging values.
