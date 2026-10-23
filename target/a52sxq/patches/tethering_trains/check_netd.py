@@ -43,6 +43,11 @@
 #   * every map/program pin it defines for API 37 (on any kernel) is created on 5.4.302 - unless the factory object
 #     of the same name does not create it on 5.4.302 either (the factory userspace runs without it: e.g. dscpPolicy's
 #     5.15+ program) or known/tolerated.txt lists it ("<obj> <pin>  # why", for a reviewed 5.10+-only addition).
+#   * every map it creates and every program it loads pins (pin_location, and create_location when set) into a bpffs
+#     directory the frozen loader creates: it mkdirs exactly LOADER_DIRS (netbpfload_a52b: the six createDir() calls
+#     at 0xaac4..0xab24 into the mkdir() wrapper at 0xf1e8) and bpfFdPin()/renameat2() create no parent, so any other
+#     directory is ENOENT (load fails) - a newer loader that adds a directory (as T added net_shared, U loader) and
+#     a train pinning into it would loop on ours,
 #   * struct bpf_map_def/bpf_prog_def sizes are the ones the loader reads (192/180), a license section exists.
 # The same instruction checks also run on the programs a52_netd.o itself loads.
 # Necessary, not sufficient - not modelled: map flags other than MMAPABLE (e.g. BPF_F_INNER_MAP is 5.10), which helpers
@@ -66,6 +71,8 @@ MAP_TYPES = set(range(0, 26)) | {RINGBUF}   # STRUCT_OPS 26 is only an enum plac
 MAX_PROG_TYPE = 25              # BPF_PROG_TYPE_CGROUP_SOCKOPT
 HELPERS = set(range(1, 111)) | {125}   # implemented helpers (see above); per-program-type availability is not modelled
 MAX_BTF_KIND = 15               # DATASEC; FLOAT/DECL_TAG/TYPE_TAG/ENUM64 are 5.13+
+LOADER_DIRS = {"/sys/fs/bpf/" + d for d in ("tethering", "netd_shared", "netd_readonly", "net_shared", "net_private",
+                                         "loader")}
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "known")
 
 
@@ -115,6 +122,14 @@ def insn_problems(code):
     return sorted(bad)
 
 
+def pin_dirs(r, create_at, pin_at):
+    """the first directory of a def record's create_location/pin_location the loader does not create, or None"""
+    for a in (create_at, pin_at):
+        loc = r[a:a + 70].split(b"\0")[0].decode()
+        if loc and os.path.dirname(loc) not in LOADER_DIRS: return os.path.dirname(loc)
+    return None
+
+
 def relocs(e, syms, si):
     """(insn offset, symbol name, symbol's section name) of the relocations of code section si"""
     out = []
@@ -148,7 +163,9 @@ def parse_obj(path):
             maps_all.add(name)
             if mina <= API < maxa: req.add(pin)
             if not in_window(mink, maxk, mina, maxa): continue
-            if typ not in MAP_TYPES: probs.append(f"map {pin}: type {typ} cannot be created on 5.4 (load fails)")
+            bad_dir = pin_dirs(r, 48, 118)
+            if bad_dir: probs.append(f"map {pin}: pins into {bad_dir}, which the frozen loader does not create (load fails)")
+            elif typ not in MAP_TYPES: probs.append(f"map {pin}: type {typ} cannot be created on 5.4 (load fails)")
             else: made.add(pin); maps_made.add(name)
     if e.has(".android_progs"):
         pi = e.idx(".android_progs"); d = e.sh[pi]["data"]
@@ -168,6 +185,10 @@ def parse_obj(path):
             if mina <= API < maxa: req.add(pin)
             if not in_window(mink, maxk, mina, maxa) or o not in code: continue
             why = ([f"program type {typ}"] if typ > MAX_PROG_TYPE else []) + insn_problems(code[o][1])
+            bad_dir = pin_dirs(r, 36, 106)
+            if bad_dir:
+                probs.append(f"program {pin}: pins into {bad_dir}, which the frozen loader does not create (load fails)")
+                continue
             rels = relocs(e, syms, code[o][2])
             calls = [i for i in range(0, len(code[o][1]) - 7, 8) if code[o][1][i] == 0x85 and code[o][1][i + 1] >> 4 == 1]
             if calls:
