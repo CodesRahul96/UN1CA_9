@@ -1,5 +1,5 @@
 .class Lcom/k4/soundtrigger/K4StRetry$10;
-.super Landroid/content/BroadcastReceiver;
+.super Landroid/media/AudioManager$AudioPlaybackCallback;
 .source "K4StRetry.java"
 
 
@@ -18,24 +18,79 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 567
-    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
+    .line 563
+    invoke-direct {p0}, Landroid/media/AudioManager$AudioPlaybackCallback;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
-    .registers 4
+.method public onPlaybackConfigChanged(Ljava/util/List;)V
+    .registers 5
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Ljava/util/List<",
+            "Landroid/media/AudioPlaybackConfiguration;",
+            ">;)V"
+        }
+    .end annotation
+
+    .line 566
+    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smanyActive(Ljava/util/List;)Z
+
+    move-result p1
+
+    .line 567
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsAudioActive()Z
+
+    move-result v0
+
+    if-ne p1, v0, :cond_b
+
+    return-void
+
+    .line 568
+    :cond_b
+    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfputsAudioActive(Z)V
+
+    .line 569
+    const-string v0, "audio stopped"
+
+    if-eqz p1, :cond_28
 
     .line 570
-    const-wide/16 p1, 0x7d0
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsReason()Ljava/lang/String;
 
-    const-string v0, "screen off"
+    move-result-object p1
 
-    invoke-static {p1, p2, v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
+    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
-    .line 571
+    move-result p1
+
+    if-eqz p1, :cond_2d
+
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsHandler()Landroid/os/Handler;
+
+    move-result-object p1
+
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetFIRE()Ljava/lang/Runnable;
+
+    move-result-object v0
+
+    invoke-virtual {p1, v0}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
+
+    goto :goto_2d
+
+    .line 572
+    :cond_28
+    const-wide/16 v1, 0x1388
+
+    invoke-static {v1, v2, v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
+
+    .line 574
+    :cond_2d
+    :goto_2d
     return-void
 .end method

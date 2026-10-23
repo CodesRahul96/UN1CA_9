@@ -73,7 +73,7 @@ else:
     print("  - detach -> K4StRetry.detached (drops the dead HAL stack's callback / pending retry / owed reboot)")
 open(hits[0], "w").write(s)
 helpers = sorted(glob.glob(patch + "/K4StRetry*.smali"))
-assert len(helpers) == 13, "K4StRetry smali files: %d (expected 13, rerun src/build.sh)" % len(helpers)
+assert len(helpers) == 14, "K4StRetry smali files: %d (expected 14, rerun src/build.sh)" % len(helpers)
 dirs = sorted((d for d in glob.glob(root + "/smali_classes*") if re.fullmatch(r"smali_classes\d+", os.path.basename(d))),
               key=lambda d: int(os.path.basename(d)[len("smali_classes"):]))
 dst = os.path.join(dirs[-1] if dirs else root + "/smali", "com/k4/soundtrigger")

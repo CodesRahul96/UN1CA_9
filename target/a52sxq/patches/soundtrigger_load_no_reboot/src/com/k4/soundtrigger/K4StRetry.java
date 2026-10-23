@@ -9,6 +9,7 @@ import android.media.AudioManager;
 import android.media.AudioPlaybackConfiguration;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.PowerManager;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.util.Slog;
@@ -146,6 +147,9 @@ public final class K4StRetry {
     private static boolean sScreenWatched;
     private static boolean sRetryRegisterPosted;
     private static String sReason;
+    /** Keeps short delayed retries / reboots from stalling in suspend (Handler delays are uptime). Handler thread. */
+    private static PowerManager.WakeLock sWakeLock;
+    private static long sWakeUntil;
 
     private static final Runnable FIRE = new Runnable() {
         @Override
@@ -169,6 +173,12 @@ public final class K4StRetry {
         @Override
         public void run() {
             resync();
+        }
+    };
+    private static final Runnable HOLD_GRACE = new Runnable() {
+        @Override
+        public void run() {
+            hold(NORMAL_GRACE_MS + 1000);
         }
     };
     private static final Runnable CHECK_HUNG = new Runnable() {
@@ -273,6 +283,7 @@ public final class K4StRetry {
             sOwed.put(enforcer, Boolean.TRUE);
             if (!listenerSaysCall() && !sHandler.hasCallbacks(RESYNC)) {
                 sHandler.postDelayed(RESYNC, NORMAL_GRACE_MS);
+                sHandler.post(HOLD_GRACE); // not here: the caller holds middleware locks
             }
         }
         if (mode == AudioManager.MODE_NORMAL) {
@@ -478,6 +489,7 @@ public final class K4StRetry {
         } else if (owed) {
             sHandler.removeCallbacks(RESYNC);
             sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+            hold(CALL_END_DELAY_MS + 1000);
         }
     }
 
@@ -596,6 +608,29 @@ public final class K4StRetry {
         sHandler.removeCallbacks(FIRE);
         sReason = reason;
         sHandler.postDelayed(FIRE, delayMs);
+        hold(delayMs + 1000);
+    }
+
+    /**
+     * Handler thread: a partial wakelock for ms (timeout, never released by hand), so a retry / reboot posted a few
+     * seconds ahead runs on time and not at the next wakeup (screen-off retry, 3 s grace, after-call resync).
+     */
+    private static void hold(long ms) {
+        long until = SystemClock.uptimeMillis() + ms;
+        if (until <= sWakeUntil) return;
+        try {
+            if (sWakeLock == null) {
+                PowerManager pm = ActivityThread.currentActivityThread().getSystemContext()
+                        .getSystemService(PowerManager.class);
+                PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
+                wl.setReferenceCounted(false);
+                sWakeLock = wl;
+            }
+            sWakeLock.acquire(ms);
+            sWakeUntil = until;
+        } catch (Throwable t) {
+            // PowerManager not up yet (boot): the delay then simply runs at the next wakeup
+        }
     }
 
     /** Handler thread: the callbacks run on the callback thread (SoundTriggerModule.onResourcesAvailable takes the
