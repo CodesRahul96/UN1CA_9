@@ -10,12 +10,16 @@ DECODE_APK "system" "$BSS" || ABORT "Failed to decode $BSS"
 DIR="$APKTOOL_DIR/system/${BSS//system\//}"
 # The anonymous callback class is FaceEnrollActivity$6 on the Fold8 and S25 builds; locate it by its superclass so a
 # renumbered class ($5, $7, ...) is still found.
+# `|| true`: under set -e a grep without a match (or an unexpanded glob) would end the build without a message.
+# No callback class at all is not "nothing to do" (the enrollment preview would stay black): ABORT.
 CB="$(grep -l -x '\.super Landroid/hardware/face/FaceManager\$EnrollmentCallback;' \
-    "$DIR"/smali*/com/samsung/android/biometrics/app/setting/face/FaceEnrollActivity\$*.smali 2> /dev/null)"
+    "$DIR"/smali*/com/samsung/android/biometrics/app/setting/face/FaceEnrollActivity\$*.smali 2> /dev/null || true)"
 if [ "$(wc -l <<< "$CB")" -gt 1 ]; then
     ABORT "More than one FaceManager.EnrollmentCallback in FaceEnrollActivity: $CB"
 fi
-if [ -f "$CB" ]; then
+if [ -z "$CB" ] || [ ! -f "$CB" ]; then
+    ABORT "face_preview: no FaceManager.EnrollmentCallback subclass FaceEnrollActivity\$* in BiometricSetting (renamed/moved?)"
+else
     LOG "- Rendering the HIDL face HAL preview frames in the enrollment screen (${CB##*/})"
     SMALI_ROOT="${CB%%/com/samsung/*}"
     mkdir -p "$SMALI_ROOT/com/k4/face"
@@ -52,7 +56,5 @@ method = """
 open(cb, "w").write(src.rstrip("\n") + "\n" + method)
 print("  - Added onImageProcessed to %s (face_preview=%s)" % (cls, rid))
 PYEOF
-else
-    LOG "- No FaceManager.EnrollmentCallback in FaceEnrollActivity in this source, skipping"
 fi
 unset BSS DIR CB SMALI_ROOT

@@ -3,22 +3,42 @@ NEW_POS="/sys/devices/virtual/fingerprint/fingerprint/position"
 
 # AODService is deliberately not listed: rebuilding it drops Samsung's signature (no Galaxy Store updates), and its
 # /sys/class/fingerprint/fingerprint/position works as is (a symlink to the devices/virtual node on the A52s).
+# Both readers are mandatory: a missing services.jar / SystemUI is a broken source, not "nothing to do". services.jar
+# must get at least one rewrite (FingerprintService is what sends the touch-down request; 0 hits = enrollment stuck at
+# 0% again with a green build); SystemUI (DeviceState) only gets a warning.
 for SPEC in "system|system/framework/services.jar" \
         "system_ext|priv-app/SystemUI/SystemUI.apk" \
         ; do
     PART="${SPEC%%|*}"
     FILE="${SPEC#*|}"
     if [[ "$PART" == "system_ext" ]]; then
-        [ -f "$WORK_DIR/system/system/system_ext/$FILE" ] || [ -f "$WORK_DIR/system_ext/$FILE" ] || continue
+        if [ ! -f "$WORK_DIR/system/system/system_ext/$FILE" ] && [ ! -f "$WORK_DIR/system_ext/$FILE" ]; then
+            ABORT "fingerprint: system_ext/$FILE not found, cannot rewrite the sensor position path"
+        fi
     else
-        [ -f "$WORK_DIR/system/$FILE" ] || continue
+        [ -f "$WORK_DIR/system/$FILE" ] || ABORT "fingerprint: system/$FILE not found, cannot rewrite the sensor position path"
     fi
     DECODE_APK "$PART" "$FILE" || ABORT "Failed to decode $FILE"
     DIR="$APKTOOL_DIR/$PART/${FILE//system\//}"
+    POS_HITS=0
     while IFS= read -r SMALI; do
-        LOG "- Using $NEW_POS in ${SMALI//$APKTOOL_DIR/}"
+        [ "$SMALI" ] || continue
+        N="$(grep -o -F "$OLD_POS" "$SMALI" | wc -l)"
+        LOG "- Using $NEW_POS in ${SMALI//$APKTOOL_DIR/} ($N)"
         sed -i "s|$OLD_POS|$NEW_POS|g" "$SMALI"
-    done < <(grep -rl "$OLD_POS" "$DIR"/smali* 2> /dev/null)
+        POS_HITS=$((POS_HITS + N))
+    done <<< "$(grep -rl -F "$OLD_POS" "$DIR"/smali* 2> /dev/null || true)"
+    if grep -rq -F "$OLD_POS" "$DIR"/smali* 2> /dev/null; then
+        ABORT "fingerprint: $OLD_POS is still referenced in $FILE"
+    fi
+    if [ "$POS_HITS" -eq 0 ] && grep -rq -F "$NEW_POS" "$DIR"/smali* 2> /dev/null; then
+        LOG "- $FILE already reads $NEW_POS"
+    elif [ "$POS_HITS" -eq 0 ]; then
+        if [ "$PART" == "system" ]; then
+            ABORT "fingerprint: no $OLD_POS read found in $FILE (moved/split string?): FingerprintService would never get the UDFPS position"
+        fi
+        LOGW "fingerprint: no $OLD_POS read in $FILE, nothing rewritten there"
+    fi
 done
 
 # Optical FOD illumination. On stock One UI the fingerprint HBM chain is:
@@ -531,4 +551,4 @@ open(p, "wb").write(d)
 PYEOF
 fi
 
-unset OLD_POS NEW_POS SPEC PART FILE DIR SMALI BSS SYSTEMUI SYSTEMUI_FP_NATIVE SYSUI_POS_CALLERS LIBUI
+unset OLD_POS NEW_POS SPEC PART FILE DIR SMALI POS_HITS N BSS SYSTEMUI SYSTEMUI_FP_NATIVE SYSUI_POS_CALLERS LIBUI
