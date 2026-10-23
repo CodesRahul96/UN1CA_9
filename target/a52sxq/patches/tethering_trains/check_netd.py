@@ -29,6 +29,11 @@
 #     without libbpf on 5.4 (loadObject(offload.o, libbpf = kernel >= 5.10)), which is skipped and stays unpinned,
 #   * no in-window program of a libbpf-loaded object (test/clatd/dscpPolicy.o, a52_netd.o) is optional: the frozen
 #     loader's libbpf path refuses those ("Optional program cannot be loaded by libbpf") and fails the object,
+#   * no in-window program calls a kfunc/extern (src 1 call relocated to an undefined symbol) and, for offload.o, no
+#     bpf-to-bpf call at all (the legacy loader links no subprograms); in libbpf objects the called .text
+#     subprograms get the same instruction and map checks,
+#   * no CO-RE relocations (.BTF.ext core_relo_len): libbpf resolves them against the running kernel's BTF, which
+#     this check cannot replay (the legacy path does not apply them at all), so they are refused until reviewed,
 #   * every map an in-window program references (its .rel<section> relocations into .maps) is created on 5.4.302:
 #     otherwise libbpf (autocreate off) / the legacy relocation (fd -1) leaves the program without its map and the
 #     verifier rejects it (load fails) - checked before, and independent of, the tolerated.txt pin filter below,
@@ -156,7 +161,19 @@ def parse_obj(path):
             if mina <= API < maxa: req.add(pin)
             if not in_window(mink, maxk, mina, maxa) or o not in code: continue
             why = ([f"program type {typ}"] if typ > MAX_PROG_TYPE else []) + insn_problems(code[o][1])
-            for _, sym, sec in relocs(e, syms, code[o][2]):
+            rels = relocs(e, syms, code[o][2])
+            calls = [i for i in range(0, len(code[o][1]) - 7, 8) if code[o][1][i] == 0x85 and code[o][1][i + 1] >> 4 == 1]
+            if calls:
+                at = {off: (sym, sec) for off, sym, sec in rels}
+                for i in calls:
+                    sym, sec = at.get(i, ("", None))
+                    if sec == "": why.append(f"kfunc/extern call {sym or '?'}")
+                    elif not libbpf: why.append("bpf-to-bpf call (the legacy loader links no subprograms)")
+                if libbpf and e.has(".text") and e.sh[e.idx(".text")]["size"]:
+                    ti = e.idx(".text")
+                    why += [f".text: {q}" for q in insn_problems(bytes(e.sh[ti]["data"]))]
+                    rels = rels + relocs(e, syms, ti)
+            for _, sym, sec in rels:
                 if sec == ".maps" and sym not in maps_made:
                     why.append(f"uses map {sym}, which " + ("is not created on 5.4.302" if sym in maps_all
                                                             else "has no .android_maps definition"))
@@ -166,6 +183,11 @@ def parse_obj(path):
             elif not why: made.add(pin)
             elif libbpf or not opt:
                 probs.append(f"program {pin} ({code[o][0]}) would be rejected by 5.4: {', '.join(why)} (load fails)")
+    if e.has(".BTF.ext"):
+        x = bytes(e.sh[e.idx(".BTF.ext")]["data"]); hl, = struct.unpack_from("<I", x, 4)
+        if hl >= 32 and struct.unpack_from("<I", x, 28)[0]:
+            probs.append("CO-RE relocations (.BTF.ext core_relo_len > 0): resolved against the kernel BTF at load "
+                         "time, not verifiable here (load not verified)")
     btf = Btf(bytes(e.sh[e.idx(".BTF")]["data"])) if e.has(".BTF") else None
     kinds = sorted({t[0] for t in btf.types[1:] if t[0] > MAX_BTF_KIND}) if btf else []
     if kinds and not libbpf:
