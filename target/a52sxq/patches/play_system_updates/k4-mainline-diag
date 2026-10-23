@@ -142,7 +142,7 @@ if [ "$ROOT" = 1 ] && [ -f "$CAP/staged_tethering_netd.o" ]; then
     CAP_VER="$(grep -o '<apex-info [^>]*moduleName="com.android.tethering"[^>]*isActive="true"[^>]*>' \
         "$CAP/staged_apex-info-list.xml" 2> /dev/null | sed -n 's/.*versionCode="\([0-9]*\)".*/\1/p' | head -n 1)"
 fi
-DEV_HINT="developer: rerun tethering/regen.py --train-progs with that netd.o (root: /cache/k4_mainline/staged_tethering_netd.o) and add it to tethering_trains/known"
+DEV_HINT="developer: add that netd.o + offload/test/clatd/dscpPolicy.o (root: /cache/k4_mainline/staged_tethering_*.o) to tethering_trains/known and rerun tethering/regen.py --train-progs"
 
 # --- the one line ---------------------------------------------------------------------------------------------------
 explain() {

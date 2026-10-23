@@ -3,6 +3,7 @@
 # A failed update boot is rolled back by apexd/vold: /data returns to its pre-boot checkpoint, so its logs, tombstones
 # and the updated APEX files are gone afterwards. /cache is not checkpointed, so keep the evidence there (root only):
 #   staged_tethering_netd.o       the netd.o of the Tethering APEX that update boot activated (regen.py input)
+#   staged_tethering_<obj>.o      its offload/test/clatd/dscpPolicy.o (tethering_trains/known inputs)
 #   staged_apex-info-list.xml     every module version active during that boot
 #   staged_apex-updated-list.xml  what apexd updated in that boot
 #   failed_staged_boot_kmsg.txt   kernel log of the last update boot that never reached boot_completed
@@ -17,6 +18,10 @@ on load-bpf-programs && property:apexd.packages.updated=true
     copy /apex/apex-info-list.xml /cache/k4_mainline/staged_apex-info-list.xml
     copy /apex/apex-updated-list.xml /cache/k4_mainline/staged_apex-updated-list.xml
     copy /apex/com.android.tethering/etc/bpf/mainline/netd.o /cache/k4_mainline/staged_tethering_netd.o
+    copy /apex/com.android.tethering/etc/bpf/mainline/offload.o /cache/k4_mainline/staged_tethering_offload.o
+    copy /apex/com.android.tethering/etc/bpf/mainline/test.o /cache/k4_mainline/staged_tethering_test.o
+    copy /apex/com.android.tethering/etc/bpf/mainline/clatd.o /cache/k4_mainline/staged_tethering_clatd.o
+    copy /apex/com.android.tethering/etc/bpf/mainline/dscpPolicy.o /cache/k4_mainline/staged_tethering_dscpPolicy.o
     setprop sys.k4.mainline.staged_boot 1
 
 # The update boot finished: nothing to keep from it.
