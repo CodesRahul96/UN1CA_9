@@ -53,10 +53,15 @@
 #     a train pinning into it would loop on ours,
 #   * struct bpf_map_def/bpf_prog_def sizes are the ones the loader reads (192/180), a license section exists.
 # The same instruction checks also run on the programs a52_netd.o itself loads.
+# Also refused: a code section name with a second '/' (readCodeSections abort()s), a libbpf object whose .android_maps
+# entry has no .maps map ("bpf_object does not contain map") or whose .maps map has no .android_maps entry (created
+# unchecked), legacy (offload.o) relocations not in the section right after their code (loadProg reads only i + 1),
+# may_goto (6.9).
 # Necessary, not sufficient - not modelled: map flags other than MMAPABLE (e.g. BPF_F_INNER_MAP is 5.10), helpers a
-# program type only gets for some attach types (counted as available), verifier complexity limits, pin collisions between objects, a legacy-path object without
-# .BTF or a libbpf object without .android_maps. None occurs in the known objects; the factory objects running on the
-# phone are the real proof, a new train still needs its first update boot watched (k4-mainline-diag).
+# program type only gets for some attach types (counted as available), verifier complexity limits, pin collisions
+# between objects, a legacy-path object without .BTF or a libbpf object without .android_maps. None occurs in the
+# known objects; the factory objects running on the phone are the real proof, a new train still needs its first
+# update boot watched (k4-mainline-diag).
 import hashlib, os, re, struct, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tethering"))
@@ -150,6 +155,7 @@ def insn_problems(code, ptype):
         elif cls in (4, 7) and op & 0xF0 == 0xB0 and off: bad.add("movsx (6.6)")
         elif op == 0xD7: bad.add("bswap (6.6)")
         elif cls == 6 and op & 0xF0 == 0: bad.add("gotol (6.6)")
+        elif op == 0xE5: bad.add("may_goto (6.9)")
         i += 8
     return sorted(bad)
 
@@ -226,6 +232,8 @@ def parse_obj(path):
         return {s[6] for s in syms if s[4] == si and s[1].endswith("_def")}
     req, made = set(), set()
     maps_made, maps_all = set(), set()                   # map names (the .maps symbol / pin suffix)
+    for n in e.names:                                    # readCodeSections: abort() on a second '/' in any code section
+        if not n.startswith(".") and n.count("/") > 1: probs.append(f"section {n} has more than one '/' (loader aborts)")
     if e.has(".android_maps"):
         d = e.sh[e.idx(".android_maps")]["data"]
         if len(d) % M_SZ or def_sizes(".android_maps") - {M_SZ}:
@@ -241,6 +249,13 @@ def parse_obj(path):
             if bad_dir: probs.append(f"map {pin}: pins into {bad_dir}, which the frozen loader does not create (load fails)")
             elif typ not in MAP_TYPES: probs.append(f"map {pin}: type {typ} is not registered in this kernel build (load fails)")
             else: made.add(pin); maps_made.add(name)
+    if libbpf:                                           # prepareLoadMaps: every .android_maps entry needs its .maps map
+        mi = e.idx(".maps") if e.has(".maps") else None
+        in_maps = {s[1] for s in syms if mi is not None and s[4] == mi}
+        for name in sorted(maps_all - in_maps):
+            probs.append(f"map {name} has no .maps (libbpf) definition (\"bpf_object does not contain map\", load fails)")
+        for name in sorted(in_maps - maps_all):          # libbpf would create it unchecked (type, pin) - refuse
+            probs.append(f"map {name} is only in .maps, not in .android_maps (created by libbpf unchecked, not verified)")
     if e.has(".android_progs"):
         pi = e.idx(".android_progs"); d = e.sh[pi]["data"]
         if len(d) % P_SZ or def_sizes(".android_progs") - {P_SZ}:
@@ -252,6 +267,13 @@ def parse_obj(path):
             f = [s[1] for s in syms if s[4] == si and s[2] & 0xF == 2]
             assert f and f[0] + "_def" in defs, (path, n, "no program definition")
             code[defs[f[0] + "_def"]] = (n, bytes(e.sh[si]["data"]), si)
+        if not libbpf:                                   # legacy loadProg takes relocations only from section i + 1
+            for si, n in enumerate(e.names):
+                if n.startswith(".") or "/" not in n or not e.sh[si]["size"]: continue
+                for ri in e.rels_for(si):
+                    if ri != si + 1 or e.names[ri] != ".rel" + n:
+                        probs.append(f"relocations of {n} are in section #{ri} {e.names[ri]}, not right after it "
+                                     f"(the legacy loader would not apply them, load fails)")
         for o in range(0, len(d), P_SZ):
             r = bytes(d[o:o + P_SZ]); typ, = struct.unpack_from("<I", r, 0); opt = r[24]
             mink, maxk = struct.unpack_from("<2I", r, 16); mina, maxa = struct.unpack_from("<2i", r, 28)
