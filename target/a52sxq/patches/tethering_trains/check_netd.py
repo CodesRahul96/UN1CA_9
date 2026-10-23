@@ -21,8 +21,10 @@
 # <versionCode>_<label>_<obj>.o for each of those objects, and for each of them the loader's own rules are replayed
 # for 5.4.302 at API 37 (kver/api windows of every map and program), plus what this kernel can execute:
 #   * every map it would create has a map type this kernel has (5.4: 0-25, + RINGBUF 27 from k4 patch 0006),
-#   * every program it would load has a 5.4 program type and only 5.4 instructions/helpers (no kfuncs, helper ids up
-#     to 125 = ktime_get_boot_ns as in the bone-machine include/uapi/linux/bpf.h, no cpu v4 / 5.12+ atomics),
+#   * every program it would load has a 5.4 program type and only 5.4 instructions/helpers (no kfuncs, no cpu v4 /
+#     5.12+ atomics; helpers: only the ids this kernel implements, i.e. has a `case BPF_FUNC_<x>:` for in net/ or
+#     kernel/ of ~/git/kernel_a52sxq_bone - 1..110 and the backported 125 ktime_get_boot_ns; 111..124 are only named
+#     in its uapi enum and the verifier rejects them),
 #     else a non-optional one fails the load and an optional one simply stays unpinned,
 #   * every map/program pin it defines for API 37 (on any kernel) is created on 5.4.302 - unless the factory object
 #     of the same name does not create it on 5.4.302 either (the factory userspace runs without it: e.g. dscpPolicy's
@@ -44,7 +46,7 @@ NON_LIBBPF = {"offload"}        # loadObject(offload.o, libbpf=false): BTF only 
 # what kernel 5.4.302 (bone-machine, k4 patches) has
 MAP_TYPES = set(range(0, 26)) | {RINGBUF}   # STRUCT_OPS 26 is only an enum placeholder in the k4 backport
 MAX_PROG_TYPE = 25              # BPF_PROG_TYPE_CGROUP_SOCKOPT
-MAX_HELPER = 125                # BPF_FUNC_ktime_get_boot_ns
+HELPERS = set(range(1, 111)) | {125}   # implemented helpers (see above); per-program-type availability is not modelled
 MAX_BTF_KIND = 15               # DATASEC; FLOAT/DECL_TAG/TYPE_TAG/ENUM64 are 5.13+
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "known")
 
@@ -83,7 +85,7 @@ def insn_problems(code):
             if src not in (0, 1, 2): bad.add(f"ld_imm64 pseudo {src}")
             i += 16; continue
         if op == 0x85:
-            if src == 0 and imm > MAX_HELPER: bad.add(f"helper {imm}")
+            if src == 0 and imm not in HELPERS: bad.add(f"helper {imm}")
             elif src == 2: bad.add("kfunc call")
         elif cls == 1 and op & 0xE0 == 0x80: bad.add("sign-extending load (6.6)")
         elif cls == 3 and op & 0xE0 == 0xC0 and imm != 0: bad.add(f"atomic op {imm:#x} (5.12)")
