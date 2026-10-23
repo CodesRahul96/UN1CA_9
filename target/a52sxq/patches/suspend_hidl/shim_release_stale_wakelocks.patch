@@ -1,0 +1,73 @@
+Follow-up for ~/git/android/vendor/k4/suspend-hidl-shim/main.cpp (not in the pinned prebuilt yet).
+Apply in the IchthysOS tree, rebuild android.system.suspend-hidl-shim, copy it here and update the sha256 pin
+in customize.sh. Releases the "<name>.<pid>" kernel wake locks a previous shim instance left behind.
+
+--- a/main.cpp
++++ b/main.cpp
+@@ -22,12 +22,14 @@
+ 
+ #include <android-base/file.h>
+ #include <android-base/logging.h>
++#include <android-base/strings.h>
+ #include <android/system/suspend/1.0/ISystemSuspend.h>
+ #include <android/system/suspend/1.0/IWakeLock.h>
+ #include <hidl/HidlTransportSupport.h>
+ #include <hwbinder/IPCThreadState.h>
+ #include <log/log.h>
+ 
++#include <cctype>
+ #include <cerrno>
+ #include <cstring>
+ #include <map>
+@@ -38,6 +40,8 @@
+ using ::android::OK;
+ using ::android::sp;
+ using ::android::status_t;
++using ::android::base::ReadFileToString;
++using ::android::base::Split;
+ using ::android::base::WriteStringToFile;
+ using ::android::hardware::configureRpcThreadpool;
+ using ::android::hardware::hidl_string;
+@@ -141,9 +145,42 @@
+     }
+ };
+ 
++// A restarted shim starts with an empty gRefs, but the kernel wake locks the
++// previous instance held stay active (they belong to no process), so the
++// device would never suspend again until reboot. Only this shim creates names
++// of the form "<name>.<pid>" (every client wake lock it hands out); the vendor's
++// own writers use other forms (rmt_storage_<n>, sscrpcd:<pid>, plain names).
++// Release every such entry before serving: the clients of the old instance hold
++// dead IWakeLock proxies and acquire again through the new one.
++bool isShimName(const std::string& name) {
++    size_t dot = name.rfind('.');
++    if (dot == std::string::npos || dot == 0 || dot + 1 == name.size()) return false;
++    for (size_t i = dot + 1; i < name.size(); ++i) {
++        if (!isdigit(static_cast<unsigned char>(name[i]))) return false;
++    }
++    return true;
++}
++
++void releaseStaleWakeLocks() {
++    std::string active;
++    if (!ReadFileToString(kSysPowerWakeLock, &active)) {
++        ALOGE("failed to read %s: %s", kSysPowerWakeLock, strerror(errno));
++        return;
++    }
++    for (const std::string& name : Split(active, " \n")) {
++        if (!isShimName(name)) continue;
++        if (WriteStringToFile(name, kSysPowerWakeUnlock)) {
++            ALOGW("released stale kernel wakelock '%s' of a previous instance", name.c_str());
++        } else {
++            ALOGE("failed to release stale '%s': %s", name.c_str(), strerror(errno));
++        }
++    }
++}
++
+ }  // namespace
+ 
+ int main() {
++    releaseStaleWakeLocks();
+     configureRpcThreadpool(1, true /* callerWillJoin */);
+ 
+     sp<ISystemSuspend> service = new SystemSuspendShim();

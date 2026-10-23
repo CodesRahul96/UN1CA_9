@@ -8,6 +8,11 @@
 # with a kernel wake lock written to /sys/power/wake_lock (refcounted per "<name>.<pid>"), released on
 # IWakeLock::release() or client death. It never touches the AIDL service, /sys/power/state or wakeup_count: while a
 # kernel wake lock is held the AIDL service simply blocks in its wakeup_count read.
+# Known gap (follow-up, prebuilt unchanged): the kernel wake locks belong to no process, so if the shim restarts
+# while it holds one (e.g. radio-interface.<pid>), the new instance starts with an empty refcount map and never
+# releases it - no deep sleep until reboot. shim_release_stale_wakelocks.patch (main.cpp: wake_unlock every
+# "<name>.<digits>" entry of /sys/power/wake_lock before registering) fixes it; it needs a rebuild in the IchthysOS
+# tree and a new sha256 pin below.
 # It runs in the stock system_suspend domain (sysfs_wake_lock rw, block_suspend, add system_suspend_hwservice; the
 # vendor policy already lets the HAL domains find system_suspend_hwservice_30_0 and binder-call system_suspend_server).
 SRC="$SRC_DIR/target/a52sxq/patches/suspend_hidl"
