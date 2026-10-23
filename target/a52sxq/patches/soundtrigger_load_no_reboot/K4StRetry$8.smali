@@ -1,11 +1,14 @@
 .class Lcom/k4/soundtrigger/K4StRetry$8;
-.super Landroid/content/BroadcastReceiver;
+.super Ljava/lang/Object;
 .source "K4StRetry.java"
+
+# interfaces
+.implements Landroid/media/AudioManager$OnModeChangedListener;
 
 
 # annotations
 .annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->registerRetryListeners()V
+    value = Lcom/k4/soundtrigger/K4StRetry;->registerModeListener()V
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -18,24 +21,20 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 295
-    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
+    .line 392
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
-    .registers 4
+.method public onModeChanged(I)V
+    .registers 2
 
-    .line 298
-    const-wide/16 p1, 0x7d0
+    .line 395
+    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonMode(I)V
 
-    const-string v0, "screen off"
-
-    invoke-static {p1, p2, v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
-
-    .line 299
+    .line 396
     return-void
 .end method

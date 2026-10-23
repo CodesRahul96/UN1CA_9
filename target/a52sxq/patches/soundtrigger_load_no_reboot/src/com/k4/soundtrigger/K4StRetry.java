@@ -10,24 +10,29 @@ import android.media.AudioPlaybackConfiguration;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.ServiceManager;
+import android.os.SystemClock;
 import android.util.Slog;
 
 import com.android.server.soundtrigger_middleware.HalException;
 import com.android.server.soundtrigger_middleware.ISoundTriggerHal;
 import com.android.server.soundtrigger_middleware.RecoverableException;
 import com.android.server.soundtrigger_middleware.SoundTriggerHalEnforcer;
+import com.android.server.soundtrigger_middleware.SoundTriggerHalWatchdog;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Executor;
 
 /**
- * Called from SoundTriggerHalEnforcer (patches/soundtrigger_load_no_reboot and soundtrigger_no_hal_reboot).
+ * Called from SoundTriggerHalEnforcer / SoundTriggerHalWatchdog (patches/soundtrigger_load_no_reboot and
+ * soundtrigger_no_hal_reboot).
  *
- * On the A52s the sound trigger HAL (HIDL 2.3, QTI st-hal) lives inside the audio HAL process, so
- * SoundTriggerHalEnforcer.reboot() (setprop sys.audio.restart.hal 1) restarts the whole audio HAL: a running call
- * loses its voice/VoIP audio both ways, audioserver restarts.
+ * On the A52s the sound trigger HAL (HIDL 2.3, QTI st-hal) lives inside the audio HAL process, so a sound trigger
+ * HAL reboot (setprop sys.audio.restart.hal 1) restarts the whole audio HAL: a running call loses its voice/VoIP
+ * audio both ways, audioserver restarts. Rule: no sound trigger HAL reboot while a call / VoIP / ringing is going
+ * on; the reboot the middleware wants is owed and runs once the audio mode is NORMAL again.
  *
  * 1. Load refusals (refused(), soundtrigger_load_no_reboot). When the HAL cannot open an ADSP listen (LSM) session
  *    it fails loadSoundModel/loadPhraseSoundModel with a plain status (-ENODEV from ape_reg_sm, "pcm_is_ready
@@ -42,40 +47,78 @@ import java.util.concurrent.Executor;
  *       concurrency ends: all playback stopped (+5 s: audio HAL output standby lags the player state) or the
  *       screen turned off (+2 s: the HAL switches to the LPI path). One retry per event, no timers.
  *
- * 2. Every other HAL error (halError(), callbackError(), soundtrigger_no_hal_reboot). Stock reboots the HAL. That
- *    reboot is also what resyncs the middleware with the HAL after a failed state change: stopRecognition leaves
- *    the enforcer's model PENDING_STOP and a failed unloadSoundModel keeps the model in its table (both are reset
- *    only on success, as are SoundTriggerModule / Validation / SoundTriggerHelper above it). The HAL death that
- *    follows the reboot makes SoundTriggerModule.binderDied() detach the old stack, attach a fresh one and send
- *    onModuleDied() to every client, which clears and reloads all models. So:
- *     - audio mode NORMAL (no call, no VoIP, not ringing): stock, reboot now.
- *     - any other audio mode, or the mode is not known yet: no reboot; a HalException becomes
- *       RecoverableException(INTERNAL_ERROR), a callback contract violation drops the event (as stock does after
- *       its reboot). The resync reboot is owed and runs once the mode is NORMAL again (+5 s, cancelled if a call
- *       starts again). Not needed any more if that HAL stack dies on its own before (detached()).
- *    SoundTriggerHalWatchdog timeouts (a hung HAL call) still reboot at once, as in stock: deferring them would
- *    keep the middleware's binder callers blocked for the whole call.
+ * 2. Every other HAL error (halError(), callbackError(), soundtrigger_no_hal_reboot). Stock reboots the HAL at once.
+ *    That reboot is also what resyncs the middleware with the HAL after a failed state change: stopRecognition
+ *    leaves the enforcer's model PENDING_STOP and a failed unloadSoundModel keeps the model in its table (both are
+ *    reset only on success, as are SoundTriggerModule / Validation / SoundTriggerHelper above it). The HAL death
+ *    that follows the reboot makes SoundTriggerModule.binderDied() detach the old stack, attach a fresh one and send
+ *    onModuleDied() to every client, which clears and reloads all models. So the reboot is always owed, never
+ *    dropped: a HalException becomes RecoverableException(INTERNAL_ERROR) (what Validation reports for it anyway),
+ *    a callback contract violation drops the event (as stock does after its reboot), and
+ *     - audio mode NORMAL: the reboot runs after a 3 s grace (stock: at once). The HAL's call concurrency handling
+ *       (stopRecognition from DeviceStateHandler at call start, HAL abort events) runs inside AudioService.setMode,
+ *       ~0.2-0.5 s before the mode change reaches mode listeners; the grace keeps an error from that window from
+ *       rebooting the HAL just as the call connects. Before rebooting, the mode is read again from AudioService.
+ *     - any other mode, or the mode is not known yet: the reboot runs once the mode is NORMAL again (+5 s,
+ *       cancelled if a call starts again). Not needed any more if that HAL stack dies on its own before
+ *       (detached()).
+ *
+ * 3. SoundTriggerHalWatchdog deadline (watchdogExpired(), soundtrigger_no_hal_reboot): a HAL call still running after
+ *    3 s. Stock logs "HAL deadline expired. Rebooting." and reboots at once, which unblocks the caller (the call
+ *    returns DeadObject). Now:
+ *     - mode NORMAL (read again from AudioService) or not known yet (boot: nothing may wait for the mode listener
+ *       there): stock, reboot now.
+ *     - call / VoIP / ringing: no reboot. The caller stays blocked in the HAL (only the sound trigger stack waits:
+ *       DeviceStateHandler's executor, the middleware / SoundTriggerHelper locks and their binder callers; audio
+ *       policy's capture-state callback is oneway, AudioService and telephony never wait on it). If the call
+ *       returns late (watchdogClosed()), nothing is rebooted: the result went through the enforcer as usual (an
+ *       error there owes its own resync reboot). If it is still hung when the mode is NORMAL again (+5 s), or for
+ *       10 minutes during the call (a dead HAL; bounds how long system_server threads can stay blocked), the HAL
+ *       is rebooted.
  */
 public final class K4StRetry {
     private static final String TAG = "K4StRetry";
     private static final String ENFORCER_TAG = "SoundTriggerHalEnforcer";
+    private static final String WATCHDOG_TAG = "SoundTriggerHalWatchdog";
     private static final int RESOURCE_CONTENTION = 1;
     private static final int INTERNAL_ERROR = 5;
     private static final long AUDIO_IDLE_DELAY_MS = 5000;
     private static final long SCREEN_OFF_DELAY_MS = 2000;
     private static final long CALL_END_DELAY_MS = 5000;
+    private static final long NORMAL_GRACE_MS = 3000;
+    private static final long WATCHDOG_MS = 3000; // SoundTriggerHalWatchdog deadline (0xbb8)
+    private static final long HUNG_IN_CALL_MAX_MS = 10 * 60 * 1000;
     private static final long REGISTER_RETRY_MS = 15000;
-    /** sMode before the mode listener is registered: treated like a call (defer). */
+    /** sMode before the mode listener is registered: treated like a call (defer) for HAL errors. */
     private static final int MODE_UNKNOWN = -100;
+
+    /** A HAL call that ran past the watchdog deadline during a call. */
+    private static final class Hung {
+        final SoundTriggerHalWatchdog hal;
+        final Exception where;
+        final long since;
+        boolean deferred;
+
+        Hung(SoundTriggerHalWatchdog hal, Exception where, long since) {
+            this.hal = hal;
+            this.where = where;
+            this.since = since;
+        }
+    }
 
     private static final Object sLock = new Object();
     /** SoundTriggerHalEnforcer -> the global callback registered on it (one per attached HAL stack). */
     private static final IdentityHashMap<Object, ISoundTriggerHal.GlobalCallback> sCallbacks = new IdentityHashMap<>();
     /** Enforcers with a load refused since the last retry. */
     private static final IdentityHashMap<Object, Boolean> sPending = new IdentityHashMap<>();
-    /** Enforcers that owe a resync reboot (HAL error during a call). */
+    /** Enforcers that owe a resync reboot (HAL error during a call, or in its NORMAL grace). */
     private static final IdentityHashMap<SoundTriggerHalEnforcer, Boolean> sOwed = new IdentityHashMap<>();
+    /** SoundTriggerHalWatchdog$Watchdog -> its HAL call, still running past the deadline. */
+    private static final IdentityHashMap<Object, Hung> sHung = new IdentityHashMap<>();
+    /** sHung.size(), read without the lock on every HAL call (watchdogClosed). */
+    private static volatile int sHungCount;
     private static Handler sHandler;
+    private static volatile AudioManager sAm;
     private static volatile int sMode = MODE_UNKNOWN;
     private static boolean sModeWatched;
     private static boolean sModeRegisterFailed;
@@ -109,6 +152,12 @@ public final class K4StRetry {
             resync();
         }
     };
+    private static final Runnable CHECK_HUNG = new Runnable() {
+        @Override
+        public void run() {
+            checkHung();
+        }
+    };
     private static final Executor EXECUTOR = new Executor() {
         @Override
         public void execute(Runnable r) {
@@ -139,12 +188,23 @@ public final class K4StRetry {
     /** First thing in SoundTriggerHalEnforcer.detach (SoundTriggerModule.binderDied: this HAL stack is gone). */
     public static void detached(Object enforcer) {
         boolean owed;
+        int hung = 0;
         synchronized (sLock) {
             sCallbacks.remove(enforcer);
             sPending.remove(enforcer);
             owed = sOwed.remove(enforcer) != null;
+            if (enforcer instanceof SoundTriggerHalEnforcer) {
+                SoundTriggerHalWatchdog hal = ((SoundTriggerHalEnforcer) enforcer).mUnderlying;
+                for (Iterator<Hung> it = sHung.values().iterator(); it.hasNext(); ) {
+                    if (it.next().hal == hal) {
+                        it.remove();
+                        hung++;
+                    }
+                }
+                sHungCount = sHung.size();
+            }
         }
-        if (owed) Slog.i(TAG, "HAL died: the deferred sound trigger HAL reboot is no longer needed");
+        if (owed || hung > 0) Slog.i(TAG, "HAL died: the deferred sound trigger HAL reboot is no longer needed");
     }
 
     /** SoundTriggerHalEnforcer.load*SoundModel catch: returns the exception to throw instead of rebooting the HAL. */
@@ -173,36 +233,151 @@ public final class K4StRetry {
      * a RecoverableException or a dead HAL). Returns the exception to throw.
      */
     public static RuntimeException halError(SoundTriggerHalEnforcer enforcer, RuntimeException e) {
-        if (rebootOrDefer(enforcer, e.toString())) return e;
+        owe(enforcer, e.toString());
         if (e instanceof HalException) return new RecoverableException(INTERNAL_ERROR, e.toString());
         return e;
     }
 
     /** SoundTriggerHalEnforcer$ModelCallbackEnforcer contract checks, replaces this$0.reboot(); the event is dropped. */
     public static void callbackError(SoundTriggerHalEnforcer enforcer) {
-        rebootOrDefer(enforcer, "HAL callback broke the sound trigger contract");
+        owe(enforcer, "HAL callback broke the sound trigger contract");
     }
 
-    /** Returns true if the HAL was rebooted now (stock), false if the reboot is owed until the call ends. */
-    private static boolean rebootOrDefer(SoundTriggerHalEnforcer enforcer, String what) {
+    /** The resync reboot is owed: after the NORMAL grace, or once the call has ended. Never on the caller's thread. */
+    private static void owe(SoundTriggerHalEnforcer enforcer, String what) {
         int mode;
         synchronized (sLock) {
             ensureHandlerLocked();
             mode = sMode;
-            if (mode == AudioManager.MODE_NORMAL) {
-                sOwed.remove(enforcer);
-            } else {
-                sOwed.put(enforcer, Boolean.TRUE);
+            sOwed.put(enforcer, Boolean.TRUE);
+            if (mode == AudioManager.MODE_NORMAL && !sHandler.hasCallbacks(RESYNC)) {
+                sHandler.postDelayed(RESYNC, NORMAL_GRACE_MS);
             }
         }
         if (mode == AudioManager.MODE_NORMAL) {
-            Slog.e(ENFORCER_TAG, "Exception caught from HAL, rebooting HAL");
-            enforcer.reboot();
-            return true;
+            Slog.e(ENFORCER_TAG, "Exception caught from HAL, rebooting HAL in " + NORMAL_GRACE_MS + " ms unless a"
+                    + " call starts: " + what);
+        } else {
+            Slog.w(TAG, "HAL error during a call or before the audio mode is known (mode " + mode + "), not"
+                    + " rebooting the HAL (shared with call audio); resync reboot once the call ends: " + what);
         }
-        Slog.w(TAG, "HAL error during a call or before the audio mode is known (mode " + mode + "), not rebooting"
-                + " the HAL (shared with call audio); resync reboot once the call ends: " + what);
-        return false;
+    }
+
+    /**
+     * SoundTriggerHalWatchdog$Watchdog deadline (UptimeTimer thread), replaces its "log, reboot()": the HAL call that
+     * created this watchdog is still running after 3 s.
+     */
+    public static void watchdogExpired(Object watchdog, SoundTriggerHalWatchdog hal, Exception where) {
+        boolean now;
+        synchronized (sLock) {
+            ensureHandlerLocked();
+            now = sMode == MODE_UNKNOWN;
+            if (!now) {
+                sHung.put(watchdog, new Hung(hal, where, SystemClock.uptimeMillis()));
+                sHungCount = sHung.size();
+                sHandler.post(CHECK_HUNG);
+            }
+        }
+        if (now) {
+            // boot (AudioService not watched yet): stock; the reboot unblocks the caller, which may be boot itself
+            Slog.e(WATCHDOG_TAG, "HAL deadline expired. Rebooting.", where);
+            hal.reboot();
+        }
+    }
+
+    /** First thing in SoundTriggerHalWatchdog$Watchdog.close(): the HAL call returned (or threw). Every HAL call. */
+    public static void watchdogClosed(Object watchdog) {
+        if (sHungCount == 0) return;
+        Hung h;
+        synchronized (sLock) {
+            h = sHung.remove(watchdog);
+            sHungCount = sHung.size();
+        }
+        if (h != null) {
+            Slog.w(TAG, "the hung sound trigger HAL call returned after "
+                    + (SystemClock.uptimeMillis() - h.since + WATCHDOG_MS) + " ms: no HAL reboot");
+        }
+    }
+
+    /** Handler thread: the mode now, read from AudioService when the listener says NORMAL (it lags setMode). */
+    private static int liveMode() {
+        int m = sMode;
+        AudioManager am = sAm;
+        if (m != AudioManager.MODE_NORMAL || am == null) return m;
+        try {
+            return am.getMode();
+        } catch (Throwable t) {
+            return m;
+        }
+    }
+
+    /** Handler thread: decide for watchdog deadlines (no middleware lock is held here). */
+    private static void checkHung() {
+        int mode = liveMode();
+        List<Hung> reboot = new ArrayList<>();
+        List<Hung> deferred = new ArrayList<>();
+        synchronized (sLock) {
+            if (mode == AudioManager.MODE_NORMAL || mode == MODE_UNKNOWN) {
+                reboot.addAll(sHung.values());
+                sHung.clear();
+            } else {
+                for (Hung h : sHung.values()) {
+                    if (!h.deferred) {
+                        h.deferred = true;
+                        deferred.add(h);
+                    }
+                }
+            }
+            sHungCount = sHung.size();
+        }
+        for (Hung h : deferred) {
+            Slog.e(TAG, "sound trigger HAL call still running after " + WATCHDOG_MS + " ms during a call (mode "
+                    + mode + "): NOT rebooting the audio HAL (shared with call audio); rebooting it after the call"
+                    + " if the call into the HAL is still hung", h.where);
+        }
+        if (!deferred.isEmpty()) {
+            if (!sHandler.hasCallbacks(CHECK_HUNG_MAX)) sHandler.postDelayed(CHECK_HUNG_MAX, HUNG_IN_CALL_MAX_MS);
+            // live mode says call, the listener still says NORMAL: resync() polls until they agree
+            if (sMode == AudioManager.MODE_NORMAL && !sHandler.hasCallbacks(RESYNC)) {
+                sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+            }
+        }
+        if (!reboot.isEmpty()) {
+            for (Hung h : reboot) Slog.e(WATCHDOG_TAG, "HAL deadline expired. Rebooting.", h.where);
+            rebootAll(new ArrayList<SoundTriggerHalEnforcer>(), reboot);
+        }
+    }
+
+    private static final Runnable CHECK_HUNG_MAX = new Runnable() {
+        @Override
+        public void run() {
+            checkHungMax();
+        }
+    };
+
+    /** Handler thread: a HAL call hung for HUNG_IN_CALL_MAX_MS during a call is a dead HAL. */
+    private static void checkHungMax() {
+        long now = SystemClock.uptimeMillis();
+        long next = Long.MAX_VALUE;
+        List<Hung> dead = new ArrayList<>();
+        synchronized (sLock) {
+            for (Iterator<Hung> it = sHung.values().iterator(); it.hasNext(); ) {
+                Hung h = it.next();
+                long age = now - h.since;
+                if (age >= HUNG_IN_CALL_MAX_MS) {
+                    dead.add(h);
+                    it.remove();
+                } else {
+                    next = Math.min(next, HUNG_IN_CALL_MAX_MS - age);
+                }
+            }
+            sHungCount = sHung.size();
+        }
+        if (next != Long.MAX_VALUE) sHandler.postDelayed(CHECK_HUNG_MAX, next);
+        if (dead.isEmpty()) return;
+        Slog.e(TAG, "sound trigger HAL call hung for " + (HUNG_IN_CALL_MAX_MS / 60000) + " min during a call:"
+                + " treating the HAL as dead, rebooting it now (this restarts the audio HAL)");
+        rebootAll(new ArrayList<SoundTriggerHalEnforcer>(), dead);
     }
 
     /** Handler thread. */
@@ -221,11 +396,12 @@ public final class K4StRetry {
                 }
             });
             sModeWatched = true;
+            sAm = am;
             int mode = am.getMode();
             Slog.i(TAG, "watching the audio mode for deferred sound trigger HAL reboots (mode " + mode + ")");
             onMode(mode);
         } catch (Throwable t) {
-            // AudioService not published yet (early boot): reboots stay deferred until the mode is known
+            // AudioService not published yet (early boot): HAL error reboots stay deferred until the mode is known
             if (!sModeRegisterFailed) {
                 sModeRegisterFailed = true;
                 Slog.w(TAG, "cannot watch the audio mode yet, retrying every 15 s: " + t);
@@ -239,7 +415,7 @@ public final class K4StRetry {
         boolean owed;
         synchronized (sLock) {
             sMode = mode;
-            owed = !sOwed.isEmpty();
+            owed = !sOwed.isEmpty() || !sHung.isEmpty();
         }
         if (mode != AudioManager.MODE_NORMAL) {
             sHandler.removeCallbacks(RESYNC);
@@ -249,21 +425,48 @@ public final class K4StRetry {
         }
     }
 
-    /** Handler thread: the call is over, run the reboot the HAL errors during it would have done. */
+    /** Handler thread: no call (any more), run the reboot the HAL errors / hung calls are owed. */
     private static void resync() {
+        int mode = liveMode();
         List<SoundTriggerHalEnforcer> owed;
+        List<Hung> hung;
         synchronized (sLock) {
-            if (sMode != AudioManager.MODE_NORMAL) return;
+            if (mode != AudioManager.MODE_NORMAL) {
+                // in a call the listener has not reported yet (it lags setMode): its NORMAL event posts this again;
+                // poll meanwhile in case it never reports a change
+                if (sMode == AudioManager.MODE_NORMAL) sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+                return;
+            }
             owed = new ArrayList<>(sOwed.keySet());
+            hung = new ArrayList<>(sHung.values());
             sOwed.clear();
+            sHung.clear();
+            sHungCount = 0;
         }
+        if (owed.isEmpty() && hung.isEmpty()) return;
+        Slog.w(TAG, "no call: rebooting the sound trigger HAL now to resync it with the middleware ("
+                + owed.size() + " HAL error(s), " + hung.size() + " hung HAL call(s))");
+        rebootAll(owed, hung);
+    }
+
+    /** Handler thread: one reboot per HAL stack (each reboot is a setprop that restarts the audio HAL). */
+    private static void rebootAll(List<SoundTriggerHalEnforcer> owed, List<Hung> hung) {
+        IdentityHashMap<SoundTriggerHalWatchdog, Boolean> done = new IdentityHashMap<>();
         for (SoundTriggerHalEnforcer enforcer : owed) {
-            Slog.w(TAG, "call ended: rebooting the sound trigger HAL now to resync it with the middleware"
-                    + " (HAL error during the call)");
+            SoundTriggerHalWatchdog hal = enforcer.mUnderlying;
+            if (hal == null || done.put(hal, Boolean.TRUE) != null) continue;
             try {
                 enforcer.reboot();
             } catch (Throwable t) {
                 Slog.e(TAG, "deferred HAL reboot failed", t);
+            }
+        }
+        for (Hung h : hung) {
+            if (done.put(h.hal, Boolean.TRUE) != null) continue;
+            try {
+                h.hal.reboot();
+            } catch (Throwable t) {
+                Slog.e(TAG, "HAL reboot failed", t);
             }
         }
     }
