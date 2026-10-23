@@ -13,8 +13,13 @@ import java.lang.ref.WeakReference;
 /**
  * Per home-capable LayeredEngine (which & 1). Two receivers:
  *  - reload ({@link HomeDepthClock#ACTION_RELOAD}, sender must hold WRITE_SECURE_SETTINGS): registered for the
- *    engine's lifetime so the Settings switch can turn the clock on; it does nothing but rebuild the sub engine, and
- *    only when the clock is on now or was on before.
+ *    engine's lifetime so the Settings switch can turn the clock on. It queues a check ({@link ReloadPolicy}) that
+ *    rebuilds the sub engine only when its clock is missing, unwanted or built from other settings than the current
+ *    ones (each build records what it read, HomeDepthClock.built). The editor's RELOAD (EXTRA_WALLPAPER_PENDING)
+ *    comes before its wallpaper apply, which normally replaces this engine in-process (reapply: the old sub engine is
+ *    destroyed, so its check never runs, then the new one is built from the settings written by then); the check runs
+ *    when this engine is shown again (the editor has closed, the apply is done) or after 6 s, whichever comes first.
+ *    A new engine elsewhere (a preview, another connection) no longer cancels it.
  *  - minute ticker (TIME_TICK, TIME_SET, TIMEZONE_CHANGED, LOCALE_CHANGED): registered only while the engine has a
  *    clock and is visible. ACTION_TIME_TICK is not a wakeup broadcast, so nothing here wakes the CPU or draws per
  *    frame; a redraw happens only when what the clock should show differs from what is on screen. The same tick asks
@@ -27,27 +32,50 @@ final class EngineState {
     private boolean visible;
     private boolean tickerOn;
     private boolean reloadOn;
+    /** A RELOAD arrived and its check has not run yet. */
+    private boolean reloadPending;
 
     private final Runnable reload = new Runnable() {
         @Override
         public void run() {
+            reloadPending = false;
             f3.a e = engine.get();
             if (e == null) {
                 return;
             }
-            int which = e.getWhich();
-            boolean enabled = HomeDepthClock.enabled();
-            boolean shared = HomeDepthClock.sharedEnabled();
-            boolean want = enabled && ((which & 3) == 1 || shared);
-            boolean have = HomeDepthClock.clockOf(e) != null || e.g instanceof HomeClockPresenter;
-            if (!want && !have) {
-                logNothingToDo(which, enabled, shared);
-                return;
+            try {
+                check(e);
+            } catch (Throwable t) {
+                Log.e(HomeDepthClock.TAG, "reload", t);
             }
-            Log.i(HomeDepthClock.TAG, "reload (which=" + e.getWhich() + ", clock " + have + " -> " + want + "): rebuilding the engine");
-            e.stopSelf();
         }
     };
+
+    private void check(f3.a e) {
+        int which = e.getWhich();
+        boolean enabled = HomeDepthClock.enabled();
+        boolean shared = HomeDepthClock.sharedEnabled();
+        h3.a p = e.g;
+        // the shared clock only ever goes into Samsung's BgCachableLayeredPresenter (h3.b, HomeDepthClock.afterBuild);
+        // a shared engine with another presenter would come back without a clock however often it is rebuilt
+        boolean want = enabled && ((which & 3) == 1 || (shared && (which & 3) == 3 && p != null && p.getClass() == h3.b.class));
+        boolean have = HomeDepthClock.clockOf(e) != null || p instanceof HomeClockPresenter;
+        String built = have && p != null ? HomeDepthClock.builtFrom(p) : null;
+        String now = want && have ? HomeDepthClock.fingerprint(context) : null;
+        switch (ReloadPolicy.decide(want, have, built, now)) {
+            case NONE:
+                logNothingToDo(which, enabled, shared);
+                return;
+            case KEEP:
+                Log.i(HomeDepthClock.TAG, "reload (which=" + which + "): clock already built from the current settings, no rebuild");
+                return;
+            default:
+                Log.i(HomeDepthClock.TAG, "reload (which=" + which + ", clock " + have + " -> " + want
+                        + (want && have ? ", " + (built == null ? "build settings unknown" : "settings changed since the build") : "")
+                        + "): rebuilding the engine");
+                e.stopSelf();
+        }
+    }
 
     private String lastSkip;
     private long lastSkipAt;
@@ -69,23 +97,20 @@ final class EngineState {
                 + "): no clock wanted or shown, nothing to rebuild (" + why + ")");
     }
 
-    /** A queued reload waits for a new wallpaper the sender is applying (see {@link #newEngine}). */
-    private boolean reloadAwaitsWallpaper;
-
     private final BroadcastReceiver reloadReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context c, Intent intent) {
             main.removeCallbacks(reload);
-            // The Wallpaper & style editor saves the clock before it applies the new wallpaper, which then creates a
-            // new engine that reads the clock settings itself: rebuilding this one first would only draw the old
-            // layers once more. Its reload therefore waits; a new home engine (or this one's destruction) drops it,
-            // and it runs only if no new wallpaper arrives in time (an apply that failed). Others: coalesce toggles.
-            reloadAwaitsWallpaper = intent.getBooleanExtra(HomeDepthClock.EXTRA_WALLPAPER_PENDING, false);
-            main.postDelayed(reload, reloadAwaitsWallpaper ? WALLPAPER_WAIT_MS : 300);
+            boolean wallpaperPending = intent.getBooleanExtra(HomeDepthClock.EXTRA_WALLPAPER_PENDING, false);
+            reloadPending = true;
+            if (wallpaperPending) {
+                f3.a e = engine.get();
+                Log.i(HomeDepthClock.TAG, "reload from the editor (which=" + (e == null ? -1 : e.getWhich())
+                        + "): checked when shown, or in " + ReloadPolicy.WALLPAPER_WAIT_MS + " ms");
+            }
+            main.postDelayed(reload, ReloadPolicy.checkDelay(wallpaperPending));
         }
     };
-    private static final long WALLPAPER_WAIT_MS = 6000;
-
     private final BroadcastReceiver tickReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context c, Intent intent) {
@@ -105,17 +130,9 @@ final class EngineState {
         reloadOn = true;
     }
 
-    /** Another home engine was created (a new wallpaper): a reload waiting for it is not needed any more. */
-    void newEngine() {
-        if (reloadAwaitsWallpaper && main.hasCallbacks(reload)) {
-            main.removeCallbacks(reload);
-            Log.i(HomeDepthClock.TAG, "new wallpaper engine: queued reload of the old one dropped");
-        }
-        reloadAwaitsWallpaper = false;
-    }
-
     void stop() {
         main.removeCallbacks(reload);
+        reloadPending = false;
         setVisible(false);
         if (reloadOn) {
             unregister(reloadReceiver);
@@ -125,6 +142,12 @@ final class EngineState {
 
     void setVisible(boolean v) {
         visible = v;
+        if (v && reloadPending) {
+            // shown after a RELOAD (the editor closed): check now, posted so a rebuild never runs inside the engine's
+            // own visibility dispatch
+            main.removeCallbacks(reload);
+            main.post(reload);
+        }
         f3.a e = engine.get();
         boolean want = v && e != null && HomeDepthClock.clockOf(e) != null;
         if (want && !tickerOn) {

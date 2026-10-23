@@ -11,11 +11,13 @@ import org.json.JSONObject;
  * The home clock as saved by the Wallpaper & style editor (DressRoom, Home "Set as wallpaper" -> Done):
  *   Settings.System k4_home_clock_item       the clock as Samsung AOD SDK ClockItem JSON (ClockItemImpl, gson)
  *   Settings.System k4_home_clock_item_rect  "left,top,right,bottom,scale" of the clock on the real screen (pixels)
- * Read once per presenter build (the editor sends RELOAD after saving, which rebuilds the engine). Either key missing or
- * unreadable -> null, and the plain ClockNode is used as before.
+ * Read once per presenter build (the editor sends RELOAD after saving; EngineState rebuilds an engine whose clock was
+ * built from other settings, see ReloadPolicy). Either key missing or unreadable -> null, and the plain ClockNode is used.
  */
 final class HomeClockItem {
     static final String KEY = "k4_home_clock_item";
+    /** The editor's WallpaperClockBundle JSON (gravity, stretch), see {@link #bundleGravity}. */
+    static final String KEY_BUNDLE = "k4_home_clock_bundle";
 
     int clockType;
     /** Font: presetFontIndex (null = keep the clock's own font), path ("" for preset fonts), weight, rounded corners. */
@@ -81,7 +83,7 @@ final class HomeClockItem {
      */
     static Integer bundleGravity(Context context) {
         try {
-            String b = Settings.System.getString(context.getContentResolver(), "k4_home_clock_bundle");
+            String b = Settings.System.getString(context.getContentResolver(), KEY_BUNDLE);
             if (b == null || b.trim().isEmpty()) {
                 return null;
             }

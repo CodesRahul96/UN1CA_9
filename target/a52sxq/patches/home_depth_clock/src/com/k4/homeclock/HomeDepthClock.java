@@ -36,7 +36,7 @@ public final class HomeDepthClock {
     static final String TAG = "K4HomeClock";
     static final String PROP = "persist.sys.k4.home_depth_clock";
     public static final String ACTION_RELOAD = "com.k4.homeclock.action.RELOAD";
-    /** RELOAD extra (boolean): the sender is about to apply a new wallpaper, whose new engine reads the settings itself. */
+    /** RELOAD extra (boolean): the sender is about to apply a wallpaper; checked when the engine is shown again or in 6 s. */
     public static final String EXTRA_WALLPAPER_PENDING = "com.k4.homeclock.extra.WALLPAPER_PENDING";
     /** Only senders holding this permission (Settings, shell) are heard. */
     static final String RELOAD_PERMISSION = "android.permission.WRITE_SECURE_SETTINGS";
@@ -111,9 +111,11 @@ public final class HomeDepthClock {
             }
             i3.c subject = data.d instanceof i3.c ? (i3.c) data.d : null;
             i3.c background = data.c instanceof i3.c ? (i3.c) data.c : null;
+            String fp = fingerprint(p.a); // before makeClock reads the settings
             DepthClock clock = makeClock(p.a, p.g, p.h, HomeClockPresenter.subjectTop(subject), null, background, p, true);
             list.add(at, clock);
             setClock(p, clock);
+            built(p, fp);
             Log.i(TAG, "shared home+lock wallpaper (which=" + p.c + "): gated clock at layer " + at + "/" + list.size());
         } catch (Throwable t) {
             Log.e(TAG, "afterBuild", t);
@@ -139,6 +141,45 @@ public final class HomeDepthClock {
             Throwable cause = t instanceof java.lang.reflect.InvocationTargetException && t.getCause() != null ? t.getCause() : t;
             Log.e(TAG, "AOD clock unavailable, plain clock (" + item + ")", cause);
             return plain;
+        }
+    }
+
+    /** What each presenter's clock was built from (fingerprint), see {@link ReloadPolicy}. */
+    private static final Map<h3.a, String> BUILT = new WeakHashMap<>();
+
+    /**
+     * The settings a clock is built from, as one string (ReloadPolicy.fingerprint), or null if they cannot be read:
+     * the editor's clock (Settings.System k4_home_clock_item, _rect, _bundle) and the persist.sys.k4.home_depth_clock*
+     * props (switch, shared, plain clock place and colour).
+     */
+    static String fingerprint(Context context) {
+        try {
+            android.content.ContentResolver r = context.getContentResolver();
+            return ReloadPolicy.fingerprint(
+                    android.provider.Settings.System.getString(r, HomeClockItem.KEY),
+                    android.provider.Settings.System.getString(r, HomeClockItem.KEY + "_rect"),
+                    android.provider.Settings.System.getString(r, HomeClockItem.KEY_BUNDLE),
+                    prop(PROP), prop(PROP + "_shared"), prop(PROP + "_y"), prop(PROP + "_color"));
+        } catch (Throwable t) {
+            Log.w(TAG, "clock settings fingerprint", t);
+            return null;
+        }
+    }
+
+    /** A build of {@code p} made its clock from {@code fingerprint} (taken before it read the settings). */
+    static void built(h3.a p, String fingerprint) {
+        synchronized (BUILT) {
+            if (fingerprint == null) {
+                BUILT.remove(p);
+            } else {
+                BUILT.put(p, fingerprint);
+            }
+        }
+    }
+
+    static String builtFrom(h3.a p) {
+        synchronized (BUILT) {
+            return BUILT.get(p);
         }
     }
 
@@ -232,9 +273,6 @@ public final class HomeDepthClock {
         try {
             if (!homeCapable(engine.getWhich())) {
                 return;
-            }
-            for (EngineState other : states()) {
-                other.newEngine();
             }
             if (engine.g instanceof HomeClockPresenter) {
                 try {

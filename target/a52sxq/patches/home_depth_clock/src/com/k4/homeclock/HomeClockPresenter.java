@@ -32,6 +32,8 @@ final class HomeClockPresenter extends h3.a {
     @Override
     public void a(b source, int w, int h, g0.a data) {
         long t0 = SystemClock.elapsedRealtime();
+        String fp = HomeDepthClock.fingerprint(this.a); // before makeClock reads the settings (EngineState's reload check)
+        HomeDepthClock.built(this, null);
         h3.f inner = new h3.f(this.a, this.c, source);
         inner.e(w, h);
         g0.a in = inner.e;
@@ -71,6 +73,7 @@ final class HomeClockPresenter extends h3.a {
             i3.c backNode = new i3.c(this.a, new i3.b(back, full, full, null), this.c);
             DepthClock clockNode = HomeDepthClock.makeClock(this.a, w, h, subjectTop, back, null, this, false);
             HomeDepthClock.setClock(this, clockNode); // also releases it if the rest of the build fails
+            HomeDepthClock.built(this, fp);
             data.c = backNode;
             group.c.add(backNode);
             // the clock and the subject are drawn after the engine's dark mode dim (see drawAbove); this node only
@@ -85,6 +88,7 @@ final class HomeClockPresenter extends h3.a {
             // keep the stock full layer stack (no clock) rather than a broken wallpaper
             Log.e(HomeDepthClock.TAG, "build failed, showing the layers without a clock", t);
             HomeDepthClock.setClock(this, null);
+            HomeDepthClock.built(this, null);
             group.c.clear();
             for (Object n : nodes) {
                 group.c.add(n);
