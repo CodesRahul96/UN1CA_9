@@ -84,9 +84,12 @@ function flush() {
 { line = $0; sub(/^ */, "", line); buf = buf " " line }
 END { flush() }' "$T/sessions.txt" > "$T/sessions.tsv"
 
-# Decide on the newest batch of staged parents: Play commits tzdata/statsd/adservices/the main train within a minute or
-# two and one reboot activates them all; one failed APEX fails the whole batch, so the most specific error message of
-# the batch is the reason. Retries after a failed boot come minutes later, hence the 3 minute window.
+# Decide on the newest batch of staged parents: one reboot activates every staged session and one failed APEX fails all
+# of them, so the most specific error message of the batch is the reason. A batch = the sessions committed within 3
+# minutes before its newest one. That never merged two reboots in the field data (10-10: failed reboots retried 4-8
+# minutes apart, 14:59/15:04/15:11/15:15/15:23), but it can split one reboot's sessions (10-10 17:35:42-17:37:53
+# tzdata/statsd/adservices, the 25-module train at 17:45:05, all applied by one reboot); no dumpsys timestamp tells
+# the reboot apart (updatedMillis == createdMillis), so a wider window would merge real retries instead.
 # (awk text shared with the -v session list: how specific a session error is; generic follow-up errors rank low)
 RANK_AWK='
 function rank(m) {
@@ -140,6 +143,7 @@ LIVE_SHA="$(sha256sum "$LIVE_NETD" 2> /dev/null | cut -d ' ' -f 1)"
 LIVE_DIR="${LIVE_NETD%/*}"
 LIVE_SET="$(for o in netd offload test clatd dscpPolicy; do sha256sum "$LIVE_DIR/$o.o" 2> /dev/null | cut -d ' ' -f 1; done)"
 LIVE_ALL="$(printf '%s\n' "$LIVE_SET" | sha256sum | cut -d ' ' -f 1)"
+[ "$(printf '%s\n' "$LIVE_SET" | grep -c .)" = 5 ] || LIVE_ALL=""   # not readable / object missing: no set identity
 LIVE_KNOWN="$(grep "^$LIVE_ALL " "$KNOWN" 2> /dev/null | head -n 1 | cut -d ' ' -f 3-)"
 LIVE_NETD_KNOWN="$(awk -v s="$LIVE_SHA" '$2 == s { sub(/^[^ ]* [^ ]* /, ""); print; exit }' "$KNOWN" 2> /dev/null)"
 # What the ROM kept of the last update boot that never finished (a52sxq_mainline.rc; an empty file = absent then)
@@ -160,31 +164,31 @@ DEV_HINT="developer: copy /cache/k4_mainline/failed_staged_tethering_<obj>.o for
 explain() {
     case "$1" in
         *"Failed to set mtime"*)
-            echo "apexd was denied setting the mtime of a new APEX dm device (SELinux race, fixed in 9.3.36 by apexd_dm_mtime) - flash 9.3.36 or newer and let Play retry" ;;
+            printf '%s\n' "apexd was denied setting the mtime of a new APEX dm device (SELinux race, fixed in 9.3.36 by apexd_dm_mtime) - flash 9.3.36 or newer and let Play retry" ;;
         *"container signature"*|*"not compatible with the one currently installed"*)
-            echo "an APEX in the ROM is re-signed with our own key, so Google's update for it is rejected before the reboot - ROM bug (Tethering must ship Google's original APEX)" ;;
+            printf '%s\n' "an APEX in the ROM is re-signed with our own key, so Google's update for it is rejected before the reboot - ROM bug (Tethering must ship Google's original APEX)" ;;
         *"Build fingerprint has changed"*)
-            echo "a new ROM build was flashed while the update was waiting for its reboot; Android drops it by design and Play downloads it again (harmless) - next time: when Play says an update is waiting for a restart, reboot once before flashing a new build" ;;
+            printf '%s\n' "a new ROM build was flashed while the update was waiting for its reboot; Android drops it by design and Play downloads it again (harmless) - next time: when Play says an update is waiting for a restart, reboot once before flashing a new build" ;;
         *"crashing native process"*)
-            echo "a native service crashed right after the update and apexd rolled it back (${1##*process: }) - if that is netd: Tethering needs newer BPF maps; $DEV_HINT" ;;
+            printf '%s\n' "a native service crashed right after the update and apexd rolled it back (${1##*process: }) - if that is netd: Tethering needs newer BPF maps; $DEV_HINT" ;;
         *"Found both applied and failed apex sessions"*)
-            echo "one module of the batch failed to activate while others did, so Android rolled the whole batch back - look at the session errors with -v (before 9.3.36 this was the apexd mtime denial)" ;;
+            printf '%s\n' "one module of the batch failed to activate while others did, so Android rolled the whole batch back - look at the session errors with -v (before 9.3.36 this was the apexd mtime denial)" ;;
         "APEX activation failed.")
             if [ -n "$CAP_MISSING" ]; then
-                echo "rolled back after the update boot: Tethering ${CAP_VER:-?} defines BPF maps the ROM does not create ($CAP_MISSING) -> netd/system_server crash; $DEV_HINT"
+                printf '%s\n' "rolled back after the update boot: Tethering ${CAP_VER:-?} defines BPF maps the ROM does not create ($CAP_MISSING) -> netd/system_server crash; $DEV_HINT"
             elif [ "$TETH_IN" = 1 ]; then
-                echo "rolled back after the update boot (boot did not finish or a service crash-looped); Tethering was part of it, so a BPF map gap is the prime suspect - run with su -v for the captured evidence"
+                printf '%s\n' "rolled back after the update boot (boot did not finish or a service crash-looped); Tethering was part of it, so a BPF map gap is the prime suspect - run with su -v for the captured evidence"
             else
-                echo "rolled back after the update boot (boot did not finish or a service crash-looped) - run with su -v for the captured evidence"
+                printf '%s\n' "rolled back after the update boot (boot did not finish or a service crash-looped) - run with su -v for the captured evidence"
             fi ;;
         *"did not know anything about a staged session"*)
-            echo "apexd lost the session state in /metadata/apex (was /metadata wiped or formatted after the update was staged?) - Play retries" ;;
+            printf '%s\n' "apexd lost the session state in /metadata/apex (was /metadata wiped or formatted after the update was staged?) - Play retries" ;;
         *"didn't activate nor fail"*|*"Impossible state"*)
-            echo "apexd did not process the staged session at boot (state left STAGED) - run with su -v and report" ;;
+            printf '%s\n' "apexd did not process the staged session at boot (state left STAGED) - run with su -v and report" ;;
         *"Another apex session failed"*)
-            echo "another update session of the same boot failed and took this one with it - see -v" ;;
+            printf '%s\n' "another update session of the same boot failed and took this one with it - see -v" ;;
         *)
-            echo "$1" ;;
+            printf '%s\n' "$1" ;;
     esac
 }
 
@@ -222,8 +226,8 @@ case "$LNP" in
     *) LNP_ON=1 ;;
 esac
 [ "$LNP_ON" = 1 ] && LINE="$LINE; WARNING: Local Network Protection is on in this Tethering ($LNP) but not enforced on kernel 5.4 - developer: ship the 5.4 LNP stats variant"
-echo "$LINE"
-echo "$LINE" > "$T/verdict.txt"
+printf '%s\n' "$LINE"
+printf '%s\n' "$LINE" > "$T/verdict.txt"
 [ "$VERBOSE" = 1 ] || exit 0
 
 # batches <N>: staged parent sessions grouped by reboot batch like the verdict (a batch = the sessions committed within
@@ -232,7 +236,7 @@ echo "$LINE" > "$T/verdict.txt"
 # denial was on a 1-module session, the 25-module train next to it had no reason of its own).
 batches() {
     awk -F '\t' '$4 == "true" && $1 == "C" { kids[$3] = kids[$3] " " $11 }
-        $4 == "true" && $1 == "P" && $3 == "-1" { n++; l[n] = $5 "\t" $2 "\t" ($6 == "true" ? "applied" : $7 == "true" ? "FAILED" : $8 == "true" ? "ready" : "staged") "\t" $11 "\t" $12 }
+        $4 == "true" && $1 == "P" && $3 == "-1" && $9 != "true" { n++; l[n] = $5 "\t" $2 "\t" ($6 == "true" ? "applied" : $7 == "true" ? "FAILED" : $8 == "true" ? "ready" : "staged") "\t" $11 "\t" $12 }
         END { for (i = 1; i <= n; i++) { split(l[i], f, "\t"); print f[1] "\t" f[2] "\t" f[3] "\t" (kids[f[2]] != "" ? kids[f[2]] : f[4]) "\t" f[5] } }' \
         "$T/sessions.tsv" | sort -rn | awk -F '\t' -v nb="$1" "$RANK_AWK"'
     {   n++; t[n] = $1 + 0; id[n] = $2; st[n] = $3; pk[n] = $4; em[n] = $5
@@ -240,31 +244,37 @@ batches() {
         last[b] = n; cnt[b]++
         if (st[n] == "FAILED") { nf[b]++; r = rank(em[n]); if (r > br[b]) { br[b] = r; best[b] = em[n]; bid[b] = id[n] } }
         else if (st[n] == "applied") na[b]++
-        else np[b]++
+        else if (st[n] == "ready") np[b]++
+        else ns[b]++
     }
     END {
         show = (nb > 0 && b > nb) ? nb : b
         if (b > show) { o = 0; for (k = show + 1; k <= b; k++) o += cnt[k]
             print "X\t0\t  (" (b - show) " older batches with " o " sessions not shown; -s saves all of them)" }
         for (k = show; k >= 1; k--) {
-            s = nf[k] ? "FAILED" : np[k] ? "pending" : "applied"
+            # same precedence as the verdict: pending > failed > applied (> unknown)
+            s = np[k] ? "pending" : nf[k] ? "FAILED" : na[k] ? "applied" : "unknown"
             h = ", " cnt[k] " session" (cnt[k] > 1 ? "s" : "") ": " s
-            if (nf[k] && na[k]) h = h " (" nf[k] " failed, " na[k] " applied)"
+            if (nf[k] && (na[k] || np[k] || ns[k]))
+                h = h " (" nf[k] " failed" (na[k] ? ", " na[k] " applied" : "") (np[k] + ns[k] ? ", " np[k] + ns[k] " not activated yet" : "") ")"
             if (nf[k]) h = h ", reason " (best[k] == "" ? "unknown (no session has an error message)" : "(#" bid[k] "): " best[k])
+            # only an error of the boot itself took the other sessions down; a pre-reboot rejection (signature,
+            # verification) or a per-session drop (fingerprint) belongs to its own session
+            act = best[k] ~ /^APEX activation failed|crashing native process|Reverting back to safe state|Another apex session failed/
             print "H\t" t[first[k]] "\t" h
             for (i = last[k]; i >= first[k]; i--) {
                 p = pk[i]; gsub(/com\.google\.android\./, "", p); sub(/^ +/, "", p)
                 print "R\t" t[i] "\t  #" id[i] "  " st[i] "  [" split(p, w, " ") "] " substr(p, 1, 90)
                 if (em[i] != "") print "X\t0\t      " em[i]
-                if (nf[k] && best[k] != "" && em[i] != best[k])
+                if (nf[k] && act && best[k] != "" && em[i] != best[k])
                     print "X\t0\t      " (st[i] == "applied" ? "applied, but its batch failed" : "batch reason") " (#" bid[k] "): " best[k]
             }
         }
     }' | while IFS="$(printf '\t')" read -r kind ms rest; do
         case "$kind" in
-            H) echo "  -- batch $(ms2date "$ms")$rest" ;;
-            R) echo "  $(ms2date "$ms")$rest" ;;
-            *) echo "$rest" ;;
+            H) printf '%s\n' "  -- batch $(ms2date "$ms")$rest" ;;
+            R) printf '%s\n' "  $(ms2date "$ms")$rest" ;;
+            *) printf '%s\n' "$rest" ;;
         esac
     done
 }
