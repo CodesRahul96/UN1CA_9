@@ -13,7 +13,7 @@ else
     # (apply_modules.sh runs with set -e: keep the failing check inside an if)
     if TT_OUT="$(python3 "$MODPATH/check_netd.py" "$TT_NETD" "${TT_KNOWN[@]}" 2>&1)"; then TT_RC=0; else TT_RC=$?; fi
     while IFS= read -r l; do [ "$l" ] && LOG "- $l"; done <<< "$TT_OUT"
-    [ "$TT_RC" = 0 ] || ABORT "tethering_trains: a52_netd.o or the frozen loader no longer covers a Tethering version phones may run (see above) - netd.o gaps: rerun tethering/regen.py --train-progs with every train in known/; offload/test/clatd/dscpPolicy gaps: that train cannot load on 5.4 with our loader"
+    [ "$TT_RC" = 0 ] || ABORT "tethering_trains: a52_netd.o or the frozen loader no longer covers a Tethering version phones may run (see above) - a52_netd.o map/program lines: rerun tethering/regen.py --train-progs with every train in known/; \"(load fails)\" lines: that train cannot load on 5.4 with our frozen loader (bpfloader reboot loop), fix the ROM side first; \"pin gap\" lines: review, then fix or add the printed line to known/tolerated.txt"
     python3 "$MODPATH/check_netd.py" --list "${TT_KNOWN[@]}" > "$WORK_DIR/system/system/etc/bpf/a52_netd.known" || \
         ABORT "tethering_trains: failed to write a52_netd.known"
     SET_METADATA "system" "system/etc/bpf/a52_netd.known" 0 0 644 "u:object_r:system_file:s0"

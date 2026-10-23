@@ -42,6 +42,10 @@
 #     5.15+ program) or known/tolerated.txt lists it ("<obj> <pin>  # why", for a reviewed 5.10+-only addition).
 #   * struct bpf_map_def/bpf_prog_def sizes are the ones the loader reads (192/180), a license section exists.
 # The same instruction checks also run on the programs a52_netd.o itself loads.
+# Necessary, not sufficient - not modelled: map flags other than MMAPABLE (e.g. BPF_F_INNER_MAP is 5.10), which helpers
+# each program type may call, verifier complexity limits, pin collisions between objects, a legacy-path object without
+# .BTF or a libbpf object without .android_maps. None occurs in the known objects; the factory objects running on the
+# phone are the real proof, a new train still needs its first update boot watched (k4-mainline-diag).
 import hashlib, os, re, struct, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tethering"))
@@ -233,12 +237,16 @@ known = {label(k): os.path.dirname(os.path.abspath(k)) for k in sys.argv[2:]}
 factory = [vl for vl in known if vl[1] == "factory"]
 if len(factory) != 1:
     print(f"known/: exactly one *_factory_netd.o needed as the baseline, got {len(factory)}"); bad += 1
-tolerated = set()
+tolerated, used = set(), set()
 tol = os.path.join(os.path.dirname(os.path.abspath(sys.argv[2])) if sys.argv[2:] else HERE, "tolerated.txt")
 if os.path.exists(tol):
     for line in open(tol):
         f = line.split("#", 1)[0].split()
-        if f: assert len(f) == 2, (tol, line); tolerated.add(tuple(f))
+        if not f: continue
+        if len(f) != 2 or f[0] not in LOADER_OBJS or not f[1].startswith("/sys/fs/bpf/"):
+            print(f"known/tolerated.txt: bad line {line.strip()!r} - format: <{'|'.join(LOADER_OBJS)}> <full pin path>  # why")
+            bad += 1; continue
+        tolerated.add(tuple(f))
 base = {}
 for ver, lab in factory + sorted(set(known) - set(factory)):
     before, n = bad, 0
@@ -253,10 +261,13 @@ for ver, lab in factory + sorted(set(known) - set(factory)):
         for q in probs:
             print(f"Tethering {ver} ({lab}) {obj}.o: {q}"); bad += 1
         for pin in sorted(missing - base.get(obj, set())):
-            if (obj, pin) in tolerated: continue
-            print(f"Tethering {ver} ({lab}) {obj}.o: {pin} defined for API {API} but not created on 5.4.302 "
-                  f"(the factory one is) - its userspace may abort; review, then fix or add it to known/tolerated.txt"); bad += 1
+            if (obj, pin) in tolerated: used.add((obj, pin)); continue
+            print(f"Tethering {ver} ({lab}) {obj}.o: pin gap: {pin} is defined for API {API} but not created on 5.4.302 "
+                  f"(the factory one is), so that train's userspace may abort. Not a load failure: review it, and only if "
+                  f"the userspace copes without it add this line to known/tolerated.txt: {obj} {pin}  # <why>"); bad += 1
         n += len(made)
     if bad == before:
         print(f"Tethering {ver} ({lab}): {', '.join(o + '.o' for o in LOADER_OBJS)} load on 5.4.302 at API {API} ({n} pins)")
+for obj, pin in sorted(tolerated - used):
+    print(f"note: known/tolerated.txt: '{obj} {pin}' matches no pin gap any more - remove it")
 sys.exit(1 if bad else 0)
