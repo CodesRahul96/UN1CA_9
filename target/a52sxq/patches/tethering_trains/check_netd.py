@@ -25,7 +25,10 @@
 #     5.12+ atomics; helpers: only the ids this kernel implements, i.e. has a `case BPF_FUNC_<x>:` for in net/ or
 #     kernel/ of ~/git/kernel_a52sxq_bone - 1..110 and the backported 125 ktime_get_boot_ns; 111..124 are only named
 #     in its uapi enum and the verifier rejects them),
-#     else a non-optional one fails the load and an optional one simply stays unpinned,
+#     else the load fails - except for an optional program in offload.o, the only object the frozen loader loads
+#     without libbpf on 5.4 (loadObject(offload.o, libbpf = kernel >= 5.10)), which is skipped and stays unpinned,
+#   * no in-window program of a libbpf-loaded object (test/clatd/dscpPolicy.o, a52_netd.o) is optional: the frozen
+#     loader's libbpf path refuses those ("Optional program cannot be loaded by libbpf") and fails the object,
 #   * every map/program pin it defines for API 37 (on any kernel) is created on 5.4.302 - unless the factory object
 #     of the same name does not create it on 5.4.302 either (the factory userspace runs without it: e.g. dscpPolicy's
 #     5.15+ program) or known/tolerated.txt lists it ("<obj> <pin>  # why", for a reviewed 5.10+-only addition).
@@ -100,6 +103,7 @@ def insn_problems(code):
 def parse_obj(path):
     """what the frozen loader does with this object on KERNEL at API: (problems, required pins, created pins)"""
     e = Elf(open(path, "rb").read()); probs = []
+    libbpf = os.path.basename(path).rsplit("_", 1)[-1][:-2] not in NON_LIBBPF
     if not e.has("license"): probs.append("no license section (loader aborts)")
     syms = list(e.syms())
     def def_sizes(sec):
@@ -136,11 +140,15 @@ def parse_obj(path):
             if mina <= API < maxa: req.add(pin)
             if not in_window(mink, maxk, mina, maxa) or o not in code: continue
             why = ([f"program type {typ}"] if typ > MAX_PROG_TYPE else []) + insn_problems(code[o][1])
-            if not why: made.add(pin)
-            elif not opt: probs.append(f"program {pin} ({code[o][0]}) would be rejected by 5.4: {', '.join(why)} (load fails)")
+            if libbpf and opt:
+                probs.append(f"program {pin} ({code[o][0]}) is optional: the frozen loader's libbpf path refuses "
+                             f"optional programs (load fails)")
+            elif not why: made.add(pin)
+            elif libbpf or not opt:
+                probs.append(f"program {pin} ({code[o][0]}) would be rejected by 5.4: {', '.join(why)} (load fails)")
     btf = Btf(bytes(e.sh[e.idx(".BTF")]["data"])) if e.has(".BTF") else None
     kinds = sorted({t[0] for t in btf.types[1:] if t[0] > MAX_BTF_KIND}) if btf else []
-    if kinds and os.path.basename(path).rsplit("_", 1)[-1][:-2] in NON_LIBBPF:
+    if kinds and not libbpf:
         probs.append(f"BTF kinds {kinds} unknown to 5.4 and not sanitized on this path (load fails)")
     elif kinds:
         print(f"note: {path}: BTF kinds {kinds} (libbpf sanitizes them on 5.4)")
