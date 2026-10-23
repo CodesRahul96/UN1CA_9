@@ -1,6 +1,7 @@
 # See module.prop. Tester log: /home/kusti420/Downloads/Telegram Desktop/logsrecentes.txt (2026-10-20 08:19:58-08:20:03)
-# K4StRetry*.smali are generated from src/ (javac --release 11 against android-36 android.jar + src/stubs,
-# d8 --min-api 36, baksmali); rebuild them when K4StRetry.java changes.
+# K4StRetry*.smali are generated from src/ by src/build.sh (javac --release 11 against android-36 android.jar +
+# src/stubs, d8 --min-api 36, baksmali); rerun it when K4StRetry.java changes. soundtrigger_no_hal_reboot (runs
+# after this patch) hooks K4StRetry.halError/callbackError into the enforcer's reboot paths.
 SERVICES="system/framework/services.jar"
 DECODE_APK "system" "$SERVICES" || ABORT "Failed to decode $SERVICES"
 python3 - "$APKTOOL_DIR/system/${SERVICES//system\//}" "$SRC_DIR/target/a52sxq/patches/soundtrigger_load_no_reboot" << 'PYEOF' || ABORT "Failed to apply the sound trigger load fix"
@@ -56,9 +57,23 @@ if s[j:].startswith(call):
 else:
     s = s[:j] + call + s[j:]
     print("  - registerCallback -> K4StRetry.setCallback")
+# detach() runs on the old enforcer when SoundTriggerModule.binderDied replaces the HAL stack: drop its entries
+sig = ".method public final detach()V\n"
+assert s.count(sig) == 1, "detach signature changed"
+i = s.index(sig) + len(sig)
+body = s[i:s.index(".end method", i)]
+DETACH = ("    .locals 0\n\n    iget-object p0, p0, %sSoundTriggerHalEnforcer;->mUnderlying:%sSoundTriggerHalWatchdog;\n\n"
+          "    invoke-virtual {p0}, %sSoundTriggerHalWatchdog;->detach()V\n\n    return-void\n" % (P, P, P))
+call = "    invoke-static {p0}, %s->detached(Ljava/lang/Object;)V\n\n" % K
+if body.startswith("    .locals 0\n\n" + call):
+    print("  - detach already hooked")
+else:
+    assert body == DETACH, "detach body changed"
+    s = s[:i] + "    .locals 0\n\n" + call + body[len("    .locals 0\n\n"):] + s[i + len(body):]
+    print("  - detach -> K4StRetry.detached (drops the dead HAL stack's callback / pending retry / owed reboot)")
 open(hits[0], "w").write(s)
 helpers = sorted(glob.glob(patch + "/K4StRetry*.smali"))
-assert len(helpers) == 5, "K4StRetry smali files: %d" % len(helpers)
+assert len(helpers) == 9, "K4StRetry smali files: %d (expected 9, rerun src/build.sh)" % len(helpers)
 dirs = sorted((d for d in glob.glob(root + "/smali_classes*") if re.fullmatch(r"smali_classes\d+", os.path.basename(d))),
               key=lambda d: int(os.path.basename(d)[len("smali_classes"):]))
 dst = os.path.join(dirs[-1] if dirs else root + "/smali", "com/k4/soundtrigger")

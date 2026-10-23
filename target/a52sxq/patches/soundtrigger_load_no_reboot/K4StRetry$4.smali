@@ -1,11 +1,14 @@
 .class Lcom/k4/soundtrigger/K4StRetry$4;
-.super Landroid/content/BroadcastReceiver;
+.super Ljava/lang/Object;
 .source "K4StRetry.java"
+
+# interfaces
+.implements Ljava/lang/Runnable;
 
 
 # annotations
-.annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->registerListeners()V
+.annotation system Ldalvik/annotation/EnclosingClass;
+    value = Lcom/k4/soundtrigger/K4StRetry;
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -18,23 +21,20 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 125
-    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
+    .line 106
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
-    .registers 3
+.method public run()V
+    .registers 1
 
-    const-wide/16 p0, 0x7d0
+    .line 109
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smresync()V
 
-    .line 128
-    const-string p2, "screen off"
-
-    invoke-static {p0, p1, p2}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
-
+    .line 110
     return-void
 .end method
