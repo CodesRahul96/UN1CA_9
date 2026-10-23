@@ -95,7 +95,11 @@ public final class K4StRetry {
      * call that is really hung costs a call its audio after ~48 s instead of 3 s (stock).
      */
     private static final long HUNG_IN_CALL_MAX_MS = 45 * 1000;
+    private static final long REGISTER_RETRY_FAST_MS = 1000; // the first minute after the first attach
+    private static final int REGISTER_FAST_TRIES = 60;
     private static final long REGISTER_RETRY_MS = 15000;
+    /** Owed reboots while AudioService stays unreachable this long: stock (no call is possible without AudioService). */
+    private static final long UNKNOWN_FALLBACK_MS = 15 * 60 * 1000;
     /** sMode before the mode listener is registered: treated like a call (defer) for HAL errors. */
     private static final int MODE_UNKNOWN = -100;
 
@@ -135,7 +139,8 @@ public final class K4StRetry {
     private static volatile AudioManager sAm;
     private static volatile int sMode = MODE_UNKNOWN;
     private static boolean sModeWatched;
-    private static boolean sModeRegisterFailed;
+    private static int sModeRegisterTries;
+    private static long sUnknownSince;
     private static boolean sAudioActive;
     private static boolean sAudioWatched;
     private static boolean sScreenWatched;
@@ -266,7 +271,7 @@ public final class K4StRetry {
             ensureHandlerLocked();
             mode = sMode;
             sOwed.put(enforcer, Boolean.TRUE);
-            if (mode == AudioManager.MODE_NORMAL && !sHandler.hasCallbacks(RESYNC)) {
+            if (!listenerSaysCall() && !sHandler.hasCallbacks(RESYNC)) {
                 sHandler.postDelayed(RESYNC, NORMAL_GRACE_MS);
             }
         }
@@ -274,8 +279,8 @@ public final class K4StRetry {
             Slog.e(ENFORCER_TAG, "Exception caught from HAL, rebooting HAL in " + NORMAL_GRACE_MS + " ms unless a"
                     + " call starts: " + what);
         } else {
-            Slog.w(TAG, "HAL error during a call or before the audio mode is known (mode " + mode + "), not"
-                    + " rebooting the HAL (shared with call audio); resync reboot once the call ends: " + what);
+            Slog.w(TAG, "HAL error during a call or before the audio mode is watched (mode " + mode + "), not"
+                    + " rebooting the HAL (shared with call audio); resync reboot once there is no call: " + what);
         }
     }
 
@@ -290,14 +295,19 @@ public final class K4StRetry {
             // the HAL call returned while this deadline was already running: nothing is hung (and close() and this
             // check both run under sLock, so one of them always sees the other)
             if (sClosed.remove(watchdog) != null) return;
-            now = sMode == MODE_UNKNOWN;
+        }
+        // the listener may not be registered yet (first attach): read AudioService directly (a field read on this ROM)
+        now = currentMode() == MODE_UNKNOWN;
+        synchronized (sLock) {
+            if (sClosed.remove(watchdog) != null) return;
             if (!now) {
                 sHung.put(watchdog, new Hung(hal, where, SystemClock.uptimeMillis()));
                 sHandler.post(CHECK_HUNG);
             }
         }
         if (now) {
-            // boot (AudioService not watched yet): stock; the reboot unblocks the caller, which may be boot itself
+            // AudioService not published yet (boot, no call possible): stock; the reboot unblocks the caller, which
+            // may be boot itself
             Slog.e(WATCHDOG_TAG, "HAL deadline expired. Rebooting.", where);
             hal.reboot();
         }
@@ -319,11 +329,17 @@ public final class K4StRetry {
         }
     }
 
-    /** Handler thread: the mode now, read from AudioService when the listener says NORMAL (it lags setMode). */
-    private static int liveMode() {
+    /**
+     * The mode now. A call mode from the listener is trusted (it only lags in the safe direction at hang-up); NORMAL or
+     * not known yet is read again from AudioService (getMode() returns the volatile mCachedAudioMode, written in
+     * setMode() before the listeners are told: lock-free, never blocks). MODE_UNKNOWN only while AudioService is not
+     * published. Any thread except under middleware locks (the first call may look up the service).
+     */
+    private static int currentMode() {
         int m = sMode;
-        AudioManager am = sAm;
-        if (m != AudioManager.MODE_NORMAL || am == null) return m;
+        if (m != AudioManager.MODE_NORMAL && m != MODE_UNKNOWN) return m;
+        AudioManager am = audioManager();
+        if (am == null) return m;
         try {
             return am.getMode();
         } catch (Throwable t) {
@@ -331,9 +347,22 @@ public final class K4StRetry {
         }
     }
 
+    private static AudioManager audioManager() {
+        AudioManager am = sAm;
+        if (am != null) return am;
+        try {
+            if (ServiceManager.checkService(Context.AUDIO_SERVICE) == null) return null;
+            am = ActivityThread.currentActivityThread().getSystemContext().getSystemService(AudioManager.class);
+            sAm = am;
+            return am;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     /** Handler thread: decide for watchdog deadlines (no middleware lock is held here). */
     private static void checkHung() {
-        int mode = liveMode();
+        int mode = currentMode();
         List<Hung> reboot = new ArrayList<>();
         List<Hung> deferred = new ArrayList<>();
         synchronized (sLock) {
@@ -356,8 +385,8 @@ public final class K4StRetry {
         }
         if (!deferred.isEmpty()) {
             if (!sHandler.hasCallbacks(CHECK_HUNG_MAX)) sHandler.postDelayed(CHECK_HUNG_MAX, HUNG_IN_CALL_MAX_MS);
-            // live mode says call, the listener still says NORMAL: resync() polls until they agree
-            if (sMode == AudioManager.MODE_NORMAL && !sHandler.hasCallbacks(RESYNC)) {
+            // live mode says call, the listener still says NORMAL / nothing: resync() polls until they agree
+            if (!listenerSaysCall() && !sHandler.hasCallbacks(RESYNC)) {
                 sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
             }
         }
@@ -416,17 +445,25 @@ public final class K4StRetry {
             });
             sModeWatched = true;
             sAm = am;
+            sModeRegisterTries = 0;
             int mode = am.getMode();
             Slog.i(TAG, "watching the audio mode for deferred sound trigger HAL reboots (mode " + mode + ")");
             onMode(mode);
         } catch (Throwable t) {
-            // AudioService not published yet (early boot): HAL error reboots stay deferred until the mode is known
-            if (!sModeRegisterFailed) {
-                sModeRegisterFailed = true;
-                Slog.w(TAG, "cannot watch the audio mode yet, retrying every 15 s: " + t);
+            // AudioService not published yet (early boot); decisions meanwhile read AudioService directly when they can
+            int n = ++sModeRegisterTries;
+            if (n == 1 || n == REGISTER_FAST_TRIES || (n > REGISTER_FAST_TRIES && n % 20 == 0)) {
+                Slog.w(TAG, "cannot watch the audio mode yet (attempt " + n + "), retrying every "
+                        + (n < REGISTER_FAST_TRIES ? "1 s" : "15 s") + ": " + t);
             }
-            sHandler.postDelayed(REGISTER_MODE, REGISTER_RETRY_MS);
+            sHandler.postDelayed(REGISTER_MODE, n < REGISTER_FAST_TRIES ? REGISTER_RETRY_FAST_MS : REGISTER_RETRY_MS);
         }
+    }
+
+    /** The listener reported a call mode, so its NORMAL event will post RESYNC. */
+    private static boolean listenerSaysCall() {
+        int m = sMode;
+        return m != AudioManager.MODE_NORMAL && m != MODE_UNKNOWN;
     }
 
     /** Handler thread. */
@@ -446,14 +483,28 @@ public final class K4StRetry {
 
     /** Handler thread: no call (any more), run the reboot the HAL errors / hung calls are owed. */
     private static void resync() {
-        int mode = liveMode();
+        int mode = currentMode();
+        if (mode == MODE_UNKNOWN) {
+            // AudioService not published yet: no call is possible, but wait for it unless that takes very long
+            long now = SystemClock.uptimeMillis();
+            if (sUnknownSince == 0) sUnknownSince = now;
+            if (now - sUnknownSince < UNKNOWN_FALLBACK_MS) {
+                sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+                return;
+            }
+            Slog.w(TAG, "audio mode still unknown after " + (UNKNOWN_FALLBACK_MS / 60000) + " min: owed sound"
+                    + " trigger HAL reboots run now (stock)");
+            mode = AudioManager.MODE_NORMAL;
+        } else {
+            sUnknownSince = 0;
+        }
         List<SoundTriggerHalEnforcer> owed;
         List<Hung> hung;
         synchronized (sLock) {
             if (mode != AudioManager.MODE_NORMAL) {
-                // in a call the listener has not reported yet (it lags setMode): its NORMAL event posts this again;
-                // poll meanwhile in case it never reports a change
-                if (sMode == AudioManager.MODE_NORMAL) sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+                // in a call the listener has not reported (yet: it lags setMode, or is not registered): its NORMAL
+                // event posts this again; poll meanwhile in case it never reports a change
+                if (!listenerSaysCall()) sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
                 return;
             }
             owed = new ArrayList<>(sOwed.keySet());
