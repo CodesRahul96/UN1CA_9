@@ -25,9 +25,9 @@
 # for 5.4.302 at API 37 (kver/api windows of every map and program), plus what this kernel can execute:
 #   * every map it would create has a map type this kernel build registers (MAP_TYPES below),
 #   * every program it would load has a program type this build registers and only 5.4 instructions/helpers (no kfuncs, no cpu v4 /
-#     5.12+ atomics; helpers: only the ids this kernel implements, i.e. has a `case BPF_FUNC_<x>:` for in net/ or
-#     kernel/ of ~/git/kernel_a52sxq_bone - 1..110 and the backported 125 ktime_get_boot_ns; 111..124 are only named
-#     in its uapi enum and the verifier rejects them),
+#     5.12+ atomics; helpers: only those its program type's get_func_proto chain returns in this build, PROG_HELPERS
+#     below - e.g. tc programs get no get_current_pid_tgid (14); overall only 1..110 and the backported 125
+#     ktime_get_boot_ns exist, 111..124 are only named in the uapi enum),
 #     else the load fails - except for an optional program in offload.o, the only object the frozen loader loads
 #     without libbpf on 5.4 (loadObject(offload.o, libbpf = kernel >= 5.10)), which is skipped and stays unpinned,
 #   * no in-window program of a libbpf-loaded object (test/clatd/dscpPolicy.o, a52_netd.o) is optional: the frozen
@@ -50,8 +50,8 @@
 #     a train pinning into it would loop on ours,
 #   * struct bpf_map_def/bpf_prog_def sizes are the ones the loader reads (192/180), a license section exists.
 # The same instruction checks also run on the programs a52_netd.o itself loads.
-# Necessary, not sufficient - not modelled: map flags other than MMAPABLE (e.g. BPF_F_INNER_MAP is 5.10), which helpers
-# each program type may call, verifier complexity limits, pin collisions between objects, a legacy-path object without
+# Necessary, not sufficient - not modelled: map flags other than MMAPABLE (e.g. BPF_F_INNER_MAP is 5.10), helpers a
+# program type only gets for some attach types (counted as available), verifier complexity limits, pin collisions between objects, a legacy-path object without
 # .BTF or a libbpf object without .android_maps. None occurs in the known objects; the factory objects running on the
 # phone are the real proof, a new train still needs its first update boot watched (k4-mainline-diag).
 import hashlib, os, re, struct, sys
@@ -99,7 +99,6 @@ PROG_HELPERS = {   # program type -> helper ids its get_func_proto chain returns
     25: {96, 1, 2, 3, 6, 107, 108, 15, 80, 81, 87, 88, 89},   # BPF_PROG_TYPE_CGROUP_SOCKOPT (cg_sockopt_func_proto); attach-type/condition dependent: [6]
 }
 # --- end of generated block ---
-HELPERS = set(range(1, 111)) | {125}   # implemented helpers (see above); per-program-type availability is not modelled
 MAX_BTF_KIND = 15               # DATASEC; FLOAT/DECL_TAG/TYPE_TAG/ENUM64 are 5.13+
 LOADER_DIRS = {"/sys/fs/bpf/" + d for d in ("tethering", "netd_shared", "netd_readonly", "net_shared", "net_private",
                                          "loader")}
@@ -130,8 +129,8 @@ def loaded(pins):
 def in_window(mk, xk, ma, xa): return mk <= KERNEL < xk and ma <= API < xa
 
 
-def insn_problems(code):
-    """features of a BPF program that kernel 5.4 does not have (empty list: fine)"""
+def insn_problems(code, ptype):
+    """features of a BPF program of type ptype that this kernel does not have (empty list: fine)"""
     bad, i = set(), 0
     while i + 8 <= len(code):
         op, regs = code[i], code[i + 1]; off, imm = struct.unpack_from("<hi", code, i + 2)
@@ -140,7 +139,7 @@ def insn_problems(code):
             if src not in (0, 1, 2): bad.add(f"ld_imm64 pseudo {src}")
             i += 16; continue
         if op == 0x85:
-            if src == 0 and imm not in HELPERS: bad.add(f"helper {imm}")
+            if src == 0 and imm not in PROG_HELPERS.get(ptype, ()): bad.add(f"helper {imm} (not offered to program type {ptype})")
             elif src == 2: bad.add("kfunc call")
         elif cls == 1 and op & 0xE0 == 0x80: bad.add("sign-extending load (6.6)")
         elif cls == 3 and op & 0xE0 == 0xC0 and imm != 0: bad.add(f"atomic op {imm:#x} (5.12)")
@@ -214,7 +213,7 @@ def parse_obj(path):
             pin = r[106:176].split(b"\0")[0].decode()
             if mina <= API < maxa: req.add(pin)
             if not in_window(mink, maxk, mina, maxa) or o not in code: continue
-            why = ([f"program type {typ} (not built into this kernel)"] if typ not in PROG_HELPERS else []) + insn_problems(code[o][1])
+            why = ([f"program type {typ} (not built into this kernel)"] if typ not in PROG_HELPERS else []) + insn_problems(code[o][1], typ)
             bad_dir = pin_dirs(r, 36, 106)
             if bad_dir:
                 probs.append(f"program {pin}: pins into {bad_dir}, which the frozen loader does not create (load fails)")
@@ -229,7 +228,7 @@ def parse_obj(path):
                     elif not libbpf: why.append("bpf-to-bpf call (the legacy loader links no subprograms)")
                 if libbpf and e.has(".text") and e.sh[e.idx(".text")]["size"]:
                     ti = e.idx(".text")
-                    why += [f".text: {q}" for q in insn_problems(bytes(e.sh[ti]["data"]))]
+                    why += [f".text: {q}" for q in insn_problems(bytes(e.sh[ti]["data"]), typ)]
                     rels = rels + relocs(e, syms, ti)
             for _, sym, sec in rels:
                 if sec == ".maps" and sym not in maps_made:
