@@ -80,3 +80,10 @@ if [ ! -f "$SRC_DIR/target/a52sxq/patches/camera_stability/disable" ] && \
     # shellcheck source=/dev/null
     source "$SRC_DIR/target/a52sxq/patches/camera_stability/apply.sh"
 fi
+
+# Google APEXes byte-identical to the source firmware (target/a52sxq/patches/play_system_updates): checked here, after
+# every other patch and mod, so nothing that runs later can re-sign or rebuild one unnoticed
+if [ ! -f "$SRC_DIR/target/a52sxq/patches/play_system_updates/disable" ]; then
+    # shellcheck source=/dev/null
+    source "$SRC_DIR/target/a52sxq/patches/play_system_updates/google_apex_guard.sh"
+fi
