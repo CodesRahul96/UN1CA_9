@@ -158,6 +158,17 @@ if [ "$ROOT" = 1 ] && [ -s "${CAPF}_netd.o" ]; then
     CAP_ALL="$(printf '%s\n' "$CAP_SET" | sha256sum | cut -d ' ' -f 1)"
     CAP_KNOWN="$(grep "^$CAP_ALL " "$KNOWN" 2> /dev/null | head -n 1 | cut -d ' ' -f 3-)"
 fi
+# The capture only explains the batch being judged if it was taken after that batch was committed (the promotion runs
+# on the boot after the failed update boot); an older one belongs to an earlier failure and is shown with -v only.
+# (mksh arithmetic is 32-bit: compare seconds, not milliseconds)
+CAP_FRESH=0
+if [ -s "${CAPF}_netd.o" ]; then
+    CAP_S="$(stat -c %Y "${CAPF}_netd.o" 2> /dev/null)"; WHEN_MS="$(g WHEN)"; WHEN_S="${WHEN_MS%???}"
+    case "$CAP_S:$WHEN_S" in
+        *[!0-9:]*|:*|*:) ;;
+        *) [ "$CAP_S" -ge "$((WHEN_S - 60))" ] && CAP_FRESH=1 ;;
+    esac
+fi
 DEV_HINT="developer: copy /cache/k4_mainline/failed_staged_tethering_<obj>.o for obj = netd offload test clatd dscpPolicy (root) to tethering_trains/known/<versionCode>_train_<obj>.o and rerun tethering/regen.py --train-progs with that netd.o"
 
 # --- the one line ---------------------------------------------------------------------------------------------------
@@ -174,7 +185,7 @@ explain() {
         *"Found both applied and failed apex sessions"*)
             printf '%s\n' "one module of the batch failed to activate while others did, so Android rolled the whole batch back - look at the session errors with -v (before 9.3.36 this was the apexd mtime denial)" ;;
         "APEX activation failed.")
-            if [ -n "$CAP_MISSING" ]; then
+            if [ "$CAP_FRESH" = 1 ] && [ -n "$CAP_MISSING" ]; then
                 printf '%s\n' "rolled back after the update boot: Tethering ${CAP_VER:-?} defines BPF maps the ROM does not create ($CAP_MISSING) -> netd/system_server crash; $DEV_HINT"
             elif [ "$TETH_IN" = 1 ]; then
                 printf '%s\n' "rolled back after the update boot (boot did not finish or a service crash-looped); Tethering was part of it, so a BPF map gap is the prime suspect - run with su -v for the captured evidence"
@@ -298,6 +309,7 @@ if [ "$ROOT" = 1 ]; then
     if [ -s "${CAPF}_netd.o" ]; then
         echo "  last update boot that did not finish ($(stat -c %y "${CAPF}_netd.o" | cut -c 1-16)): Tethering ${CAP_VER:-?}${CAP_KNOWN:+ (BPF objects = verified $CAP_KNOWN)}, maps a52_netd.o lacks: ${CAP_MISSING:-none}"
         [ -n "$CAP_VER" ] && [ "$CAP_VER" = "$TETH_VER" ] && echo "    (that is the Tethering active now)"
+        [ "$CAP_FRESH" = 1 ] || echo "    (older than the newest update batch, so the verdict above does not use it)"
         for o in netd offload test clatd dscpPolicy; do [ -s "${CAPF}_$o.o" ] || echo "    ($o.o was not in that APEX)"; done
     else
         echo "  no unfinished update boot captured in $CAP (filled when one does not reach boot_completed)"
