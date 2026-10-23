@@ -14,8 +14,19 @@ import glob, re, sys
 f = glob.glob(sys.argv[1] + "/smali*/com/android/systemui/util/SecQsUiDisplayModeInteractor.smali")
 assert len(f) == 1, "SecQsUiDisplayModeInteractor"
 s = open(f[0]).read()
-s, n = re.subn(r"(\.method private final getDeviceFormFactor\(\)Lcom/android/systemui/util/SecQsUiDisplayModeInteractor\$DeviceFormFactor;\n(?:.*\n)*?\s+sget-object p0, Lcom/android/systemui/util/SecQsUiDisplayModeInteractor\$DeviceFormFactor;->)FOLD(:)", r"\1PHONE\2", s)
-assert n == 1, "getDeviceFormFactor"
+# work on the method body only, so a FOLD load in a later method can never satisfy the count
+SIG = ".method private final getDeviceFormFactor()Lcom/android/systemui/util/SecQsUiDisplayModeInteractor$DeviceFormFactor;\n"
+assert s.count(SIG) == 1, "getDeviceFormFactor() not found"
+start = s.index(SIG)
+end = s.index("\n.end method", start) + 1
+body = s[start:end]
+FF = "Lcom/android/systemui/util/SecQsUiDisplayModeInteractor$DeviceFormFactor;"
+fold = re.compile(r"(\n +sget-object p0, " + re.escape(FF) + r"->)FOLD(:" + re.escape(FF) + r"\n\n +return-object p0\n)")
+if not fold.search(body) and "->FOLD:" not in body and re.search(r"sget-object p0, " + re.escape(FF) + r"->PHONE:", body):
+    print("  - getDeviceFormFactor() already returns PHONE"); sys.exit(0)
+body, n = fold.subn(r"\1PHONE\2", body)
+assert n == 1, "getDeviceFormFactor(): %d 'sget-object p0, ...->FOLD; return-object p0' sites" % n
+s = s[:start] + body + s[end:]
 open(f[0], "w").write(s)
 PYEOF
 LOG "- Quick panel form factor forced to PHONE"

@@ -39,8 +39,17 @@ open(f, "w").write(s)
 f = glob.glob(A + "/**/SecSettings.apk/res/values/bools.xml", recursive=True)
 assert len(f) == 1, "SecSettings bools"; f = f[0]
 s = open(f).read()
-s = s.replace('<bool name="config_pd_enable">true</bool>', '<bool name="config_pd_enable">false</bool>')
+PD_ON, PD_OFF = '<bool name="config_pd_enable">true</bool>', '<bool name="config_pd_enable">false</bool>'
+n_on, n_off = s.count(PD_ON), s.count(PD_OFF)
+# exactly one definition, either form (true on the S26U, false on the S25 / an earlier run); anything else (other
+# spelling, @bool/ reference, several entries) would bring the page back silently
+assert n_on + n_off == 1 and s.count('name="config_pd_enable"') == 1, "config_pd_enable: %d true, %d false" % (n_on, n_off)
+s = s.replace(PD_ON, PD_OFF)
+assert s.count(PD_OFF) == 1
 open(f, "w").write(s)
+qual = [q for q in glob.glob(A + "/**/SecSettings.apk/res/values-*/bools.xml", recursive=True)
+        if 'name="config_pd_enable"' in open(q).read()]
+assert not qual, "config_pd_enable overridden in " + ", ".join(qual)
 
 # SecSettings > Display > Continue apps on cover screen: fold sources only hide it on multi-fold models; flat
 # sources (S25) already compile it to a constant UNSUPPORTED_ON_DEVICE

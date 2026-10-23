@@ -13,8 +13,25 @@ fi
 # black), S25 1440x3120 HEVC Main10 120 fps level 6.2 (2.1M blocks/s). Turn those entries into the still image with
 # the same colour (desc_str_id), drop the image entries they duplicate and the cover screen videos, and remove the
 # mp4s (~370 MB on the Fold8, ~830 MB on the S25).
+# Keyed on any mp4 in the APK or in resources_info.json (not on one file name), so a renamed video can't slip through
+# as a black default wallpaper. No mp4 anywhere = nothing to do (also the state after an earlier run).
 APK="$WORK_DIR/system/system/priv-app/wallpaper-res/wallpaper-res.apk"
-if [ -f "$APK" ] && unzip -l "$APK" "res/raw/video_001.mp4" &> /dev/null; then
+WP_MP4=false
+if [ -f "$APK" ]; then
+    unzip -Z1 "$APK" > /dev/null 2>&1 || ABORT "wallpaper: cannot list wallpaper-res.apk"
+    if unzip -Z1 "$APK" | grep -q -E "\.mp4$"; then
+        WP_MP4=true
+    fi
+    if unzip -p "$APK" "res/raw/resources_info.json" 2> /dev/null | grep -q -F '.mp4"'; then
+        WP_MP4=true
+    fi
+    if ! $WP_MP4; then
+        LOG "- wallpaper-res.apk has no video wallpapers (already converted), nothing to do"
+    fi
+else
+    LOG "- No wallpaper-res.apk in this source, nothing to do"
+fi
+if $WP_MP4; then
     WP_TMP="$(mktemp -d)"
 
     unzip -q "$APK" "res/raw/resources_info.json" -d "$WP_TMP" || ABORT "Failed to extract resources_info.json"
@@ -71,6 +88,9 @@ EOF
         # shellcheck disable=SC2086
         zip -q -d "$APK" $VIDEOS || ABORT "Failed to strip wallpaper videos"
     fi
+    if unzip -Z1 "$APK" | grep -q -E "\.mp4$"; then
+        ABORT "wallpaper: unexpected mp4 left in wallpaper-res.apk: $(unzip -Z1 "$APK" | grep -E "\.mp4$" | tr "\n" " ")"
+    fi
 
     CERT_PREFIX="aosp"
     $ROM_IS_OFFICIAL && CERT_PREFIX="unica"
@@ -81,4 +101,4 @@ EOF
     rm -rf "$WP_TMP"
     unset WP_TMP CERT_PREFIX VIDEOS
 fi
-unset APK
+unset APK WP_MP4

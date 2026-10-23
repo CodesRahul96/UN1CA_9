@@ -5,6 +5,8 @@ set -e
 SRC="$1"; OUT="$2"; HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$(cd "$HERE/../../../.." && pwd)"
 T="$ROOT/out/tools/bin"; H=~/git/android/out/host/linux-x86/bin; K="$HERE/../tethering/keys"; J21=~/git/android/prebuilts/jdk/jdk21/linux-x86
 export JAVA_HOME=$J21 PATH=$J21/bin:$PATH
+# e2fsck: 0 = clean, 1 = errors corrected; anything else (uncorrected errors, usage/operational error) stops the script
+FSCK() { local rc=0; e2fsck "$@" > /dev/null || rc=$?; [ "$rc" -le 1 ] || { echo "e2fsck $* failed with exit code $rc" >&2; exit 1; }; }
 W="$(mktemp -d)"; trap 'mountpoint -q "$W/mnt" && fusermount3 -u "$W/mnt"; rm -rf "$W"' EXIT
 unzip -q "$SRC" apex_payload.img -d "$W"; mkdir -p "$W/mnt"
 "$T/fuse2fs" -o ro,fakeroot "$W/apex_payload.img" "$W/mnt"; APK="$(find "$W/mnt/app" -name Bluetooth.apk)"; REL="${APK#$W/mnt/}"; cp "$APK" "$W/Bluetooth.apk"; fusermount3 -u "$W/mnt"
@@ -50,7 +52,7 @@ java -Xmx6g -jar "$T/apktool.jar" b -o "$W/unsigned.apk" "$W/dec" >/dev/null
 "$H/zipalign" -p -f 4 "$W/unsigned.apk" "$W/aligned.apk"
 java -jar "$T/signapk.jar" "$ROOT/security/aosp_platform.x509.pem" "$ROOT/security/aosp_platform.pk8" "$W/aligned.apk" "$W/Bluetooth_patched.apk"
 "$H/avbtool" erase_footer --image "$W/apex_payload.img"
-e2fsck -fy -E unshare_blocks "$W/apex_payload.img" >/dev/null || true
+FSCK -fy -E unshare_blocks "$W/apex_payload.img"
 resize2fs "$W/apex_payload.img" 40M >/dev/null
 "$T/fuse2fs" -o rw,fakeroot "$W/apex_payload.img" "$W/mnt"; cat "$W/Bluetooth_patched.apk" > "$W/mnt/$REL"
 # The re-signed Bluetooth.apk no longer matches Samsung's platform key, so the signature|privileged framework
@@ -77,9 +79,18 @@ for perm in add:
 open(p, "w").write(s)
 PY
 fusermount3 -u "$W/mnt"
-e2fsck -fy "$W/apex_payload.img" >/dev/null || true
+FSCK -fy "$W/apex_payload.img"
 "$H/avbtool" add_hashtree_footer --image "$W/apex_payload.img" --key "$K/payload.pem" --algorithm SHA256_RSA4096 --hash_algorithm sha256 --do_not_generate_fec --partition_name com.android.bt
 "$H/avbtool" extract_public_key --key "$K/payload.pem" --output "$W/apex_pubkey"
 cp "$SRC" "$W/unsigned.apex"; (cd "$W" && zip -q -d unsigned.apex "META-INF/*" && zip -q -X -0 unsigned.apex apex_payload.img apex_pubkey)
-java -jar "$T/signapk.jar" "$K/container.x509.pem" "$K/container.pk8" "$W/unsigned.apex" "$OUT"
+# -a 4096: the stored apex_payload.img must start on a 4 KiB boundary (as in the stock APEX) or the loop device can't
+# use direct I/O and every BT APEX page is cached twice (9.3.72 shipped it at offset 56)
+java -jar "$T/signapk.jar" -a 4096 --align-file-size "$K/container.x509.pem" "$K/container.pk8" "$W/unsigned.apex" "$OUT"
+python3 - "$OUT" <<'PY'
+import struct, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1]); i = z.getinfo("apex_payload.img"); f = open(sys.argv[1], "rb"); f.seek(i.header_offset)
+h = f.read(30); off = i.header_offset + 30 + struct.unpack("<H", h[26:28])[0] + struct.unpack("<H", h[28:30])[0]
+assert i.compress_type == 0 and off % 4096 == 0, "apex_payload.img at offset %d (compress %d)" % (off, i.compress_type)
+print("apex_payload.img stored at offset %d" % off)
+PY
 echo "wrote $OUT"

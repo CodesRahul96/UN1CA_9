@@ -4,7 +4,9 @@
 # half-triggers dump HAL_INTERFACES_OF_INTEREST stacks, bugreports dump all HALs) therefore kills them: tester log
 # 9.1.13 18:44:35/18:45:13 "dumpStackTraces nativepids=..." -> both codec services restart with new pids, and the
 # 9.1.15 bugreport shows Chrome's "Codec2 component "c2.qti.vp9.decoder" died" / MediaCodec error 1101 at that point.
-# Append the system crash_dump rules (exact lines, so argument filters are kept) for syscalls the policy lacks.
+# Append the system crash_dump rules (exact lines, so argument filters are kept) for the reviewed syscalls the policy
+# lacks. Only a fixed list is granted: a new source whose crash_dump policy gains another syscall the codec policies
+# don't have ABORTs here, so the codec sandboxes (reachable from app media input) are never widened unreviewed.
 python3 - "$WORK_DIR" << 'PYEOF' || ABORT "Failed to update the codec HAL seccomp policies"
 import os, re, sys
 wd = sys.argv[1]
@@ -12,6 +14,8 @@ wd = sys.argv[1]
 # (tombstone log section): setsockopt(fd, SOL_SOCKET=1, SO_RCVTIMEO_OLD=20 / SO_SNDTIMEO_OLD=21), on arm and arm64 alike.
 # Numbers, not names: the 32-bit VNDK libminijail does not know SO_SNDTIMEO.
 NARROW = {"setsockopt": "setsockopt: arg1 == 1 && arg2 == 20 || arg1 == 1 && arg2 == 21"}
+# what the Android 17 crash_dump needs over A14 (the second pass below grants the same list)
+ALLOW = ("getppid", "setsockopt", "uname", "readlinkat", "recvfrom")
 crash = {a: os.path.join(wd, "system/system/etc/seccomp_policy/crash_dump.%s.policy" % a) for a in ("arm", "arm64")}
 # policy file -> (binary using it, arch of that binary)
 targets = [
@@ -41,6 +45,9 @@ for pol, binary, arch in targets:
     have |= set(rules(sibling))
     want = rules(crash[arch])
     missing = [n for n in want if n not in have]
+    unreviewed = [n for n in missing if n not in ALLOW]
+    assert not unreviewed, "%s: crash_dump.%s.policy needs syscalls outside the reviewed list: %s" % (
+        pol, arch, " ".join(unreviewed))
     if not missing:
         print("%s: nothing to add" % pol)
         continue
@@ -62,6 +69,7 @@ wd = sys.argv[1]
 # (tombstone log section): setsockopt(fd, SOL_SOCKET=1, SO_RCVTIMEO_OLD=20 / SO_SNDTIMEO_OLD=21), on arm and arm64 alike.
 # Numbers, not names: the 32-bit VNDK libminijail does not know SO_SNDTIMEO.
 NARROW = {"setsockopt": "setsockopt: arg1 == 1 && arg2 == 20 || arg1 == 1 && arg2 == 21"}
+ALLOW = ("getppid", "setsockopt", "uname", "readlinkat", "recvfrom")
 crash = {a: os.path.join(wd, "system/system/etc/seccomp_policy/crash_dump.%s.policy" % a) for a in ("arm", "arm64")}
 def rules(path):
     out = {}
@@ -82,7 +90,7 @@ for pol_p in sorted(glob.glob(os.path.join(wd, "vendor/etc/seccomp_policy/*"))):
         continue
     arch = "arm" if any(k in have for k in ("mmap2", "_llseek", "fstat64", "fcntl64")) else "arm64"
     want = rules(crash[arch])
-    missing = [n for n in ("getppid", "setsockopt", "uname", "readlinkat", "recvfrom") if n in want and n not in have]
+    missing = [n for n in ALLOW if n in want and n not in have]
     if not missing:
         continue
     with open(pol_p, "a") as f:
