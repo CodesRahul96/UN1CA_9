@@ -86,4 +86,6 @@ fi
 if [ ! -f "$SRC_DIR/target/a52sxq/patches/play_system_updates/disable" ]; then
     # shellcheck source=/dev/null
     source "$SRC_DIR/target/a52sxq/patches/play_system_updates/google_apex_guard.sh"
+else
+    LOGW "play_system_updates is disabled: the Google APEX byte-identity build guard is skipped too"
 fi
