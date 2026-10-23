@@ -18,7 +18,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 495
+    .line 500
     invoke-direct {p0}, Landroid/media/AudioManager$AudioPlaybackCallback;-><init>()V
 
     return-void
@@ -37,12 +37,12 @@
         }
     .end annotation
 
-    .line 498
+    .line 503
     invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smanyActive(Ljava/util/List;)Z
 
     move-result p1
 
-    .line 499
+    .line 504
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsAudioActive()Z
 
     move-result v0
@@ -51,16 +51,16 @@
 
     return-void
 
-    .line 500
+    .line 505
     :cond_b
     invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfputsAudioActive(Z)V
 
-    .line 501
+    .line 506
     const-string v0, "audio stopped"
 
     if-eqz p1, :cond_28
 
-    .line 502
+    .line 507
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsReason()Ljava/lang/String;
 
     move-result-object p1
@@ -83,13 +83,13 @@
 
     goto :goto_2d
 
-    .line 504
+    .line 509
     :cond_28
     const-wide/16 v1, 0x1388
 
     invoke-static {v1, v2, v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
 
-    .line 506
+    .line 511
     :cond_2d
     :goto_2d
     return-void

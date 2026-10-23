@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
 
 /**
@@ -121,8 +122,12 @@ public final class K4StRetry {
     private static final IdentityHashMap<SoundTriggerHalEnforcer, Boolean> sOwed = new IdentityHashMap<>();
     /** SoundTriggerHalWatchdog$Watchdog -> its HAL call, still running past the deadline. */
     private static final IdentityHashMap<Object, Hung> sHung = new IdentityHashMap<>();
-    /** sHung.size(), read without the lock on every HAL call (watchdogClosed). */
-    private static volatile int sHungCount;
+    /**
+     * Watchdogs closed (HAL call returned) without a sHung entry. The deadline lambda may already be running when the
+     * call returns at ~3000 ms (removeCallbacksAndMessages cannot stop it); watchdogExpired then finds the watchdog
+     * here and records nothing. Weak keys (identity hashCode/equals): closed watchdogs are garbage right after close().
+     */
+    private static final WeakHashMap<Object, Boolean> sClosed = new WeakHashMap<>();
     /** Decisions only (mode, retries, reboots): never calls into the middleware, whose locks a hung HAL call holds. */
     private static Handler sHandler;
     /** Middleware callbacks (onResourcesAvailable takes the SoundTriggerModule monitor): may block behind a hung call. */
@@ -213,7 +218,6 @@ public final class K4StRetry {
                         hung++;
                     }
                 }
-                sHungCount = sHung.size();
             }
         }
         if (owed || hung > 0) Slog.i(TAG, "HAL died: the deferred sound trigger HAL reboot is no longer needed");
@@ -283,10 +287,12 @@ public final class K4StRetry {
         boolean now;
         synchronized (sLock) {
             ensureHandlerLocked();
+            // the HAL call returned while this deadline was already running: nothing is hung (and close() and this
+            // check both run under sLock, so one of them always sees the other)
+            if (sClosed.remove(watchdog) != null) return;
             now = sMode == MODE_UNKNOWN;
             if (!now) {
                 sHung.put(watchdog, new Hung(hal, where, SystemClock.uptimeMillis()));
-                sHungCount = sHung.size();
                 sHandler.post(CHECK_HUNG);
             }
         }
@@ -297,13 +303,15 @@ public final class K4StRetry {
         }
     }
 
-    /** First thing in SoundTriggerHalWatchdog$Watchdog.close(): the HAL call returned (or threw). Every HAL call. */
+    /**
+     * SoundTriggerHalWatchdog$Watchdog.close(), after its timer is cancelled: the HAL call returned (or threw). Every
+     * HAL call (a few per minute): always under sLock, see sClosed.
+     */
     public static void watchdogClosed(Object watchdog) {
-        if (sHungCount == 0) return;
         Hung h;
         synchronized (sLock) {
             h = sHung.remove(watchdog);
-            sHungCount = sHung.size();
+            if (h == null) sClosed.put(watchdog, Boolean.TRUE);
         }
         if (h != null) {
             Slog.w(TAG, "the hung sound trigger HAL call returned after "
@@ -340,7 +348,6 @@ public final class K4StRetry {
                     }
                 }
             }
-            sHungCount = sHung.size();
         }
         for (Hung h : deferred) {
             Slog.e(TAG, "sound trigger HAL call still running after " + WATCHDOG_MS + " ms during a call (mode "
@@ -383,7 +390,6 @@ public final class K4StRetry {
                     next = Math.min(next, HUNG_IN_CALL_MAX_MS - age);
                 }
             }
-            sHungCount = sHung.size();
         }
         if (next != Long.MAX_VALUE) sHandler.postDelayed(CHECK_HUNG_MAX, next);
         if (dead.isEmpty()) return;
@@ -454,7 +460,6 @@ public final class K4StRetry {
             hung = new ArrayList<>(sHung.values());
             sOwed.clear();
             sHung.clear();
-            sHungCount = 0;
         }
         if (owed.isEmpty() && hung.isEmpty()) return;
         Slog.w(TAG, "no call: rebooting the sound trigger HAL now to resync it with the middleware ("
