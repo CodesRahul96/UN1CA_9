@@ -4,7 +4,7 @@
 CAMERA_APK="system/priv-app/SamsungCamera/SamsungCamera.apk"
 [ -f "$WORK_DIR/system/$CAMERA_APK" ] || ABORT "camera_stability: /$CAMERA_APK not found"
 DECODE_APK "system" "$CAMERA_APK" || ABORT "camera_stability: failed to decode /$CAMERA_APK"
-LOG "- SamsungCamera: Single Take on the MediaRecorder path, vendor CaptureResult keys looked up once, is_drm on PPP drafts"
+LOG "- SamsungCamera: Single Take on the MediaRecorder path, vendor CaptureResult keys looked up once"
 python3 - "$APKTOOL_DIR/system/${CAMERA_APK//system\//}" << 'PYEOF' || ABORT "camera_stability: failed to patch SamsungCamera"
 import glob, os, re, sys
 
@@ -226,35 +226,41 @@ else:
 
 # ---------------------------------------------------------------------------------------------------------------------
 # 3. PostSavingModuleSecMpInsert.insertToSecMpForDraft: is_drm=1 on the PPP draft insert (sef_file_type 0xb70).
-f = one("com/samsung/android/camera/core2/processor/postSaving/module/PostSavingModuleSecMpInsert.smali")
-s = open(f).read()
-a, b = method(s, ".method private insertToSecMpForDraft(Lcom/samsung/android/camera/core2/container/SavingInfoContainer;"
-                 "Lcom/samsung/android/camera/core2/util/ImageBuffer;)V")
-body = s[a:b]
-DB = "Lcom/samsung/android/camera/core2/processor/PostProcessDBHelper;"
-anchor = ("    invoke-static/range {v0 .. v6}, %s->createContentValues(Landroid/content/Context;Ljava/io/File;"
-          "Lcom/samsung/android/camera/core2/util/ImageInfo;Lcom/samsung/android/camera/core2/container/ExtraBundle;"
-          "Ljava/io/File;ZI)Landroid/content/ContentValues;\n\n    move-result-object p0\n\n") % DB
-drm = ("    %s: One UI 9 MediaProvider only takes a PPP draft (sef_file_type 2928) with is_drm=1\n"
-       "    const/4 p2, 0x1\n\n"
-       "    invoke-static {p2}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;\n\n"
-       "    move-result-object p2\n\n"
-       "    const-string v0, \"is_drm\"\n\n"
-       "    invoke-virtual {p0, v0, p2}, Landroid/content/ContentValues;->put(Ljava/lang/String;Ljava/lang/Integer;)V\n\n") % MARK
-tail = "    sget-object p2, %s->SEC_MEDIA_PROVIDER_URI:Landroid/net/Uri;\n\n    invoke-static {v7, p2, p0}, %s->insertToDB(" % (DB, DB)
-if MARK in body:
-    assert body.count(anchor + drm + tail) == 1, "insertToSecMpForDraft: another camera_stability version"
-    print("  - PostSavingModuleSecMpInsert draft insert already sets is_drm")
+# Off by default: the draft must carry is_drm=1 and it is not verified yet that the final photo row ends with
+# is_drm=0 (a photo left marked DRM would be worse than the harmless rejected draft). Enable with K4_CAMERA_PPP_DRM=1.
+import os
+if os.environ.get("K4_CAMERA_PPP_DRM") != "1":
+    print("  - PPP draft is_drm: not applied (unverified; K4_CAMERA_PPP_DRM=1 enables it)")
 else:
-    assert '"is_drm"' not in body and "iget-boolean v5, p0, Lcom/samsung/android/camera/core2/processor/postSaving/module/" \
-        "PostSavingModuleSecMpInsert;->mIsDraft:Z" in body, "insertToSecMpForDraft: unexpected stock body"
-    # setContentFileValues() is what adds _data_draft + sef_file_type 0xb70 for a draft
-    dbh = open(one("com/samsung/android/camera/core2/processor/PostProcessDBHelper.smali")).read()
-    da, db = method(dbh, ".method public static setContentFileValues(Landroid/content/ContentValues;Ljava/io/File;Ljava/io/File;Z)V")
-    assert '"_data_draft"' in dbh[da:db] and "const/16 p1, 0xb70" in dbh[da:db], "setContentFileValues: no draft values"
-    body = replace_once(body, anchor + tail, anchor + drm + tail, "insertToSecMpForDraft insert")
-    s = s[:a] + body + s[b:]
-    open(f, "w").write(s)
-    print("  - PostSavingModuleSecMpInsert.insertToSecMpForDraft(): is_drm=1")
+    f = one("com/samsung/android/camera/core2/processor/postSaving/module/PostSavingModuleSecMpInsert.smali")
+    s = open(f).read()
+    a, b = method(s, ".method private insertToSecMpForDraft(Lcom/samsung/android/camera/core2/container/SavingInfoContainer;"
+                     "Lcom/samsung/android/camera/core2/util/ImageBuffer;)V")
+    body = s[a:b]
+    DB = "Lcom/samsung/android/camera/core2/processor/PostProcessDBHelper;"
+    anchor = ("    invoke-static/range {v0 .. v6}, %s->createContentValues(Landroid/content/Context;Ljava/io/File;"
+              "Lcom/samsung/android/camera/core2/util/ImageInfo;Lcom/samsung/android/camera/core2/container/ExtraBundle;"
+              "Ljava/io/File;ZI)Landroid/content/ContentValues;\n\n    move-result-object p0\n\n") % DB
+    drm = ("    %s: One UI 9 MediaProvider only takes a PPP draft (sef_file_type 2928) with is_drm=1\n"
+           "    const/4 p2, 0x1\n\n"
+           "    invoke-static {p2}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;\n\n"
+           "    move-result-object p2\n\n"
+           "    const-string v0, \"is_drm\"\n\n"
+           "    invoke-virtual {p0, v0, p2}, Landroid/content/ContentValues;->put(Ljava/lang/String;Ljava/lang/Integer;)V\n\n") % MARK
+    tail = "    sget-object p2, %s->SEC_MEDIA_PROVIDER_URI:Landroid/net/Uri;\n\n    invoke-static {v7, p2, p0}, %s->insertToDB(" % (DB, DB)
+    if MARK in body:
+        assert body.count(anchor + drm + tail) == 1, "insertToSecMpForDraft: another camera_stability version"
+        print("  - PostSavingModuleSecMpInsert draft insert already sets is_drm")
+    else:
+        assert '"is_drm"' not in body and "iget-boolean v5, p0, Lcom/samsung/android/camera/core2/processor/postSaving/module/" \
+            "PostSavingModuleSecMpInsert;->mIsDraft:Z" in body, "insertToSecMpForDraft: unexpected stock body"
+        # setContentFileValues() is what adds _data_draft + sef_file_type 0xb70 for a draft
+        dbh = open(one("com/samsung/android/camera/core2/processor/PostProcessDBHelper.smali")).read()
+        da, db = method(dbh, ".method public static setContentFileValues(Landroid/content/ContentValues;Ljava/io/File;Ljava/io/File;Z)V")
+        assert '"_data_draft"' in dbh[da:db] and "const/16 p1, 0xb70" in dbh[da:db], "setContentFileValues: no draft values"
+        body = replace_once(body, anchor + tail, anchor + drm + tail, "insertToSecMpForDraft insert")
+        s = s[:a] + body + s[b:]
+        open(f, "w").write(s)
+        print("  - PostSavingModuleSecMpInsert.insertToSecMpForDraft(): is_drm=1")
 PYEOF
 unset CAMERA_APK
