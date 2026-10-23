@@ -136,7 +136,12 @@ pins "$OURS_NETD" > "$T/ours.pins"
 pins "$LIVE_NETD" > "$T/live.pins"
 LIVE_MISSING="$(comm -23 "$T/live.pins" "$T/ours.pins" | sed 's|.*/map_netd_||; s|.*/map_||' | tr '\n' ' ')"
 LIVE_SHA="$(sha256sum "$LIVE_NETD" 2> /dev/null | cut -d ' ' -f 1)"
-LIVE_KNOWN="$(grep "^$LIVE_SHA " "$KNOWN" 2> /dev/null | cut -d ' ' -f 2-)"
+# a52_netd.known: "<sha256 of the five objects' sha256 lines> <netd.o sha256> <label>" (tethering_trains/check_netd.py)
+LIVE_DIR="${LIVE_NETD%/*}"
+LIVE_SET="$(for o in netd offload test clatd dscpPolicy; do sha256sum "$LIVE_DIR/$o.o" 2> /dev/null | cut -d ' ' -f 1; done)"
+LIVE_ALL="$(printf '%s\n' "$LIVE_SET" | sha256sum | cut -d ' ' -f 1)"
+LIVE_KNOWN="$(grep "^$LIVE_ALL " "$KNOWN" 2> /dev/null | head -n 1 | cut -d ' ' -f 3-)"
+LIVE_NETD_KNOWN="$(awk -v s="$LIVE_SHA" '$2 == s { sub(/^[^ ]* [^ ]* /, ""); print; exit }' "$KNOWN" 2> /dev/null)"
 CAP_MISSING=""; CAP_VER=""
 if [ "$ROOT" = 1 ] && [ -f "$CAP/staged_tethering_netd.o" ]; then
     pins "$CAP/staged_tethering_netd.o" > "$T/staged.pins"
@@ -198,7 +203,9 @@ LINE="$LINE; update level ${LEVEL:-?}; Tethering ${TETH_VER:-?}"
 if [ -n "$LIVE_MISSING" ]; then
     LINE="$LINE; WARNING: the active Tethering defines BPF maps the ROM lacks ($LIVE_MISSING)"
 elif [ -n "$LIVE_KNOWN" ]; then
-    LINE="$LINE (BPF maps covered, $LIVE_KNOWN)"
+    LINE="$LINE (all its BPF objects verified at build time: $LIVE_KNOWN)"
+elif [ -n "$LIVE_NETD_KNOWN" ]; then
+    LINE="$LINE (netd.o maps covered as in $LIVE_NETD_KNOWN, but its offload/test/clatd/dscpPolicy.o differ from every verified train)"
 elif [ -s "$T/live.pins" ]; then
     LINE="$LINE (BPF maps covered by name; this netd.o is not in the ROM's verified list)"
 fi
@@ -268,7 +275,7 @@ echo "   one reboot activates a whole batch and one failed module fails all of i
 batches 5
 echo
 echo "== Tethering BPF"
-echo "  active Tethering $TETH_VER, netd.o sha256 $LIVE_SHA ${LIVE_KNOWN:+($LIVE_KNOWN)}"
+echo "  active Tethering $TETH_VER, netd.o sha256 $LIVE_SHA, BPF set sha256 $LIVE_ALL ${LIVE_KNOWN:+($LIVE_KNOWN)}"
 echo "  ROM a52_netd.o: $(wc -l < "$T/ours.pins") maps; active netd.o: $(wc -l < "$T/live.pins") maps; missing: ${LIVE_MISSING:-none}"
 grep -q "netbpfload_a52" /system/etc/init/netbpfload.rc 2> /dev/null && echo "  bpfloader runs /system/bin/netbpfload_a52* (frozen loader)" || \
     echo "  WARNING: /system/etc/init/netbpfload.rc does not run netbpfload_a52*"

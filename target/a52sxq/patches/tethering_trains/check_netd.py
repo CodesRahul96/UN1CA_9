@@ -2,7 +2,10 @@
 # Does our frozen BPF loader + frozen netd.o load what every Tethering version we know about needs?
 #
 #   check_netd.py <a52_netd.o> <known netd.o>...    exit 0: all covered; 1: something missing (printed)
-#   check_netd.py --list <known netd.o>...          prints "<sha256> <label>" lines for /system/etc/bpf/a52_netd.known
+#   check_netd.py --list <known netd.o>...          prints the /system/etc/bpf/a52_netd.known lines:
+#       "<set sha256> <netd.o sha256> Tethering <versionCode> (<label>)", set sha256 = sha256 of the five lines
+#       "<sha256 of X.o>\n" for X = netd offload test clatd dscpPolicy (k4-mainline-diag computes the same on the phone,
+#       so a train that only changes offload.o is not mistaken for a verified one)
 #
 # Our loader (netbpfload_a52*) only ever loads /system/etc/bpf/a52_netd.o, whatever Tethering APEX is active. The
 # APEX's userspace (libservice-connectivity.so in system_server, libnetd_updatable.so in netd) opens the map and
@@ -202,9 +205,15 @@ def parse_obj(path):
 
 
 if sys.argv[1] == "--list":
+    sets = {}                                            # one line per distinct object set (a train may reship them)
     for k in sys.argv[2:]:
-        ver, lab = label(k)
-        print(hashlib.sha256(open(k, "rb").read()).hexdigest(), f"Tethering {ver} ({lab})")
+        ver, lab = label(k); d = os.path.dirname(os.path.abspath(k))
+        hs = [hashlib.sha256(open(k if o == "netd" else os.path.join(d, f"{ver}_{lab}_{o}.o"), "rb").read()).hexdigest()
+              for o in ("netd",) + LOADER_OBJS]
+        whole = hashlib.sha256("".join(h + "\n" for h in hs).encode()).hexdigest()
+        sets.setdefault((whole, hs[0]), []).append(f"Tethering {ver} ({lab})")
+    for (whole, netd), labs in sets.items():
+        print(whole, netd, " = ".join(labs))
     sys.exit(0)
 
 ours = Elf(open(sys.argv[1], "rb").read())
