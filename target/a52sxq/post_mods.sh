@@ -72,3 +72,11 @@ if [ ! -f "$SRC_DIR/target/a52sxq/patches/home_depth_clock/disable" ]; then
     # shellcheck source=/dev/null
     source "$SRC_DIR/target/a52sxq/patches/home_depth_clock/settings.sh"
 fi
+
+# hal3_mass SamsungCamera fixes (target/a52sxq/patches/camera_stability): applied here, not from the patch, because the
+# r9qxxx camera is only installed and decoded by unica/patches/camera, which runs after the device patches
+if [ ! -f "$SRC_DIR/target/a52sxq/patches/camera_stability/disable" ] && \
+        $TARGET_CAMERA_SUPPORT_MASS_APP_FLAVOR && ! $SOURCE_CAMERA_SUPPORT_MASS_APP_FLAVOR; then
+    # shellcheck source=/dev/null
+    source "$SRC_DIR/target/a52sxq/patches/camera_stability/apply.sh"
+fi
