@@ -12,6 +12,9 @@ assert len(hits) == 1, "SoundTriggerHalEnforcer: %d" % len(hits)
 for c in ("HalException", "RecoverableException", "ISoundTriggerHal$GlobalCallback"):
     assert glob.glob(root + "/smali*/com/android/server/soundtrigger_middleware/%s.smali" % c), "%s missing" % c
 s = open(hits[0]).read()
+# every check before the first write: the helper set must be complete
+helpers = sorted(glob.glob(patch + "/K4StRetry*.smali"))
+assert len(helpers) == 14, "K4StRetry smali files: %d (expected 14, rerun src/build.sh)" % len(helpers)
 P = "Lcom/android/server/soundtrigger_middleware/"
 K = "Lcom/k4/soundtrigger/K4StRetry;"
 CATCH = "    :catch_0\n    move-exception p1\n\n"
@@ -72,8 +75,6 @@ else:
     s = s[:i] + "    .locals 0\n\n" + call + body[len("    .locals 0\n\n"):] + s[i + len(body):]
     print("  - detach -> K4StRetry.detached (drops the dead HAL stack's callback / pending retry / owed reboot)")
 open(hits[0], "w").write(s)
-helpers = sorted(glob.glob(patch + "/K4StRetry*.smali"))
-assert len(helpers) == 14, "K4StRetry smali files: %d (expected 14, rerun src/build.sh)" % len(helpers)
 dirs = sorted((d for d in glob.glob(root + "/smali_classes*") if re.fullmatch(r"smali_classes\d+", os.path.basename(d))),
               key=lambda d: int(os.path.basename(d)[len("smali_classes"):]))
 dst = os.path.join(dirs[-1] if dirs else root + "/smali", "com/k4/soundtrigger")

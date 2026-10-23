@@ -43,11 +43,15 @@ import java.util.concurrent.Executor;
  *    resource is free; SoundTriggerHelper then keeps the model requested, tells the client onRecognitionPaused()
  *    and loads it again on onResourcesAvailable(). A HIDL 2.x HAL has no such callback, so:
  *     - -ENODEV/-EBUSY/-ENOMEM/-EAGAIN -> RecoverableException(RESOURCE_CONTENTION) (client sees STATUS_BUSY, stays
- *       requested); any other status -> RecoverableException(INTERNAL_ERROR). Never a HAL reboot: a failed load
- *       leaves nothing to resync (the enforcer only records a model after a successful load).
+ *       requested); any other status -> RecoverableException(INTERNAL_ERROR). A HAL status refusal never
+ *       reboots: it leaves nothing to resync (the enforcer only records a model after a successful load). A load
+ *       that fails otherwise (not a HalException: conversion error, non-DeadObject RemoteException) goes through
+ *       halError() like any HAL error (2.), and a load that hangs past 3 s through watchdogExpired() (3.).
  *     - while a refusal is pending: onResourcesAvailable() on that HAL stack's global callback when the HAL's
  *       concurrency ends: all playback stopped (+5 s: audio HAL output standby lags the player state) or the
- *       screen turned off (+2 s: the HAL switches to the LPI path). One retry per event, no timers.
+ *       screen turned off (+2 s: the HAL switches to the LPI path). One retry per event, no timers. The callback
+ *       runs on a separate thread (K4StRetryCb): SoundTriggerModule.onResourcesAvailable takes the module monitor,
+ *       which a hung Session HAL call holds, and the decision thread (K4StRetry) must never wait for a HAL call.
  *
  * 2. Every other HAL error (halError(), callbackError(), soundtrigger_no_hal_reboot). Stock reboots the HAL at once.
  *    That reboot is also what resyncs the middleware with the HAL after a failed state change: stopRecognition
@@ -57,26 +61,33 @@ import java.util.concurrent.Executor;
  *    onModuleDied() to every client, which clears and reloads all models. So the reboot is always owed, never
  *    dropped: a HalException becomes RecoverableException(INTERNAL_ERROR) (what Validation reports for it anyway),
  *    a callback contract violation drops the event (as stock does after its reboot), and
- *     - audio mode NORMAL: the reboot runs after a 3 s grace (stock: at once). The HAL's call concurrency handling
- *       (stopRecognition from DeviceStateHandler at call start, HAL abort events) runs inside AudioService.setMode,
- *       ~0.2-0.5 s before the mode change reaches mode listeners; the grace keeps an error from that window from
- *       rebooting the HAL just as the call connects. Before rebooting, the mode is read again from AudioService.
- *     - any other mode, or the mode is not known yet: the reboot runs once the mode is NORMAL again (+5 s,
- *       cancelled if a call starts again). Not needed any more if that HAL stack dies on its own before
- *       (detached()).
+ *     - the mode listener says NORMAL (or has not reported yet): the reboot is decided 3 s later (stock: at once).
+ *       The HAL's call concurrency handling (stopRecognition from DeviceStateHandler at call start, HAL abort
+ *       events) runs inside AudioService.setMode, ~0.2-0.5 s before the mode change reaches mode listeners; the
+ *       grace keeps an error from that window from rebooting the HAL just as the call connects. At decision time
+ *       the mode is read again from AudioService (currentMode()); a call then -> owed as below.
+ *     - the listener says call / VoIP / ringing: the reboot runs once the mode is NORMAL again (+5 s, cancelled if
+ *       a call starts again), however long that mode lasts (a VoIP app keeps IN_COMMUNICATION only while it plays
+ *       or records: AudioService drops an inactive mode owner after 6 s). Not needed any more if that HAL stack
+ *       dies on its own before (detached()).
+ *     - AudioService not published yet (boot): polled every 5 s; stock after 15 min of that.
+ *    The 3 s grace, the screen-off retry and the after-call resync hold a short partial wakelock (Handler delays
+ *    are uptime and would otherwise wait for the next wakeup).
  *
  * 3. SoundTriggerHalWatchdog deadline (watchdogExpired(), soundtrigger_no_hal_reboot): a HAL call still running after
  *    3 s. Stock logs "HAL deadline expired. Rebooting." and reboots at once, which unblocks the caller (the call
  *    returns DeadObject). Now:
- *     - mode NORMAL (read again from AudioService) or not known yet (boot: nothing may wait for the mode listener
- *       there): stock, reboot now.
+ *     - mode NORMAL (read again from AudioService) or AudioService not published yet (boot, no call possible, and
+ *       boot itself may be the blocked caller): stock, reboot now (on the UptimeTimer thread when unpublished).
  *     - call / VoIP / ringing: no reboot. The caller stays blocked in the HAL (only the sound trigger stack waits:
  *       DeviceStateHandler's executor, the middleware / SoundTriggerHelper locks and their binder callers; audio
  *       policy's capture-state callback is oneway, AudioService and telephony never wait on it). If the call
  *       returns late (watchdogClosed()), nothing is rebooted: the result went through the enforcer as usual (an
- *       error there owes its own resync reboot). If it is still hung when the mode is NORMAL again (+5 s), or for
- *       45 s past the deadline during the call (a dead HAL; 48 s in all stays below the system_server Watchdog's
- *       60 s, so blocked system_server threads can never get system_server killed), the HAL is rebooted.
+ *       error there owes its own resync reboot). A call that returns right at the deadline, while the deadline is
+ *       already running, is seen by both sides under sLock (sClosed): no stale hung entry. If it is still hung
+ *       when the mode is NORMAL again (+5 s), or for 45 s past the deadline during the call (a dead HAL; 48 s in
+ *       all stays below the system_server Watchdog's 60 s, so blocked system_server threads can never get
+ *       system_server killed), the HAL is rebooted.
  */
 public final class K4StRetry {
     private static final String TAG = "K4StRetry";

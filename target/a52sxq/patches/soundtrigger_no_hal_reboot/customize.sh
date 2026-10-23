@@ -27,7 +27,8 @@ for m in (HAL_ERROR, CB_ERROR, WD_EXPIRED, WD_CLOSED):
     assert ".method public static " + m in helper, "K4StRetry.%s missing (soundtrigger_load_no_reboot too old?)" % m
 
 # (1) SoundTriggerHalEnforcer.handleException: the "log, reboot(), throw e" branch -> K4StRetry.halError
-#     (mode NORMAL: same log + reboot; call/VoIP active: HalException -> RecoverableException(5), reboot owed)
+#     (HalException -> RecoverableException(5); the reboot is owed: no call -> after a 3 s grace with the mode re-read,
+#     call/VoIP active -> after the call)
 f = one("com/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer.smali")
 s = open(f).read()
 sig = ".method public final handleException(Ljava/lang/RuntimeException;)V"
@@ -49,7 +50,7 @@ else:
     assert body.count("instance-of v0, v0, Landroid/os/DeadObjectException;") == 1, "handleException: dead-HAL check changed"
     s = s[:i] + body.replace(OLD, NEW) + s[j:]
     writes.append((f, s))
-    print("  - handleException: HAL error -> K4StRetry.halError (reboot now outside calls, after the call otherwise)")
+    print("  - handleException: HAL error -> K4StRetry.halError (reboot after a 3 s grace outside calls, after the call otherwise)")
 
 # (2) ModelCallbackEnforcer contract checks: this$0.reboot() -> K4StRetry.callbackError(this$0); the event is dropped
 #     either way (stock returns right after its reboot); wtfStack logging stays
