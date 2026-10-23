@@ -20,7 +20,12 @@ K4LN_APPEND()
 PLAT="$WORK_DIR/system/system/etc/selinux/plat_sepolicy.cil"
 SEXT="$WORK_DIR/system/system/system_ext/etc/selinux/system_ext_sepolicy.cil"
 VEND="$WORK_DIR/vendor/etc/selinux/vendor_sepolicy.cil"
-K4LN_APPEND "$PLAT" "(allowx domain file_type (ioctl file (0xf514 0xf522 0xf528)))"
+# Samsung F2FS file ioctls (0xf514 = F2FS_IOC_SEC_TRIM_FILE, AOSP grants it to vold only): the 5.4 kernel has no
+# handler for any of them, the denials are only audit noise. dontauditx, not allowx: a grant would let every domain
+# secure-discard any file it can open the day a kernel picks up the sec-trim backport. sdcard_type too (stock S26U
+# lists both; FUSE/sdcardfs files were still audited).
+K4LN_APPEND "$PLAT" "(dontauditx domain file_type (ioctl file (0xf514 0xf522 0xf528)))"
+K4LN_APPEND "$PLAT" "(dontauditx domain sdcard_type (ioctl file (0xf514 0xf522 0xf528)))"
 K4LN_APPEND "$SEXT" "(dontaudit mediaserver vendor_sys_gpp_prop (file (read getattr map open)))"
 K4LN_APPEND "$VEND" "(dontaudit appdomain vendor_display_prop (file (read getattr map open)))"
 K4LN_APPEND "$VEND" "(dontaudit mediaserver_30_0 vendor_display_prop (file (read getattr map open)))"
