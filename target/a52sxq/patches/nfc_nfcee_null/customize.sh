@@ -9,9 +9,11 @@ end = s.index(".end method", start)
 body = s[start:end]
 m = re.search(r"(    invoke-virtual \{(\w+)\}, Landroid/nfc/NfcOemExtension;->getActiveNfceeList\(\)Ljava/util/Map;\n\n    move-result-object (\w+)\n)", body)
 assert m and body.count("getActiveNfceeList") == 1, "getActiveNfceeList call"
-assert "k4_nfcee_ok" not in body, "already patched"
 reg = m.group(3)
 guard = m.group(1) + f"\n    if-nez {reg}, :k4_nfcee_ok\n\n    const/4 {reg}, 0x0\n\n    return {reg}\n\n    :k4_nfcee_ok\n"
+if "k4_nfcee_ok" in body:
+    assert body.count(guard) == 1 and body.count("k4_nfcee_ok") == 2, "k4_nfcee_ok marker without the expected guard"
+    print("  - getActiveNfceeTech already guarded"); sys.exit(0)
 s = s[:start] + body.replace(m.group(1), guard) + s[end:]
 open(f, "w").write(s)
 PYEOF
