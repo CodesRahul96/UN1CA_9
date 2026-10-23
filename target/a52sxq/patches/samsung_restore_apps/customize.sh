@@ -5,6 +5,8 @@
 # had neither. APKs are the Galaxy Store builds for SM-S948B / API 37 (stubDownload.as), signed by Samsung Cert.
 # Staged like the ReSukiSU manager: unica/patches/_debloat deletes /system/preload after the target patches run and
 # unica/mods/preload copies .extra_preload/* into /system/preload and registers it in vpl_apks_count_list.txt.
+# make_rom.sh empties $WORK_DIR/.extra_preload at the start of every build, so nothing survives a build that stopped
+# before unica/mods/preload.
 # PrePackageInstaller then installs them to /data/app on first boot / after an upgrade, skipping an APK when the
 # same or a higher version is already installed.
 RESTORE_APPS_DIR="$SRC_DIR/prebuilts/samsung_restore_apps"
