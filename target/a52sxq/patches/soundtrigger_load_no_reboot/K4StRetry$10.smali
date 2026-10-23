@@ -18,7 +18,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 498
+    .line 504
     invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
 
     return-void
@@ -29,13 +29,13 @@
 .method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
     .registers 4
 
-    .line 501
+    .line 507
     const-wide/16 p1, 0x7d0
 
     const-string v0, "screen off"
 
     invoke-static {p1, p2, v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
 
-    .line 502
+    .line 508
     return-void
 .end method

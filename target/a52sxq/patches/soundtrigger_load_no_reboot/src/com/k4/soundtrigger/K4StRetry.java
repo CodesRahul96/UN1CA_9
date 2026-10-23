@@ -117,7 +117,10 @@ public final class K4StRetry {
     private static final IdentityHashMap<Object, Hung> sHung = new IdentityHashMap<>();
     /** sHung.size(), read without the lock on every HAL call (watchdogClosed). */
     private static volatile int sHungCount;
+    /** Decisions only (mode, retries, reboots): never calls into the middleware, whose locks a hung HAL call holds. */
     private static Handler sHandler;
+    /** Middleware callbacks (onResourcesAvailable takes the SoundTriggerModule monitor): may block behind a hung call. */
+    private static Handler sCbHandler;
     private static volatile AudioManager sAm;
     private static volatile int sMode = MODE_UNKNOWN;
     private static boolean sModeWatched;
@@ -173,6 +176,9 @@ public final class K4StRetry {
             HandlerThread t = new HandlerThread(TAG);
             t.start();
             sHandler = new Handler(t.getLooper());
+            HandlerThread cb = new HandlerThread(TAG + "Cb");
+            cb.start();
+            sCbHandler = new Handler(cb.getLooper());
             sHandler.post(REGISTER_MODE);
         }
     }
@@ -529,9 +535,10 @@ public final class K4StRetry {
         sHandler.postDelayed(FIRE, delayMs);
     }
 
-    /** Handler thread. */
+    /** Handler thread: the callbacks run on the callback thread (SoundTriggerModule.onResourcesAvailable takes the
+     *  module monitor, which a hung Session HAL call holds; the decision thread must never wait for it). */
     private static void fire() {
-        List<ISoundTriggerHal.GlobalCallback> cbs = new ArrayList<>();
+        final List<ISoundTriggerHal.GlobalCallback> cbs = new ArrayList<>();
         synchronized (sLock) {
             for (Object enforcer : sPending.keySet()) {
                 ISoundTriggerHal.GlobalCallback cb = sCallbacks.get(enforcer);
@@ -539,13 +546,20 @@ public final class K4StRetry {
             }
             sPending.clear();
         }
-        for (ISoundTriggerHal.GlobalCallback cb : cbs) {
-            Slog.i(TAG, sReason + ": resources available, loading refused sound models again");
-            try {
-                cb.onResourcesAvailable();
-            } catch (Throwable t) {
-                Slog.e(TAG, "onResourcesAvailable failed", t);
+        if (cbs.isEmpty()) return;
+        final String reason = sReason;
+        sCbHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                for (ISoundTriggerHal.GlobalCallback cb : cbs) {
+                    Slog.i(TAG, reason + ": resources available, loading refused sound models again");
+                    try {
+                        cb.onResourcesAvailable();
+                    } catch (Throwable t) {
+                        Slog.e(TAG, "onResourcesAvailable failed", t);
+                    }
+                }
             }
-        }
+        });
     }
 }
