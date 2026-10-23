@@ -3,9 +3,12 @@
 on post-fs-data
     exec u:r:k4apexdm:s0 root root -- /system/bin/sh /system/bin/k4-apex-dm-relabel
 
-# Same check again for an "add" uevent that ueventd handled after the run above (the 5.4 race can relabel late):
-# apexd-snapshotde sets ready later in post-fs-data, and once more when boot completes. Background (init does not wait),
-# same domain; the script is idempotent and only logs when it changed something.
+# Same check again for an "add" uevent that ueventd handled after the run above (the 5.4 race can relabel late).
+# apexd.status=ready is already set when the run above happens (init.rc's own post-fs-data runs exec_start
+# apexd-snapshotde first), so this property event is queued behind what late-init already queued: the second pass
+# runs around zygote-start, in parallel with system_server - not guaranteed before PackageManager's APEX scan (only the
+# blocking post-fs-data exec is). The third pass runs after boot completes and only helps later readers. Background
+# (init does not wait), same domain; the script is idempotent and only logs when it changed something.
 on property:apexd.status=ready
     exec_background u:r:k4apexdm:s0 root root -- /system/bin/sh /system/bin/k4-apex-dm-relabel apexd-ready
 

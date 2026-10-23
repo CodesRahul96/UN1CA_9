@@ -1,8 +1,8 @@
 #!/system/bin/sh
 # k4-apex-dm-relabel - give every APEX dm block device its apex_dm_device label back before system_server scans them.
 # Installed by target/a52sxq/patches/apex_dm_relabel, run by init at post-fs-data (after apexd.status=activated,
-# blocking, before zygote-start) and again in the background at apexd.status=ready and sys.boot_completed=1, for an
-# "add" uevent that lands after the first run. Idempotent and cheap: it only touches wrongly labelled APEX nodes, a
+# blocking, before zygote-start) and again in the background at apexd.status=ready (around zygote-start) and
+# sys.boot_completed=1, for an "add" uevent that lands after the first run. Idempotent and cheap: it only touches wrongly labelled APEX nodes, a
 # clean run is one grep, two ls -Z and a 0.1 s sleep. $1 = the trigger, only used in the kmsg line.
 #
 # On kernels <= 5.10 the dm "add" uevent fires at DM_DEV_CREATE, before the device is in the dm hash, so ueventd's
