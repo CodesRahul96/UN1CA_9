@@ -6,12 +6,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
+import android.media.AudioAttributes;
 import android.media.AudioPlaybackConfiguration;
+import android.media.AudioRecordingConfiguration;
+import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.PowerManager;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyCallback;
+import android.telephony.TelephonyManager;
 import android.util.Slog;
 
 import com.android.server.soundtrigger_middleware.HalException;
@@ -21,6 +28,8 @@ import com.android.server.soundtrigger_middleware.SoundTriggerHalEnforcer;
 import com.android.server.soundtrigger_middleware.SoundTriggerHalWatchdog;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -34,7 +43,20 @@ import java.util.concurrent.Executor;
  * On the A52s the sound trigger HAL (HIDL 2.3, QTI st-hal) lives inside the audio HAL process, so a sound trigger
  * HAL reboot (setprop sys.audio.restart.hal 1) restarts the whole audio HAL: a running call loses its voice/VoIP
  * audio both ways, audioserver restarts. Rule: no sound trigger HAL reboot while a call / VoIP / ringing is going
- * on; the reboot the middleware wants is owed and runs once the audio mode is NORMAL again.
+ * on; the reboot the middleware wants is owed and runs once there is no call again.
+ *
+ * "A call" (inCall()) is any of: the audio mode is not NORMAL (mode listener, and AudioService.getMode() re-read:
+ * the volatile mCachedAudioMode, a field read on this ROM); the telephony call state of any active subscription is
+ * not IDLE (covers a silent / vibrate incoming call, for which Telecom sets no RINGTONE mode); an active playback
+ * with USAGE_VOICE_COMMUNICATION / _SIGNALLING / NOTIFICATION_RINGTONE (VoIP apps that never set IN_COMMUNICATION,
+ * a VoIP app ringing in mode NORMAL) or an active recording from VOICE_COMMUNICATION / VOICE_CALL / _UPLINK /
+ * _DOWNLINK. The non-mode signals are cached from async callbacks (TelephonyCallback per subscription,
+ * AudioManager playback / recording callbacks) that run on their own thread (K4StRetryState), which also does every
+ * registration (with retry), every service lookup and the wakelock: the decision thread never makes a blocking
+ * binder call or takes a foreign lock, and the state thread never takes sLock or a middleware lock, so delivery of
+ * those callbacks cannot wait for a HAL thread. A signal that is not known (registration failed, a subscription
+ * whose first state has not arrived) counts as a call, bounded like everything else (45 s for a hung HAL call,
+ * 15 min for owed reboots). No telephony service at all (boot before the phone process, no SIM stack) is no call.
  *
  * 1. Load refusals (refused(), soundtrigger_load_no_reboot). When the HAL cannot open an ADSP listen (LSM) session
  *    it fails loadSoundModel/loadPhraseSoundModel with a plain status (-ENODEV from ape_reg_sm, "pcm_is_ready
@@ -114,6 +136,8 @@ public final class K4StRetry {
     private static final long UNKNOWN_FALLBACK_MS = 15 * 60 * 1000;
     /** sMode before the mode listener is registered: treated like a call (defer) for HAL errors. */
     private static final int MODE_UNKNOWN = -100;
+    /** Per-subscription call state before its first callback: counts as a call. */
+    private static final int CALL_STATE_UNKNOWN = -1;
 
     /** A HAL call that ran past the watchdog deadline during a call. */
     private static final class Hung {
@@ -148,19 +172,56 @@ public final class K4StRetry {
     private static Handler sHandler;
     /** Middleware callbacks (onResourcesAvailable takes the SoundTriggerModule monitor): may block behind a hung call. */
     private static Handler sCbHandler;
+    /**
+     * Registrations, service lookups, the wakelock and the call-signal callbacks (telephony, playback, recording):
+     * may block in binder calls, never takes sLock or a middleware lock.
+     */
+    private static Handler sStateHandler;
+    /** Cached call signals, written on the state thread only. */
+    private static volatile boolean sVoicePlayback;
+    private static volatile boolean sVoiceRecording;
+    private static volatile boolean sTelBusy;
+    /** Signals that are not known (failed registration, a subscription without its first state). */
+    private static volatile boolean sSignalsUnknown;
+    private static volatile long sSignalsUnknownSince;
+    /** State thread only. */
+    private static boolean sPlaybackWatched;
+    private static boolean sRecordingWatched;
+    private static boolean sTelWatched;
+    private static boolean sTelFailed;
+    private static boolean sAudioSignalsFailed;
+    private static int sStateRegisterTries;
+    private static SubscriptionManager sSubs;
+    private static TelephonyManager sTel;
+    private static final HashMap<Integer, SubCall> sSubCalls = new HashMap<>();
     private static volatile AudioManager sAm;
     private static volatile int sMode = MODE_UNKNOWN;
-    private static boolean sModeWatched;
-    private static int sModeRegisterTries;
+    private static volatile boolean sModeWatched;
     private static long sUnknownSince;
-    private static boolean sAudioActive;
-    private static boolean sAudioWatched;
+    private static volatile boolean sAudioActive;
     private static boolean sScreenWatched;
-    private static boolean sRetryRegisterPosted;
     private static String sReason;
-    /** Keeps short delayed retries / reboots from stalling in suspend (Handler delays are uptime). Handler thread. */
+    /** Keeps short delayed retries / reboots from stalling in suspend (Handler delays are uptime). State thread. */
     private static PowerManager.WakeLock sWakeLock;
     private static long sWakeUntil;
+
+    /** Telephony call state of one subscription (state thread). */
+    private static final class SubCall extends TelephonyCallback implements TelephonyCallback.CallStateListener {
+        final int subId;
+        final TelephonyManager tm;
+        int state = CALL_STATE_UNKNOWN;
+
+        SubCall(int subId, TelephonyManager tm) {
+            this.subId = subId;
+            this.tm = tm;
+        }
+
+        @Override
+        public void onCallStateChanged(int s) {
+            state = s;
+            updateTelephony();
+        }
+    }
 
     private static final Runnable FIRE = new Runnable() {
         @Override
@@ -168,28 +229,22 @@ public final class K4StRetry {
             fire();
         }
     };
-    private static final Runnable REGISTER_MODE = new Runnable() {
+    private static final Runnable REGISTER_STATE = new Runnable() {
         @Override
         public void run() {
-            registerModeListener();
+            registerState();
         }
     };
-    private static final Runnable REGISTER_RETRY = new Runnable() {
+    private static final Runnable SIGNALS = new Runnable() {
         @Override
         public void run() {
-            registerRetryListeners();
+            onCallSignals();
         }
     };
     private static final Runnable RESYNC = new Runnable() {
         @Override
         public void run() {
             resync();
-        }
-    };
-    private static final Runnable HOLD_GRACE = new Runnable() {
-        @Override
-        public void run() {
-            hold(NORMAL_GRACE_MS + 1000);
         }
     };
     private static final Runnable CHECK_HUNG = new Runnable() {
@@ -204,6 +259,12 @@ public final class K4StRetry {
             sHandler.post(r);
         }
     };
+    private static final Executor STATE_EXECUTOR = new Executor() {
+        @Override
+        public void execute(Runnable r) {
+            sStateHandler.post(r);
+        }
+    };
 
     private K4StRetry() {}
 
@@ -216,7 +277,10 @@ public final class K4StRetry {
             HandlerThread cb = new HandlerThread(TAG + "Cb");
             cb.start();
             sCbHandler = new Handler(cb.getLooper());
-            sHandler.post(REGISTER_MODE);
+            HandlerThread st = new HandlerThread(TAG + "State");
+            st.start();
+            sStateHandler = new Handler(st.getLooper());
+            sStateHandler.post(REGISTER_STATE);
         }
     }
 
@@ -262,10 +326,6 @@ public final class K4StRetry {
         synchronized (sLock) {
             sPending.put(enforcer, Boolean.TRUE);
             ensureHandlerLocked();
-            if (!sRetryRegisterPosted) {
-                sRetryRegisterPosted = true;
-                sHandler.post(REGISTER_RETRY);
-            }
         }
         return new RecoverableException(RESOURCE_CONTENTION, msg);
     }
@@ -288,20 +348,21 @@ public final class K4StRetry {
     /** The resync reboot is owed: after the NORMAL grace, or once the call has ended. Never on the caller's thread. */
     private static void owe(SoundTriggerHalEnforcer enforcer, String what) {
         int mode;
+        boolean signals = callBySignals();
         synchronized (sLock) {
             ensureHandlerLocked();
             mode = sMode;
             sOwed.put(enforcer, Boolean.TRUE);
-            if (!listenerSaysCall() && !sHandler.hasCallbacks(RESYNC)) {
+            if (!listenerSaysCall() && !signalWillReport() && !sHandler.hasCallbacks(RESYNC)) {
                 sHandler.postDelayed(RESYNC, NORMAL_GRACE_MS);
-                sHandler.post(HOLD_GRACE); // not here: the caller holds middleware locks
+                hold(NORMAL_GRACE_MS + 1000); // only posts to the state thread
             }
         }
-        if (mode == AudioManager.MODE_NORMAL) {
+        if (mode == AudioManager.MODE_NORMAL && !signals) {
             Slog.e(ENFORCER_TAG, "Exception caught from HAL, rebooting HAL in " + NORMAL_GRACE_MS + " ms unless a"
                     + " call starts: " + what);
         } else {
-            Slog.w(TAG, "HAL error during a call or before the audio mode is watched (mode " + mode + "), not"
+            Slog.w(TAG, "HAL error during a call or before the call state is known (" + callState(mode) + "), not"
                     + " rebooting the HAL (shared with call audio); resync reboot once there is no call: " + what);
         }
     }
@@ -318,7 +379,7 @@ public final class K4StRetry {
             // check both run under sLock, so one of them always sees the other)
             if (sClosed.remove(watchdog) != null) return;
         }
-        // the listener may not be registered yet (first attach): read AudioService directly (a field read on this ROM)
+        // AudioService not resolved yet by the state thread (boot): stock
         now = currentMode() == MODE_UNKNOWN;
         synchronized (sLock) {
             if (sClosed.remove(watchdog) != null) return;
@@ -354,13 +415,14 @@ public final class K4StRetry {
     /**
      * The mode now. A call mode from the listener is trusted (it only lags in the safe direction at hang-up); NORMAL or
      * not known yet is read again from AudioService (getMode() returns the volatile mCachedAudioMode, written in
-     * setMode() before the listeners are told: lock-free, never blocks). MODE_UNKNOWN only while AudioService is not
-     * published. Any thread except under middleware locks (the first call may look up the service).
+     * setMode() before the listeners are told: an in-process call, lock-free, never blocks; the state thread made the
+     * first call, so AudioManager's service lookup is cached). MODE_UNKNOWN only until the state thread has resolved
+     * AudioService (boot). Any thread.
      */
     private static int currentMode() {
         int m = sMode;
         if (m != AudioManager.MODE_NORMAL && m != MODE_UNKNOWN) return m;
-        AudioManager am = audioManager();
+        AudioManager am = sAm;
         if (am == null) return m;
         try {
             return am.getMode();
@@ -369,17 +431,25 @@ public final class K4StRetry {
         }
     }
 
-    private static AudioManager audioManager() {
-        AudioManager am = sAm;
-        if (am != null) return am;
-        try {
-            if (ServiceManager.checkService(Context.AUDIO_SERVICE) == null) return null;
-            am = ActivityThread.currentActivityThread().getSystemContext().getSystemService(AudioManager.class);
-            sAm = am;
-            return am;
-        } catch (Throwable t) {
-            return null;
-        }
+    /** A call by the cached non-mode signals (telephony, voice audio); unknown counts, for at most 15 min. Any thread. */
+    private static boolean callBySignals() {
+        if (sTelBusy || sVoicePlayback || sVoiceRecording) return true;
+        return sSignalsUnknown && SystemClock.uptimeMillis() - sSignalsUnknownSince < UNKNOWN_FALLBACK_MS;
+    }
+
+    /** A known non-mode signal says call: its end is reported (SIGNALS), so no poll is needed. */
+    private static boolean signalWillReport() {
+        return sTelBusy || sVoicePlayback || sVoiceRecording;
+    }
+
+    /** No call at all: mode (live) NORMAL and no signal. Decision thread / timer thread. */
+    private static boolean noCall(int mode) {
+        return mode == AudioManager.MODE_NORMAL && !callBySignals();
+    }
+
+    private static String callState(int mode) {
+        return "mode " + mode + (sTelBusy ? ", telephony call" : "") + (sVoicePlayback ? ", voice/ring playback" : "")
+                + (sVoiceRecording ? ", voice recording" : "") + (sSignalsUnknown ? ", call signals not known" : "");
     }
 
     /** Handler thread: decide for watchdog deadlines (no middleware lock is held here). */
@@ -387,8 +457,9 @@ public final class K4StRetry {
         int mode = currentMode();
         List<Hung> reboot = new ArrayList<>();
         List<Hung> deferred = new ArrayList<>();
+        boolean free = mode == MODE_UNKNOWN || noCall(mode);
         synchronized (sLock) {
-            if (mode == AudioManager.MODE_NORMAL || mode == MODE_UNKNOWN) {
+            if (free) {
                 reboot.addAll(sHung.values());
                 sHung.clear();
             } else {
@@ -401,14 +472,14 @@ public final class K4StRetry {
             }
         }
         for (Hung h : deferred) {
-            Slog.e(TAG, "sound trigger HAL call still running after " + WATCHDOG_MS + " ms during a call (mode "
-                    + mode + "): NOT rebooting the audio HAL (shared with call audio); rebooting it after the call"
+            Slog.e(TAG, "sound trigger HAL call still running after " + WATCHDOG_MS + " ms during a call ("
+                    + callState(mode) + "): NOT rebooting the audio HAL (shared with call audio); rebooting it after the call"
                     + " if the call into the HAL is still hung", h.where);
         }
         if (!deferred.isEmpty()) {
             if (!sHandler.hasCallbacks(CHECK_HUNG_MAX)) sHandler.postDelayed(CHECK_HUNG_MAX, HUNG_IN_CALL_MAX_MS);
-            // live mode says call, the listener still says NORMAL / nothing: resync() polls until they agree
-            if (!listenerSaysCall() && !sHandler.hasCallbacks(RESYNC)) {
+            // only the live mode (or an unknown signal) says call: resync() polls until it agrees
+            if (!listenerSaysCall() && !signalWillReport() && !sHandler.hasCallbacks(RESYNC)) {
                 sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
             }
         }
@@ -450,36 +521,259 @@ public final class K4StRetry {
         rebootAll(new ArrayList<SoundTriggerHalEnforcer>(), dead);
     }
 
-    /** Handler thread. */
-    private static void registerModeListener() {
-        if (sModeWatched) return;
+    /**
+     * State thread: resolve AudioService, register the mode listener, the playback / recording / screen-off callbacks
+     * and the telephony call-state callbacks. Every part is retried until it works (1 s for the first minute, then
+     * 15 s). sAm is published only after the mode listener is registered and getMode() was called once (so its
+     * service lookup is cached and the decision thread's getMode() never looks anything up).
+     */
+    private static void registerState() {
+        boolean retry = false;
+        Throwable why = null;
         try {
-            // AudioManager keeps a listener it failed to register with AudioService: only try once it is published,
-            // and with a new listener per attempt (re-adding one throws)
-            if (ServiceManager.checkService(Context.AUDIO_SERVICE) == null) throw new IllegalStateException("no audio service");
             Context ctx = ActivityThread.currentActivityThread().getSystemContext();
-            AudioManager am = ctx.getSystemService(AudioManager.class);
-            am.addOnModeChangedListener(EXECUTOR, new AudioManager.OnModeChangedListener() {
-                @Override
-                public void onModeChanged(int mode) {
-                    onMode(mode);
-                }
-            });
-            sModeWatched = true;
-            sAm = am;
-            sModeRegisterTries = 0;
-            int mode = am.getMode();
-            Slog.i(TAG, "watching the audio mode for deferred sound trigger HAL reboots (mode " + mode + ")");
-            onMode(mode);
-        } catch (Throwable t) {
-            // AudioService not published yet (early boot); decisions meanwhile read AudioService directly when they can
-            int n = ++sModeRegisterTries;
-            if (n == 1 || n == REGISTER_FAST_TRIES || (n > REGISTER_FAST_TRIES && n % 20 == 0)) {
-                Slog.w(TAG, "cannot watch the audio mode yet (attempt " + n + "), retrying every "
-                        + (n < REGISTER_FAST_TRIES ? "1 s" : "15 s") + ": " + t);
+            if (!sModeWatched) {
+                // AudioManager keeps a listener it failed to register with AudioService: only try once it is
+                // published, and with a new listener per attempt (re-adding one throws)
+                if (ServiceManager.checkService(Context.AUDIO_SERVICE) == null) throw new IllegalStateException("no audio service");
+                AudioManager am = ctx.getSystemService(AudioManager.class);
+                am.addOnModeChangedListener(EXECUTOR, new AudioManager.OnModeChangedListener() {
+                    @Override
+                    public void onModeChanged(int mode) {
+                        onMode(mode);
+                    }
+                });
+                final int mode = am.getMode();
+                sAm = am;
+                sModeWatched = true;
+                Slog.i(TAG, "watching the audio mode for deferred sound trigger HAL reboots (mode " + mode + ")");
+                sHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        onMode(mode);
+                    }
+                });
             }
-            sHandler.postDelayed(REGISTER_MODE, n < REGISTER_FAST_TRIES ? REGISTER_RETRY_FAST_MS : REGISTER_RETRY_MS);
+            AudioManager am = sAm;
+            try {
+                if (!sPlaybackWatched) {
+                    am.registerAudioPlaybackCallback(new AudioManager.AudioPlaybackCallback() {
+                        @Override
+                        public void onPlaybackConfigChanged(List<AudioPlaybackConfiguration> configs) {
+                            onPlayback(configs);
+                        }
+                    }, sStateHandler);
+                    sPlaybackWatched = true;
+                    onPlayback(am.getActivePlaybackConfigurations());
+                }
+                if (!sRecordingWatched) {
+                    am.registerAudioRecordingCallback(new AudioManager.AudioRecordingCallback() {
+                        @Override
+                        public void onRecordingConfigChanged(List<AudioRecordingConfiguration> configs) {
+                            onRecording(configs);
+                        }
+                    }, sStateHandler);
+                    sRecordingWatched = true;
+                    onRecording(am.getActiveRecordingConfigurations());
+                }
+                sAudioSignalsFailed = false;
+            } catch (Throwable t) {
+                sAudioSignalsFailed = true;
+                retry = true;
+                why = t;
+            }
+            if (!sScreenWatched) {
+                try {
+                    ctx.registerReceiver(new BroadcastReceiver() {
+                        @Override
+                        public void onReceive(Context c, Intent i) {
+                            sHandler.post(SCREEN_OFF);
+                        }
+                    }, new IntentFilter(Intent.ACTION_SCREEN_OFF), null, sStateHandler, Context.RECEIVER_NOT_EXPORTED);
+                    sScreenWatched = true;
+                } catch (Throwable t) {
+                    retry = true;
+                    why = t;
+                }
+            }
+            if (!sTelWatched) {
+                try {
+                    if (!registerTelephony(ctx)) { // not there yet: no CS call possible meanwhile
+                        retry = true;
+                        if (why == null) why = new IllegalStateException("no telephony service yet");
+                    }
+                } catch (Throwable t) {
+                    sTelFailed = true;
+                    retry = true;
+                    why = t;
+                }
+            }
+        } catch (Throwable t) {
+            // AudioService not published yet (early boot)
+            retry = true;
+            why = t;
         }
+        updateUnknown();
+        if (!retry) {
+            if (sStateRegisterTries > 0) Slog.i(TAG, "call state watched (after " + sStateRegisterTries + " retries)");
+            sStateRegisterTries = 0;
+            return;
+        }
+        int n = ++sStateRegisterTries;
+        if (n == 1 || n == REGISTER_FAST_TRIES || (n > REGISTER_FAST_TRIES && n % 20 == 0)) {
+            Slog.w(TAG, "cannot watch the audio mode / call state yet (attempt " + n + "), retrying every "
+                    + (n < REGISTER_FAST_TRIES ? "1 s" : "15 s") + ": " + why);
+        }
+        sStateHandler.postDelayed(REGISTER_STATE, n < REGISTER_FAST_TRIES ? REGISTER_RETRY_FAST_MS : REGISTER_RETRY_MS);
+    }
+
+    /**
+     * State thread. No telephony service (boot before the phone process, or none at all): no CS call is possible,
+     * retried until it appears. Then one TelephonyCallback per active subscription (as SoundTrigger's own
+     * PhoneCallStateHandler does), kept in step with subscription changes. Returns false while the telephony
+     * services are not published (retry later); throws if registering fails (counted as a call until it works).
+     */
+    private static boolean registerTelephony(Context ctx) {
+        if (ServiceManager.checkService("isub") == null || ServiceManager.checkService("phone") == null) {
+            sTelFailed = false;
+            return false;
+        }
+        SubscriptionManager subs = ctx.getSystemService(SubscriptionManager.class);
+        TelephonyManager tel = ctx.getSystemService(TelephonyManager.class);
+        if (subs == null || tel == null) {
+            sTelFailed = false;
+            sTelWatched = true; // no telephony on this build
+            return true;
+        }
+        sSubs = subs;
+        sTel = tel;
+        subs.addOnSubscriptionsChangedListener(STATE_EXECUTOR, new SubscriptionManager.OnSubscriptionsChangedListener() {
+            @Override
+            public void onSubscriptionsChanged() {
+                syncSubscriptions();
+            }
+        });
+        sTelWatched = true;
+        syncSubscriptions();
+        return true;
+    }
+
+    /** State thread: one SubCall per active subscription. */
+    private static void syncSubscriptions() {
+        try {
+            List<SubscriptionInfo> list = sSubs.getActiveSubscriptionInfoList();
+            HashSet<Integer> ids = new HashSet<>();
+            if (list != null) {
+                for (SubscriptionInfo si : list) {
+                    if (si != null) ids.add(si.getSubscriptionId());
+                }
+            }
+            for (Iterator<SubCall> it = sSubCalls.values().iterator(); it.hasNext(); ) {
+                SubCall c = it.next();
+                if (!ids.contains(c.subId)) {
+                    it.remove();
+                    try {
+                        c.tm.unregisterTelephonyCallback(c);
+                    } catch (Throwable t) {
+                        // gone anyway
+                    }
+                }
+            }
+            for (Integer id : ids) {
+                if (sSubCalls.containsKey(id)) continue;
+                TelephonyManager tm = sTel.createForSubscriptionId(id);
+                SubCall c = new SubCall(id, tm);
+                sSubCalls.put(id, c); // unknown until its first state arrives (registration delivers it at once)
+                tm.registerTelephonyCallback(STATE_EXECUTOR, c);
+            }
+            sTelFailed = false;
+        } catch (Throwable t) {
+            sTelFailed = true;
+            Slog.w(TAG, "cannot follow the telephony call state, counting it as a call until it works: " + t);
+            sStateHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    syncSubscriptions();
+                }
+            }, REGISTER_RETRY_MS);
+        }
+        updateTelephony();
+    }
+
+    /** State thread. */
+    private static void updateTelephony() {
+        boolean busy = false;
+        for (SubCall c : sSubCalls.values()) {
+            if (c.state != TelephonyManager.CALL_STATE_IDLE && c.state != CALL_STATE_UNKNOWN) busy = true;
+        }
+        setSignal(0, busy);
+    }
+
+    /** State thread: voice / ringtone playback (a call or VoIP that may not set a call mode), and the retry trigger. */
+    private static void onPlayback(List<AudioPlaybackConfiguration> configs) {
+        boolean active = false;
+        boolean voice = false;
+        if (configs != null) {
+            for (AudioPlaybackConfiguration c : configs) {
+                if (c == null || !c.isActive()) continue;
+                active = true;
+                int u;
+                try {
+                    u = c.getAudioAttributes().getUsage();
+                } catch (Throwable t) {
+                    u = -1;
+                }
+                if (u == AudioAttributes.USAGE_VOICE_COMMUNICATION
+                        || u == AudioAttributes.USAGE_VOICE_COMMUNICATION_SIGNALLING
+                        || u == AudioAttributes.USAGE_NOTIFICATION_RINGTONE) {
+                    voice = true;
+                }
+            }
+        }
+        setSignal(1, voice);
+        if (active != sAudioActive) {
+            sAudioActive = active;
+            sHandler.post(active ? AUDIO_STARTED : AUDIO_STOPPED);
+        }
+    }
+
+    /** State thread. */
+    private static void onRecording(List<AudioRecordingConfiguration> configs) {
+        boolean voice = false;
+        if (configs != null) {
+            for (AudioRecordingConfiguration c : configs) {
+                if (c == null) continue;
+                int src = c.getClientAudioSource();
+                if (src == MediaRecorder.AudioSource.VOICE_COMMUNICATION || src == MediaRecorder.AudioSource.VOICE_CALL
+                        || src == MediaRecorder.AudioSource.VOICE_UPLINK
+                        || src == MediaRecorder.AudioSource.VOICE_DOWNLINK) {
+                    voice = true;
+                }
+            }
+        }
+        setSignal(2, voice);
+    }
+
+    /** State thread: publish one signal; tell the decision thread when "a call by signals" changed. */
+    private static void setSignal(int which, boolean on) {
+        boolean before = callBySignals();
+        if (which == 0) sTelBusy = on;
+        else if (which == 1) sVoicePlayback = on;
+        else sVoiceRecording = on;
+        updateUnknown();
+        if (callBySignals() != before) sHandler.post(SIGNALS);
+    }
+
+    /** State thread. */
+    private static void updateUnknown() {
+        boolean before = callBySignals();
+        boolean unknown = sTelFailed || sAudioSignalsFailed || (sAm != null && (!sPlaybackWatched || !sRecordingWatched));
+        for (SubCall c : sSubCalls.values()) {
+            if (c.state == CALL_STATE_UNKNOWN) unknown = true;
+        }
+        if (unknown && !sSignalsUnknown) sSignalsUnknownSince = SystemClock.uptimeMillis();
+        sSignalsUnknown = unknown;
+        if (callBySignals() != before) sHandler.post(SIGNALS);
     }
 
     /** The listener reported a call mode, so its NORMAL event will post RESYNC. */
@@ -495,8 +789,26 @@ public final class K4StRetry {
             sMode = mode;
             owed = !sOwed.isEmpty() || !sHung.isEmpty();
         }
-        if (mode != AudioManager.MODE_NORMAL) {
+        if (mode != AudioManager.MODE_NORMAL || signalWillReport()) {
             sHandler.removeCallbacks(RESYNC);
+        } else if (owed) {
+            sHandler.removeCallbacks(RESYNC);
+            sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+            hold(CALL_END_DELAY_MS + 1000);
+        }
+    }
+
+    /** Handler thread: a telephony / voice-audio signal started or ended. */
+    private static void onCallSignals() {
+        boolean owed;
+        synchronized (sLock) {
+            owed = !sOwed.isEmpty() || !sHung.isEmpty();
+        }
+        if (listenerSaysCall() || callBySignals()) {
+            sHandler.removeCallbacks(RESYNC);
+            if (owed && !signalWillReport() && !listenerSaysCall()) {
+                sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS); // only an unknown signal: poll
+            }
         } else if (owed) {
             sHandler.removeCallbacks(RESYNC);
             sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
@@ -523,11 +835,12 @@ public final class K4StRetry {
         }
         List<SoundTriggerHalEnforcer> owed;
         List<Hung> hung;
+        boolean free = noCall(mode);
         synchronized (sLock) {
-            if (mode != AudioManager.MODE_NORMAL) {
-                // in a call the listener has not reported (yet: it lags setMode, or is not registered): its NORMAL
-                // event posts this again; poll meanwhile in case it never reports a change
-                if (!listenerSaysCall()) sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
+            if (!free) {
+                // still a call. The listener / a known signal reports its end and posts this again; otherwise (only the
+                // live mode lagging the listener, or an unknown signal) poll
+                if (!listenerSaysCall() && !signalWillReport()) sHandler.postDelayed(RESYNC, CALL_END_DELAY_MS);
                 return;
             }
             owed = new ArrayList<>(sOwed.keySet());
@@ -563,53 +876,24 @@ public final class K4StRetry {
         }
     }
 
-    /** Handler thread. */
-    private static void registerRetryListeners() {
-        try {
-            if (ServiceManager.checkService(Context.AUDIO_SERVICE) == null) throw new IllegalStateException("no audio service");
-            Context ctx = ActivityThread.currentActivityThread().getSystemContext();
-            if (!sAudioWatched) {
-                AudioManager am = ctx.getSystemService(AudioManager.class);
-                sAudioActive = anyActive(am.getActivePlaybackConfigurations());
-                am.registerAudioPlaybackCallback(new AudioManager.AudioPlaybackCallback() {
-                    @Override
-                    public void onPlaybackConfigChanged(List<AudioPlaybackConfiguration> configs) {
-                        boolean active = anyActive(configs);
-                        if (active == sAudioActive) return;
-                        sAudioActive = active;
-                        if (active) {
-                            if ("audio stopped".equals(sReason)) sHandler.removeCallbacks(FIRE);
-                        } else {
-                            schedule(AUDIO_IDLE_DELAY_MS, "audio stopped");
-                        }
-                    }
-                }, sHandler);
-                sAudioWatched = true;
-            }
-            if (!sScreenWatched) {
-                ctx.registerReceiver(new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context c, Intent i) {
-                        schedule(SCREEN_OFF_DELAY_MS, "screen off");
-                    }
-                }, new IntentFilter(Intent.ACTION_SCREEN_OFF), null, sHandler, Context.RECEIVER_NOT_EXPORTED);
-                sScreenWatched = true;
-            }
-            Slog.i(TAG, "watching playback and screen-off for refused sound models (audio active " + sAudioActive + ")");
-        } catch (Throwable t) {
-            // AudioService / ActivityManager not reachable yet (refusal during boot): try again later
-            Slog.e(TAG, "cannot watch playback / screen state, retrying in 30 s", t);
-            sHandler.postDelayed(REGISTER_RETRY, 30000);
+    private static final Runnable AUDIO_STARTED = new Runnable() {
+        @Override
+        public void run() {
+            if ("audio stopped".equals(sReason)) sHandler.removeCallbacks(FIRE);
         }
-    }
-
-    private static boolean anyActive(List<AudioPlaybackConfiguration> configs) {
-        if (configs == null) return false;
-        for (AudioPlaybackConfiguration c : configs) {
-            if (c != null && c.isActive()) return true;
+    };
+    private static final Runnable AUDIO_STOPPED = new Runnable() {
+        @Override
+        public void run() {
+            schedule(AUDIO_IDLE_DELAY_MS, "audio stopped");
         }
-        return false;
-    }
+    };
+    private static final Runnable SCREEN_OFF = new Runnable() {
+        @Override
+        public void run() {
+            schedule(SCREEN_OFF_DELAY_MS, "screen off");
+        }
+    };
 
     /** Handler thread. */
     private static void schedule(long delayMs, String reason) {
@@ -623,12 +907,24 @@ public final class K4StRetry {
     }
 
     /**
-     * Handler thread: a partial wakelock for ms (timeout, never released by hand), so a retry / reboot posted a few
-     * seconds ahead runs on time and not at the next wakeup (screen-off retry, 3 s grace, after-call resync).
+     * A partial wakelock for ms (timeout, never released by hand), so a retry / reboot posted a few seconds ahead runs
+     * on time and not at the next wakeup (screen-off retry, 3 s grace, after-call resync). Any thread: PowerManager
+     * (its own lock, a binder call the first time) is only called on the state thread.
      */
-    private static void hold(long ms) {
-        long until = SystemClock.uptimeMillis() + ms;
-        if (until <= sWakeUntil) return;
+    private static void hold(final long ms) {
+        final long until = SystemClock.uptimeMillis() + ms;
+        sStateHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                acquire(until);
+            }
+        });
+    }
+
+    /** State thread. */
+    private static void acquire(long until) {
+        long ms = until - SystemClock.uptimeMillis();
+        if (until <= sWakeUntil || ms <= 0) return;
         try {
             if (sWakeLock == null) {
                 PowerManager pm = ActivityThread.currentActivityThread().getSystemContext()

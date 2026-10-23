@@ -14,7 +14,7 @@ for c in ("HalException", "RecoverableException", "ISoundTriggerHal$GlobalCallba
 s = open(hits[0]).read()
 # every check before the first write: the helper set must be complete
 helpers = sorted(glob.glob(patch + "/K4StRetry*.smali"))
-assert len(helpers) == 14, "K4StRetry smali files: %d (expected 14, rerun src/build.sh)" % len(helpers)
+assert len(helpers) == 23, "K4StRetry smali files: %d (expected 23, rerun src/build.sh)" % len(helpers)
 P = "Lcom/android/server/soundtrigger_middleware/"
 K = "Lcom/k4/soundtrigger/K4StRetry;"
 CATCH = "    :catch_0\n    move-exception p1\n\n"

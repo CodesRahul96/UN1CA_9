@@ -1,11 +1,11 @@
 .class Lcom/k4/soundtrigger/K4StRetry$11;
-.super Landroid/content/BroadcastReceiver;
+.super Landroid/media/AudioManager$AudioPlaybackCallback;
 .source "K4StRetry.java"
 
 
 # annotations
 .annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->registerRetryListeners()V
+    value = Lcom/k4/soundtrigger/K4StRetry;->registerState()V
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -18,24 +18,28 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 590
-    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
+    .line 560
+    invoke-direct {p0}, Landroid/media/AudioManager$AudioPlaybackCallback;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
-    .registers 4
+.method public onPlaybackConfigChanged(Ljava/util/List;)V
+    .registers 2
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Ljava/util/List<",
+            "Landroid/media/AudioPlaybackConfiguration;",
+            ">;)V"
+        }
+    .end annotation
 
-    .line 593
-    const-wide/16 p1, 0x7d0
+    .line 563
+    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonPlayback(Ljava/util/List;)V
 
-    const-string v0, "screen off"
-
-    invoke-static {p1, p2, v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
-
-    .line 594
+    .line 564
     return-void
 .end method
