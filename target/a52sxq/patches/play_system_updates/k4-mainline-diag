@@ -87,14 +87,16 @@ END { flush() }' "$T/sessions.txt" > "$T/sessions.tsv"
 # Decide on the newest batch of staged parents: Play commits tzdata/statsd/adservices/the main train within a minute or
 # two and one reboot activates them all; one failed APEX fails the whole batch, so the most specific error message of
 # the batch is the reason. Retries after a failed boot come minutes later, hence the 3 minute window.
-awk -F '\t' '
+# (awk text shared with the -v session list: how specific a session error is; generic follow-up errors rank low)
+RANK_AWK='
 function rank(m) {
     if (m == "") return 0
     if (m ~ /Another apex session failed/) return 1
     if (m ~ /^APEX activation failed\.$/ || m ~ /^Reverting back to safe state/) return 2
     if (m ~ /Found both applied and failed apex sessions/) return 3
     return 4
-}
+}'
+awk -F '\t' "$RANK_AWK"'
 $4 == "true" && $1 == "C" { kids[$3] = kids[$3] " " $11 }
 $4 == "true" && $1 == "P" && $3 == "-1" && $9 != "true" {
     n++; id[n] = $2; t[n] = $5 + 0; ap[n] = $6; fa[n] = $7; re[n] = $8; pk[n] = $11; msg[n] = $12
@@ -212,20 +214,58 @@ echo "$LINE"
 echo "$LINE" > "$T/verdict.txt"
 [ "$VERBOSE" = 1 ] || exit 0
 
+# batches <N>: staged parent sessions grouped by reboot batch like the verdict (a batch = the sessions committed within
+# 3 minutes before its newest one), the newest N batches (0 = all), oldest first. Every row of a batch with a failure
+# also shows the batch's most specific error, since the others only say "APEX activation failed." (10-10: the mtime
+# denial was on a 1-module session, the 25-module train next to it had no reason of its own).
+batches() {
+    awk -F '\t' '$4 == "true" && $1 == "C" { kids[$3] = kids[$3] " " $11 }
+        $4 == "true" && $1 == "P" && $3 == "-1" { n++; l[n] = $5 "\t" $2 "\t" ($6 == "true" ? "applied" : $7 == "true" ? "FAILED" : $8 == "true" ? "ready" : "staged") "\t" $11 "\t" $12 }
+        END { for (i = 1; i <= n; i++) { split(l[i], f, "\t"); print f[1] "\t" f[2] "\t" f[3] "\t" (kids[f[2]] != "" ? kids[f[2]] : f[4]) "\t" f[5] } }' \
+        "$T/sessions.tsv" | sort -rn | awk -F '\t' -v nb="$1" "$RANK_AWK"'
+    {   n++; t[n] = $1 + 0; id[n] = $2; st[n] = $3; pk[n] = $4; em[n] = $5
+        if (n == 1 || t[n] < anchor - 180000) { b++; anchor = t[n]; first[b] = n; br[b] = -1 }
+        last[b] = n; cnt[b]++
+        if (st[n] == "FAILED") { nf[b]++; r = rank(em[n]); if (r > br[b]) { br[b] = r; best[b] = em[n]; bid[b] = id[n] } }
+        else if (st[n] == "applied") na[b]++
+        else np[b]++
+    }
+    END {
+        show = (nb > 0 && b > nb) ? nb : b
+        if (b > show) { o = 0; for (k = show + 1; k <= b; k++) o += cnt[k]
+            print "X\t0\t  (" (b - show) " older batches with " o " sessions not shown; -s saves all of them)" }
+        for (k = show; k >= 1; k--) {
+            s = nf[k] ? "FAILED" : np[k] ? "pending" : "applied"
+            h = ", " cnt[k] " session" (cnt[k] > 1 ? "s" : "") ": " s
+            if (nf[k] && na[k]) h = h " (" nf[k] " failed, " na[k] " applied)"
+            if (nf[k]) h = h ", reason " (best[k] == "" ? "unknown (no session has an error message)" : "(#" bid[k] "): " best[k])
+            print "H\t" t[first[k]] "\t" h
+            for (i = last[k]; i >= first[k]; i--) {
+                p = pk[i]; gsub(/com\.google\.android\./, "", p); sub(/^ +/, "", p)
+                print "R\t" t[i] "\t  #" id[i] "  " st[i] "  [" split(p, w, " ") "] " substr(p, 1, 90)
+                if (em[i] != "") print "X\t0\t      " em[i]
+                if (nf[k] && best[k] != "" && em[i] != best[k])
+                    print "X\t0\t      " (st[i] == "applied" ? "applied, but its batch failed" : "batch reason") " (#" bid[k] "): " best[k]
+            }
+        }
+    }' | while IFS="$(printf '\t')" read -r kind ms rest; do
+        case "$kind" in
+            H) echo "  -- batch $(ms2date "$ms")$rest" ;;
+            R) echo "  $(ms2date "$ms")$rest" ;;
+            *) echo "$rest" ;;
+        esac
+    done
+}
+
 # --- details -------------------------------------------------------------------------------------------------------
 {
 echo
 echo "== build: $(getprop ro.build.display.id) | kernel $(uname -r) | uid $(id -u)"
 echo "== apexd.status=$(getprop apexd.status) bpf.progs_loaded=$(getprop bpf.progs_loaded) boot reasons: $(getprop persist.sys.boot.reason.history | tr '\n' ' ' | cut -c 1-160)"
 echo
-echo "== staged update sessions (newest last): committed | state | packages | error"
-awk -F '\t' '$4 == "true" && $1 == "C" { kids[$3] = kids[$3] " " $11 }
-    $4 == "true" && $1 == "P" && $3 == "-1" { n++; l[n] = $5 "\t" $2 "\t" ($6 == "true" ? "applied" : $7 == "true" ? "FAILED" : $8 == "true" ? "ready" : "staged") "\t" $11 "\t" $12 }
-    END { for (i = 1; i <= n; i++) { split(l[i], f, "\t"); print f[1] "\t" f[2] "\t" f[3] "\t" (kids[f[2]] != "" ? kids[f[2]] : f[4]) "\t" f[5] } }' \
-    "$T/sessions.tsv" | sort -n | tail -n 12 | while IFS="$(printf '\t')" read -r ms sid state pk em; do
-        echo "  $(ms2date "$ms")  #$sid  $state  [$(echo $pk | wc -w)] $(echo $pk | sed 's/com\.google\.android\.//g' | cut -c 1-90)"
-        [ -n "$em" ] && echo "      $em"
-    done
+echo "== staged update sessions by batch (newest last): committed | session | state | packages"
+echo "   one reboot activates a whole batch and one failed module fails all of it: the reason is the batch's most specific error"
+batches 5
 echo
 echo "== Tethering BPF"
 echo "  active Tethering $TETH_VER, netd.o sha256 $LIVE_SHA ${LIVE_KNOWN:+($LIVE_KNOWN)}"
@@ -266,6 +306,7 @@ logcat -d -b all 2> /dev/null | grep -E "apexd|StagingManager|PackageInstallerSe
 
 if [ "$SAVE" = 1 ]; then
     pm list packages --apex-only --show-versioncode > "$T/apex_versions.txt" 2>&1
+    batches 0 > "$T/sessions_by_batch.txt" 2>&1
     dumpsys rollback > "$T/rollback.txt" 2>&1
     getprop > "$T/getprop.txt" 2>&1
     logcat -d -b all > "$T/logcat.txt" 2>&1
