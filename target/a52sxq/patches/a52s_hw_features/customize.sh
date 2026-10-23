@@ -68,16 +68,10 @@ if f:
         s = s[:start] + UNSUPPORTED + s[end:]
         open(f, "w").write(s)
 
-# SecSettings > Connected devices > Samsung DeX (and "Samsung DeX" in the top-level Connected devices summary): on a
-# phone ExternalDisplayUtils.isWirelessDexOnlyDevice() is true whenever /sys/class/dp_sec/dex is missing, i.e. it
-# treats every non-DisplayPort phone as a Wireless DeX device. The A52s has no DeX at all (stock didn't offer it,
-# desktop windowing is off and the DeX tile is hidden below); with false the callers fall back to the dp_sec check -> hidden
-f = glob.glob(A + "/**/SecSettings.apk/smali*/com/samsung/android/settings/desktop/ExternalDisplayUtils.smali", recursive=True)
-assert len(f) == 1, "ExternalDisplayUtils"; f = f[0]
-s = open(f).read()
-start, end = method_span(s, ".method public static isWirelessDexOnlyDevice(Landroid/content/Context;)Z")
-s = s[:start] + ".method public static isWirelessDexOnlyDevice(Landroid/content/Context;)Z\n    .locals 0\n\n    const/4 p0, 0x0\n\n    return p0\n" + s[end:]
-open(f, "w").write(s)
+# Samsung DeX (Settings > Connected devices > Samsung DeX, the launcher's QS tile, the default tile list) is owned by
+# the wireless_dex patch: wireless DeX to a TV/monitor is supported, wired DeX is not (no DP alt mode). Do not touch
+# ExternalDisplayUtils.isWirelessDexOnlyDevice(), TileFeatureChecker's DesktopModeTile branch or the DesktopMode
+# default tile here; wireless_dex asserts their stock state.
 
 # SecSettings > Wi-Fi > Labs (developer) > Wi-Fi 7 mode / MLO: SemWifiUtils.isSupportedWifi7() only checks the country
 # code, not the chip; the A52s has no 802.11be (stock had no such option) -> UNSUPPORTED_ON_DEVICE (3)
@@ -90,41 +84,18 @@ if f:
     s = s[:start] + UNSUPPORTED + s[end:]
     open(f, "w").write(s)
 
-# SystemUI: Wireless DeX tile is offered unconditionally when the launcher exports DesktopModeTile.
-# Match the spec comparison generically (registers/labels are build specific) and return false right after it.
-f = glob.glob(A + "/**/SystemUI.apk/smali*/com/android/systemui/qs/TileFeatureChecker.smali", recursive=True)
-assert len(f) == 1, "TileFeatureChecker"; f = f[0]
-s = open(f).read()
-pat = re.compile(r'( +)const-string (\w+), "com\.sec\.android\.app\.launcher/com\.honeyspace\.dexservice\.DesktopModeTile"\n\n'
-                 r' +invoke-virtual \{\2, \w+\}, Ljava/lang/Object;->equals\(Ljava/lang/Object;\)Z\n\n'
-                 r' +move-result (\w+)\n\n'
-                 r' +if-eqz \3, :\w+\n\n')
-hits = list(pat.finditer(s))
-assert len(hits) == 1, "DesktopModeTile branch: %d" % len(hits)
-m = hits[0]
-mstart = s.rindex("\n.method ", 0, m.start())
-assert s[mstart:s.index("\n", mstart + 1)].endswith(")Z"), "DesktopModeTile check is not in a boolean method"
-ind, reg = m.group(1), m.group(3)
-ret = "%sconst/4 %s, 0x0\n\n%sreturn %s\n" % (ind, reg, ind, reg)
-rest = s[m.end():]
-g = re.match(r" +goto(?:/16|/32)? :\w+\n", rest)
-if g:  # the match branch only jumps to the shared "return true" tail
-    s = s[:m.end()] + ret + rest[g.end():]
-else:  # anything else (inline checks): return false before it, the old code stays unreachable
-    s = s[:m.end()] + ret + "\n" + rest
-open(f, "w").write(s)
-
-# Default tile list (new setups): drop DeX and Auracast
+# Default tile list (new setups): drop Auracast (LE Audio broadcast is disabled above)
 f = glob.glob(A + "/**/SystemUI.apk/res/values/strings.xml", recursive=True)
 assert len(f) == 1, "SystemUI strings"; f = f[0]
 s = open(f).read()
 key = '<string name="sec_quick_settings_tiles_default">'
+assert s.count(key) == 1, "sec_quick_settings_tiles_default: %d" % s.count(key)
 i = s.index(key) + len(key); j = s.index("</string>", i)
-tiles = [t for t in s[i:j].split(",") if t not in ("DesktopMode", "Auracast")]
+tiles = [t for t in s[i:j].split(",") if t != "Auracast"]
 s = s[:i] + ",".join(tiles) + s[j:]
 open(f, "w").write(s)
 PYEOF
-LOG "- Hid Wireless DeX tile and Settings entry, Adaptive color tone, Continue apps on cover screen, Wi-Fi 7 labs, LE Audio/Auracast and the source AICore SoC configs"
+LOG "- Hid Adaptive color tone, Continue apps on cover screen, Wi-Fi 7 labs, LE Audio/Auracast and the source AICore SoC configs"
 
 # android.hardware.security.model.compatible ("supports the Android security model", CDD): the stock A52s declares it in
 # /system/etc/permissions/handheld_core_hardware.xml, the S26 Ultra in its own vendor copy of that file. This port has

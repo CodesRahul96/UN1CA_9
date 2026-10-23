@@ -12,7 +12,9 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.provider.Settings;
@@ -24,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * K4_UN1CA: Device Care sleeping-app Add lists.
@@ -34,6 +38,11 @@ import java.util.List;
  * Deep sleeping Add lists; when the user adds it, it is first taken off the allowlist (what App info > Battery >
  * Optimized does), given its FAS row (same provider insert SDHMS does on install) and only restricted once MARs tracks it
  * and, for deep sleep, MARs' own protection check (canRestrictWithReason) has no objection.
+ *
+ * ed.z.c() is called on Device Care's UI thread (Add/Done of the sleeping-app lists, the app battery switch) as well
+ * as from binder/executor threads (ExternalBatteryProvider). Taking an app off the allowlist and waiting for MARs can
+ * take seconds, so on the UI thread a list that holds an allowlisted app is prepared on a background thread and the
+ * stock body then runs on the UI thread with the prepared list (see enter()).
  */
 public final class K4RestrictList {
     private static final String TAG = "K4RestrictList";
@@ -44,7 +53,73 @@ public final class K4RestrictList {
     private static final String[] ROLES = {"android.app.role.DIALER", "android.app.role.SMS", "android.app.role.HOME",
             "android.app.role.ASSISTANT", "android.app.role.WALLET", "android.app.role.SYSTEM_GALLERY"};
 
+    /** Main thread only: set while the stock body runs for a list that enter() already prepared. */
+    private static boolean sReplay;
+    private static ExecutorService sWorker;
+
     private K4RestrictList() {}
+
+    /**
+     * Hook at the top of ed.z.c(Context, List, type, on, reason). Returns the list the stock body should restrict, or
+     * null when the call was handed to the background thread (the stock body must return at once; it is re-entered on
+     * the main thread with the prepared list when the preparation is done).
+     */
+    public static List enter(final ed.z z, final Context c, final List list, final int type, final boolean on,
+            final String reason) {
+        if (!on || (type != 0 && type != 1) || c == null || list == null || list.isEmpty()) return list;
+        Looper main = Looper.getMainLooper();
+        if (Looper.myLooper() != main) return prepare(c, list, type, on);
+        if (sReplay) return list;
+        if (!hasAllowlisted(list)) return list;
+        final Handler ui = new Handler(main);
+        final List copy = new ArrayList(list);  // the caller may reuse its list once c() returns
+        try {
+            worker().execute(new Runnable() {
+                @Override
+                public void run() {
+                    List prepared = copy;
+                    try {
+                        prepared = prepare(c, copy, type, on);
+                    } catch (Throwable t) {
+                        Log.w(TAG, "prepare", t);
+                    }
+                    final List out = prepared;
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            sReplay = true;
+                            try {
+                                z.c(c, out, type, on, reason);
+                            } catch (Throwable t) {
+                                Log.w(TAG, "restrict", t);
+                            } finally {
+                                sReplay = false;
+                            }
+                        }
+                    });
+                }
+            });
+        } catch (Throwable t) {
+            Log.w(TAG, "background prepare, restricting without it", t);  // never block the UI thread
+            return list;
+        }
+        Log.i(TAG, "preparing " + copy.size() + " app(s) for type " + type + " in the background");
+        return null;
+    }
+
+    private static synchronized ExecutorService worker() {
+        if (sWorker == null) sWorker = Executors.newSingleThreadExecutor();
+        return sWorker;
+    }
+
+    /** Cheap UI-thread gate (one binder call): does the list hold an app on the USER doze allowlist? */
+    private static boolean hasAllowlisted(List list) {
+        String[] user = (String[]) call(deviceIdle(), "getUserPowerWhitelist");
+        if (user == null || user.length == 0) return false;
+        HashSet<String> set = new HashSet<>(Arrays.asList(user));
+        for (Object o : list) if (o instanceof kc.d && set.contains(((kc.d) o).a)) return true;
+        return false;
+    }
 
     /** Add-list filter (jc.e.c(II)). type 0 = deep sleep, 1 = sleep, 3 = never auto sleep. */
     public static boolean canList(SemAppRestrictionManager m, int type, String pkg, int uid) {
@@ -87,8 +162,9 @@ public final class K4RestrictList {
     }
 
     /**
-     * Entry of ed.z.c(Context, List, type, on, reason): makes allowlisted candidates that are being put to sleep / deep
-     * sleep manageable by MARs before the stock code restricts the list. Returns the list the stock code should use.
+     * Makes allowlisted candidates that are being put to sleep / deep sleep manageable by MARs before the stock code
+     * restricts the list (blocks up to WAIT_MS: never call it on the UI thread). Returns the list the stock code should
+     * use: candidates MARs vetoed or did not pick up in time are dropped from it and put back on the allowlist.
      */
     public static List prepare(Context c, List list, int type, boolean on) {
         if (!on || (type != 0 && type != 1) || c == null || list == null || list.isEmpty()) return list;
@@ -128,7 +204,8 @@ public final class K4RestrictList {
             for (kc.d e : pending) {
                 while (!isTracked(m, e.a, e.c) && SystemClock.uptimeMillis() < end) SystemClock.sleep(100);
                 if (!isTracked(m, e.a, e.c)) {
-                    Log.w(TAG, e.a + " not managed by MARs after " + WAIT_MS + " ms, left battery-optimized");
+                    Log.w(TAG, e.a + " not managed by MARs after " + WAIT_MS + " ms, restoring allowlist");
+                    call(deviceIdle(), "addPowerSaveWhitelistApp", e.a);
                     drop.add(e);
                     continue;
                 }
