@@ -74,8 +74,10 @@ TETH_SRC="$FW_DIR/$SOURCE_FIRMWARE_PATH/system/system/apex/com.google.android.te
 (cd "$SRC_DIR/target/a52sxq/patches/tethering" && sha256sum --quiet --strict -c SHA256SUMS) || \
     ABORT "tethering: netbpfload_a52*, lib*B.so, netd_a52*.o or the re-signed APEX differ from SHA256SUMS - rerun regen.py"
 unset TETH_SRC
-EVAL "cp -a \"$SRC_DIR/target/a52sxq/patches/tethering/netbpfload_a52\" \"$WORK_DIR/system/system/bin/netbpfload_a52\""
-SET_METADATA "system" "system/bin/netbpfload_a52" 0 2000 755 "u:object_r:bpfloader_exec:s0"
+# netbpfload_a52 (the patched loader, linked against the system libbase/libc++ and libbpf.so) stays in the patch dir
+# and in SHA256SUMS, because regen.py derives netbpfload_a52b from it, but it is not installed: nothing runs it (the
+# rc below starts netbpfload_a52b) and a second binary labelled bpfloader_exec (root, SYS_ADMIN, writes every BPF
+# pin) has no business in the image. Run it by hand from the patch dir for diagnostics if needed.
 # netbpfload_a52b: same binary, but linked against the APEX's own libbase/libc++/libbpf shipped under renamed
 # sonames (libbasB/libcBB/libbpB), in case the system libbase/libc++ is what made netbpfload_a52 abort at exec.
 for f in bin/netbpfload_a52b lib64/libbasB.so lib64/libcBB.so lib64/libbpB.so; do
@@ -85,7 +87,9 @@ SET_METADATA "system" "system/bin/netbpfload_a52b" 0 2000 755 "u:object_r:bpfloa
 SET_METADATA "system" "system/lib64/libbasB.so" 0 0 644 "u:object_r:system_lib_file:s0"
 SET_METADATA "system" "system/lib64/libcBB.so" 0 0 644 "u:object_r:system_lib_file:s0"
 SET_METADATA "system" "system/lib64/libbpB.so" 0 0 644 "u:object_r:system_lib_file:s0"
-# netbpfload links libbpf.so, which only the APEX ships (its libbase/libc++/libz needs resolve against /system)
+# The APEX's libbpf.so (its libbase/libc++/libz needs resolve against /system), installed for netbpfload_a52 when
+# that ran. It replaces the S26U's own /system/lib64/libbpf.so (also linked by the unused stock bin/bpfloader and by
+# lib64/liblibbpf_rs.dylib.so); left as shipped so far - review whether the stock copy can stay.
 EVAL "cp -a \"$SRC_DIR/target/a52sxq/patches/tethering/libbpf.so\" \"$WORK_DIR/system/system/lib64/libbpf.so\""
 SET_METADATA "system" "system/lib64/libbpf.so" 0 0 644 "u:object_r:system_lib_file:s0"
 if $TETH_RESIGN; then
@@ -102,7 +106,7 @@ EVAL "cp -a \"$SRC_DIR/target/a52sxq/patches/tethering/$NETD_O\" \"$WORK_DIR/sys
 SET_METADATA "system" "system/etc/bpf/a52_netd.o" 0 0 644 "u:object_r:system_file:s0"
 unset NETD_O
 
-LOG "- Pointing bpfloader/mdnsd_netbpfload at /system/bin/netbpfload_a52"
+LOG "- Pointing bpfloader/mdnsd_netbpfload at /system/bin/netbpfload_a52b"
 # netbpfload parses the first line ("# YYYY Q A B C # ...") of this file in a static initializer and abort()s
 # without it: keep the stock header.
 NB_RC="$WORK_DIR/system/system/etc/init/netbpfload.rc"

@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <linux/dma-buf.h>
 #include <sys/system_properties.h>
 #include <android/binder_ibinder.h>
@@ -42,6 +43,7 @@ int k4n_verbose;
 // misbehaves): a build thread does it and a call waits for it at most this long, then takes the classic pipe.
 #define K4N_BUILD_WAIT_MS 8000.0
 #define K4N_BUILD_STUCK_MS 10000.0  // a build running longer than this counts as "not usable" in TX_K4_STATUS
+#define K4N_SLOT_WAIT_MS 500.0     // setBuffer: how long a slot replacement waits for the pipe to go idle
 #define K4N_FLUSH_WAIT_MS 3000.0    // flush/reset: how long the pipe may take to go idle before it is failed
 #define RENDER "com.k4.neural.IRender"
 #define TYPE_FRC 3
@@ -86,6 +88,28 @@ static int cv_wait_until(pthread_cond_t* cv, pthread_mutex_t* mu, double deadlin
     double ns = t.tv_nsec + (deadline_ms - now) * 1e6;
     t.tv_sec += (time_t) (ns / 1e9); t.tv_nsec = (long) (ns - (double) (time_t) (ns / 1e9) * 1e9);
     return pthread_cond_clockwait(cv, mu, CLOCK_MONOTONIC, &t);
+}
+
+// Size of the memory behind a client's fd, -1 when it cannot be told: memfd / regular file and dma-buf (st_size; lseek
+// SEEK_END for a dma-buf without one), ashmem (ASHMEM_GET_SIZE). A client claiming a larger size than its fd has would
+// make the first access past the end SIGBUS the daemon (and every client with it).
+#define K4N_ASHMEM_GET_SIZE _IO(0x77, 4)
+static long long fd_mem_size(int fd) {
+    struct stat st;
+    if (fstat(fd, &st) != 0) return -1;
+    if (S_ISCHR(st.st_mode)) { int r = ioctl(fd, K4N_ASHMEM_GET_SIZE, NULL); return r > 0 ? r : -1; }
+    if (st.st_size > 0) return st.st_size;
+    if (S_ISREG(st.st_mode)) return 0;
+    off_t e = lseek(fd, 0, SEEK_END);       // dma-buf (not a regular file: no client reads through its offset)
+    if (e < 0) return -1;
+    lseek(fd, 0, SEEK_SET); return e;
+}
+// 0 when fd has at least need bytes or its size cannot be told (logged), -1 when it is known to be smaller
+static int fd_size_ok(int fd, size_t need, const char* what) {
+    long long have = fd_mem_size(fd);
+    if (have < 0) { if (k4n_verbose > 1) K4N_LOG("%s: size of fd unknown, mapping %zu bytes unchecked", what, need); return 0; }
+    if ((unsigned long long) have >= need) return 0;
+    K4N_LOG("%s: fd has %lld bytes, %zu claimed", what, have, need); return -1;
 }
 
 // The network is only ever built on its own thread (engine_build_async). Binder calls wait for it with a deadline
@@ -630,16 +654,30 @@ static binder_status_t mpp_tx(AIBinder* b, transaction_code_t code, const AParce
         K4N_LOG("setBuffer: type %d, %d buffers", type, n);
         for (int i = 0; i < n; i++) {
             Buf nb; int id = -1, gs = 0, gh = 0;
-            if (read_buffer(in, &nb, &id, &gs, &gh) || id < 0 || id >= MAXBUF) { K4N_LOG("setBuffer: buffer %d rejected", i); return write_err(out, -22); }
+            if (read_buffer(in, &nb, &id, &gs, &gh)) { K4N_LOG("setBuffer: buffer %d rejected", i); return write_err(out, -22); }
+            if (id < 0 || id >= MAXBUF) { K4N_LOG("setBuffer: buffer %d rejected (id %d)", i, id); close(nb.fd); return write_err(out, -22); }
             nb.stride = gs ? gs : p->stride; nb.scan = gs ? gh : p->elev; nb.dmabuf = gs != 0;
             if ((gs && type == 0) || nb.stride < p->w || nb.scan < p->h || nb.size < (size_t) nb.stride * nb.scan + (size_t) nb.stride * (p->h / 2)) {
                 K4N_LOG("setBuffer: buffer %d rejected (id %d size %zu stride %d scanlines %d)", i, id, nb.size, nb.stride, nb.scan); close(nb.fd); return write_err(out, -22); }
+            if (fd_size_ok(nb.fd, nb.size, "setBuffer")) { close(nb.fd); return write_err(out, -22); }
             nb.p = mmap(NULL, nb.size, PROT_READ | PROT_WRITE, MAP_SHARED, nb.fd, 0);
             if (nb.p == MAP_FAILED) { K4N_LOG("setBuffer: mmap failed: %s", strerror(errno)); close(nb.fd); return write_err(out, -12); }
             nb.valid = 1;
             pthread_mutex_lock(&p->mu);
             Buf* slot = type == 0 ? &p->in[id] : &p->out[id];
-            if (slot->valid) { munmap(slot->p, slot->size); close(slot->fd); }
+            if (slot->valid) {
+                // the workers use a buffer without the lock while busy / out_busy / work_has: replace it only when the
+                // pipe is idle (the stock player flushes before it sends new buffers, so this normally does not wait)
+                double deadline = k4n_now_ms() + K4N_SLOT_WAIT_MS;
+                while ((p->busy || p->out_busy || p->work_has) && !p->quit)
+                    if (cv_wait_until(&p->cv, &p->mu, deadline) == ETIMEDOUT) break;
+                if (p->busy || p->out_busy || p->work_has || p->quit) {
+                    pthread_mutex_unlock(&p->mu);
+                    K4N_LOG("setBuffer: buffer id %d is in use by the running pipe, not replaced", id);
+                    munmap(nb.p, nb.size); close(nb.fd); return write_err(out, -16);
+                }
+                munmap(slot->p, slot->size); close(slot->fd);
+            }
             *slot = nb;
             pthread_mutex_unlock(&p->mu);
         }
@@ -885,6 +923,7 @@ static binder_status_t ren_open(const AParcel* in, AParcel* out) {
     if (ver != 1) why = "protocol version";
     else if (neural_mode() <= 0) why = "persist.sys.k4.slowmo_neural is off";
     else if (w < 64 || h < 64 || w > 1920 || h > 1920 || (w & 1) || (h & 1) || slots < 3 || slots > 16 || fd < 0) why = "bad arguments";
+    else if (fd_size_ok(fd, size, "render session")) why = "memory smaller than the slots";
     else if ((mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) == MAP_FAILED) why = strerror(errno);
     if (fd >= 0) close(fd);
     if (!why) {

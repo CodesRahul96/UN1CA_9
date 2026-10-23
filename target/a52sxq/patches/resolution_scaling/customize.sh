@@ -9,11 +9,14 @@
 # mBaseDisplayPhysicalXDpi/YDpi back in, so DisplayInfo.physicalXDpi stays at the native 409.432 x 406.4 and every
 # mm -> px conversion (TypedValue COMPLEX_UNIT_MM/PT/IN: value * metrics.xdpi) keeps producing native pixels.
 #
-# updateBaseDisplayMetrics(width, height, density, xDpi, yDpi) is the single place that stores the base dpi, and
-# every caller sets mIsSizeForced first. The helper replaces the two dpi arguments:
-#   forced size:      mInitialPhysicalXDpi * width / mInitialDisplayWidth (same for Y with the heights)
-#   not forced:       mInitialPhysicalXDpi (what every caller passes anyway; also drops a scaled value that a
-#                     caller hands back after the override is gone)
+# updateBaseDisplayMetrics(width, height, density, xDpi, yDpi) is the single place that stores the base dpi. The
+# helper replaces the two dpi arguments; "forced" is decided from the size passed in, not from mIsSizeForced, because
+# WindowManagerService.applyForcedPropertiesForDefaultDisplay() calls updateBaseDisplayMetrics(forcedW, forcedH, ...)
+# first and only then sets mIsSizeForced (updateDefaultDisplaySize -> DisplayWindowSettings.setForcedSize, which does
+# not call it again):
+#   width != mInitialDisplayWidth:  mInitialPhysicalXDpi * width / mInitialDisplayWidth (same for Y with the heights)
+#   width == mInitialDisplayWidth:  mInitialPhysicalXDpi (what every caller passes anyway; also drops a scaled value
+#                                   that a caller hands back after the override is gone)
 #   before the initial values exist (constructor): the argument unchanged
 # mInitial* always hold the real panel values: the constructor and DeferredDisplayUpdater take them from the
 # non-override DisplayInfo, and DeferredDisplayUpdater stores them before it calls updateBaseDisplayMetrics().
@@ -34,7 +37,7 @@ stale = [p for p in glob.glob(root + "/smali*/com/android/server/wm/K4ForcedSize
 assert not stale, "stale helper copies: %s" % stale
 
 # the fields the helper reads, with the types it assumes
-for need in (".field public mIsSizeForced:Z", ".field public mInitialDisplayWidth:I", ".field public mInitialDisplayHeight:I",
+for need in (".field public mInitialDisplayWidth:I", ".field public mInitialDisplayHeight:I",
              ".field public mInitialPhysicalXDpi:F", ".field public mInitialPhysicalYDpi:F",
              ".field public mBaseDisplayPhysicalXDpi:F", ".field public mBaseDisplayPhysicalYDpi:F"):
     assert s.count(need + "\n") == 1, need
@@ -84,8 +87,9 @@ open(dst, "w").write("""\
     return-void
 .end method
 
-# forced: mIsSizeForced; base/initial: forced and native size along one axis; initialDpi: real panel dpi of that
-# axis; passed: the caller's argument, kept while the display's initial values are not known yet
+# forced: the size passed differs from the native one; base/initial: passed and native size along one axis;
+# initialDpi: real panel dpi of that axis; passed: the caller's argument, kept while the display's initial values are
+# not known yet
 .method public static scale(ZIIFF)F
     .locals 2
 
@@ -121,9 +125,15 @@ open(dst, "w").write("""\
 .method public static x(%(DC)sIF)F
     .locals 3
 
-    iget-boolean v0, p0, %(DC)s->mIsSizeForced:Z
-
     iget v1, p0, %(DC)s->mInitialDisplayWidth:I
+
+    const/4 v0, 0x0
+
+    if-eq p1, v1, :cond_native
+
+    const/4 v0, 0x1
+
+    :cond_native
 
     iget v2, p0, %(DC)s->mInitialPhysicalXDpi:F
 
@@ -137,9 +147,15 @@ open(dst, "w").write("""\
 .method public static y(%(DC)sIF)F
     .locals 3
 
-    iget-boolean v0, p0, %(DC)s->mIsSizeForced:Z
-
     iget v1, p0, %(DC)s->mInitialDisplayHeight:I
+
+    const/4 v0, 0x0
+
+    if-eq p1, v1, :cond_native
+
+    const/4 v0, 0x1
+
+    :cond_native
 
     iget v2, p0, %(DC)s->mInitialPhysicalYDpi:F
 

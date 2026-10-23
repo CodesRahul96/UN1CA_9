@@ -14,7 +14,8 @@
 # Nothing here uses fixed offsets: each string is looked up by content (must exist exactly once as a whole C string)
 # and its single ADRP+ADD reference is found by decoding the executable segments. Each key must have exactly one
 # reference, or the build aborts. Sites: Fold8 F976B policy 0x62178/0x62198/0x62234, flinger 0x83ae4;
-# S25 S931B policy 0x61e1c/0x61e3c/0x61ed8, flinger 0x83ae4.
+# S25 S931B policy 0x61e1c/0x61e3c/0x61ed8, flinger 0x83ae4. The S26 Ultra S948B libraries (current source) were
+# checked the same way on 2026-10-22: one ADRP+ADD reference per key and no pointer/RELA reference to the strings.
 PYCODE=$(cat << 'PYEOF'
 import struct, sys
 from array import array

@@ -5,13 +5,19 @@ Our own binary (its sha256 is pinned in ../customize.sh: a rebuilt copy must upd
 - Source: `../src/{k4neuralmpp.c,k4n_engine.c,k4n.h}`; rebuild with `../src/build.sh` (AOSP prebuilt clang r596125,
   NDK sysroot API 30 and bionic crt objects of an AOSP tree; C only, no libc++). Working copy and test tools:
   `/mnt/B1/OneUi9/scratch/htpre/neural` on the build PC (NOTES.md one level up).
-- This copy: sha256 `a7fb6df755ecf547cbdb47a5e250ccec3ee2ff1dbedd46870ec737c2198ecdda`, 110456 bytes, built 2026-10-16 with
-  `build.sh`: the previous copy plus no FastRPC CPU latency vote. The executable exports `remote_handle64_control`
+- This copy: sha256 `50d3e6b4a834a7ed5a1973819820706a96e178583036da841128e8f5ebc0da80`, 111848 bytes, built 2026-10-23 with `build.sh` (the same toolchain rebuilt
+  a7fb6df7... byte for byte from the previous sources first): client buffers are mapped only when the fd really has
+  the claimed size (fstat / ASHMEM_GET_SIZE / dma-buf SEEK_END; a smaller memfd used to SIGBUS the daemon on first
+  access), for setBuffer and the render session; setBuffer closes the fd of a buffer it rejects for its id; a buffer
+  slot that already holds a mapping is replaced only once the pipe is idle (waits at most 500 ms, then -16), so a
+  worker never runs on unmapped memory. NOT yet run on a phone.
+  Previous copy: sha256 `a7fb6df755ecf547cbdb47a5e250ccec3ee2ff1dbedd46870ec737c2198ecdda`, 110456 bytes, built 2026-10-16 with
+  `build.sh`, shipped up to 9.3.72 (runs on R5CTA0ESFTF in hal_mpp_default): the previous copy plus no FastRPC CPU latency vote. The executable exports `remote_handle64_control`
   (build.sh `--export-dynamic-symbol`), so libSnpeHtpV68Stub.so's burst-profile request DSPRPC_CONTROL_LATENCY (100 us)
   lands there and is dropped; libcdsprpc's release of that vote (FASTRPC_IOCTL_CONTROL cmd 12, enable 0) made this 5.4
   kernel call dev_pm_qos_update_request(-1): WARN at drivers/base/power/qos.c:158 and a 0 us resume latency constraint
   on the silver cores until the session closed. Every other request is passed on to libcdsprpc.
-  `persist.sys.k4.slowmo_rpc_qos=1` lets the vote through again. NOT yet run on a phone.
+  `persist.sys.k4.slowmo_rpc_qos=1` lets the vote through again.
   Previous copy: sha256 `84d04202c5d73c2e2e05698933e02a536cd06603c61dd6791c576fc356fe22ff`, 106832 bytes, built 2026-10-15 with
   `build.sh` (rebuilt byte for byte from its sources on 2026-10-16): better hands in saved clips (render session): a second FILM crop when a second region moves at least half
   as much as the first, FILM also at the quarter positions for the fastest 25% of pairs (x4 saves), the strongest

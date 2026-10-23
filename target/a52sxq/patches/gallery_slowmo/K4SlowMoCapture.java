@@ -2,7 +2,10 @@
 // methods below from its own methods (hooks added by customize.sh); state is kept here per SemMediaCapture instance.
 // Only the instant slow-mo clip of Gallery (one dynamic viewing section over the whole requested range, neural service
 // present, eligible source) is taken; everything else, and any failure, goes down the stock VEKit path.
-// Source of K4SlowMoCapture.smali (see K4SlowMo.java for how the smali is generated).
+// Source of K4SlowMoCapture.smali (see K4SlowMo.java for how the smali is generated). The save_smali/ set (this file,
+// K4SlowMoExport.java, K4TimeStretch.java) is compiled with javac -source 11 -target 11 -g:none
+// -XDstringConcat=inline (K4SlowMo on the classpath), then d8 --release --min-api 34 WITH desugaring (the shipped
+// K4SlowMoExport uses its -$$Nest$ accessors); that reproduces the shipped files byte for byte.
 package com.k4.media;
 
 import android.os.Handler;
@@ -21,7 +24,10 @@ public final class K4SlowMoCapture implements K4SlowMoExport.Listener, Runnable 
     private static final int PARAM_CAPTURE_TYPE = 1012, TYPE_INSTANT_SLOW_MO_CLIP = 89, MSG_RECORDING_COMPLETED = 7;
     private static final WeakHashMap<Object, K4SlowMoCapture> sStates = new WeakHashMap<>();
 
-    private Object mCapture;                 // the SemMediaCapture while our export runs
+    // The SemMediaCapture while our export runs. sStates is weak on the capture but this value holds it strongly, so
+    // the field is cleared as soon as the export has finished (onFinished / run()): a capture Gallery drops without
+    // release() then lets its entry (and the stopped K4SlowMoExport) be collected.
+    private Object mCapture;
     private FileDescriptor mIn, mOut;
     private long mInOffset, mInLength;
     private int mStart = -1, mEnd = -1, mDvCount, mDvStart, mDvEnd, mType = -1;
@@ -157,9 +163,9 @@ public final class K4SlowMoCapture implements K4SlowMoExport.Listener, Runnable 
     public void onFinished(K4SlowMoExport e, boolean ok, String detail) {
         Object capture = mCapture;
         try {
-            if (ok) { mFinished = true; Handler h = handler(capture); if (h != null) h.sendMessage(h.obtainMessage(MSG_RECORDING_COMPLETED)); return; }
+            if (ok) { mCapture = null; mFinished = true; Handler h = handler(capture); if (h != null) h.sendMessage(h.obtainMessage(MSG_RECORDING_COMPLETED)); return; }
             clearOutput();
-            if (mCancelled) { mFinished = true; Log.w(TAG, "save: cancelled (" + detail + "), output cleared"); return; }
+            if (mCancelled) { mCapture = null; mFinished = true; Log.w(TAG, "save: cancelled (" + detail + "), output cleared"); return; }
             if (e.isOffline()) {        // the offline render failed: the real-time recording instead (same output, emptied)
                 Log.w(TAG, "save: offline render failed (" + detail + "), recording the neural playback instead");
                 try { K4SlowMoExport r = new K4SlowMoExport(mIn, mInOffset, mInLength, mOut, mDvStart, mDvEnd, mDvRate, this, false); mExport = r; r.start(); if (mCancelled) r.cancel(); return; }

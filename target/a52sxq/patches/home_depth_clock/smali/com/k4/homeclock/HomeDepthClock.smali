@@ -892,7 +892,7 @@
 
     monitor-enter v0
     :try_end_3
-    .catchall {:try_start_0 .. :try_end_3} :catchall_21
+    .catchall {:try_start_0 .. :try_end_3} :catchall_2d
 
     .line 283
     :try_start_3
@@ -907,7 +907,7 @@
     .line 284
     monitor-exit v0
     :try_end_c
-    .catchall {:try_start_3 .. :try_end_c} :catchall_1e
+    .catchall {:try_start_3 .. :try_end_c} :catchall_2a
 
     .line 285
     :try_start_c
@@ -915,7 +915,7 @@
 
     monitor-enter v0
     :try_end_f
-    .catchall {:try_start_c .. :try_end_f} :catchall_21
+    .catchall {:try_start_c .. :try_end_f} :catchall_2d
 
     .line 286
     :try_start_f
@@ -926,7 +926,7 @@
     .line 287
     monitor-exit v0
     :try_end_15
-    .catchall {:try_start_f .. :try_end_15} :catchall_1b
+    .catchall {:try_start_f .. :try_end_15} :catchall_27
 
     .line 288
     if-eqz v1, :cond_1a
@@ -934,54 +934,70 @@
     .line 289
     :try_start_17
     invoke-virtual {v1}, Lcom/k4/homeclock/EngineState;->stop()V
-    :try_end_1a
-    .catchall {:try_start_17 .. :try_end_1a} :catchall_21
 
-    .line 293
+    .line 294
     :cond_1a
-    goto :goto_29
+    iget-object p0, p0, Lf3/a;->g:Lh3/a;
+
+    .line 295
+    if-eqz p0, :cond_26
+
+    instance-of v0, p0, Lcom/k4/homeclock/HomeClockPresenter;
+
+    if-nez v0, :cond_26
+
+    .line 296
+    const/4 v0, 0x0
+
+    invoke-static {p0, v0}, Lcom/k4/homeclock/HomeDepthClock;->setClock(Lh3/a;Lcom/k4/homeclock/DepthClock;)V
+    :try_end_26
+    .catchall {:try_start_17 .. :try_end_26} :catchall_2d
+
+    .line 300
+    :cond_26
+    goto :goto_35
 
     .line 287
-    :catchall_1b
+    :catchall_27
     move-exception p0
 
-    :try_start_1c
+    :try_start_28
     monitor-exit v0
-    :try_end_1d
-    .catchall {:try_start_1c .. :try_end_1d} :catchall_1b
+    :try_end_29
+    .catchall {:try_start_28 .. :try_end_29} :catchall_27
 
-    :try_start_1d
+    :try_start_29
     throw p0
-    :try_end_1e
-    .catchall {:try_start_1d .. :try_end_1e} :catchall_21
+    :try_end_2a
+    .catchall {:try_start_29 .. :try_end_2a} :catchall_2d
 
     .line 284
-    :catchall_1e
+    :catchall_2a
     move-exception p0
 
-    :try_start_1f
+    :try_start_2b
     monitor-exit v0
-    :try_end_20
-    .catchall {:try_start_1f .. :try_end_20} :catchall_1e
+    :try_end_2c
+    .catchall {:try_start_2b .. :try_end_2c} :catchall_2a
 
-    :try_start_20
+    :try_start_2c
     throw p0
-    :try_end_21
-    .catchall {:try_start_20 .. :try_end_21} :catchall_21
+    :try_end_2d
+    .catchall {:try_start_2c .. :try_end_2d} :catchall_2d
 
-    .line 291
-    :catchall_21
+    .line 298
+    :catchall_2d
     move-exception p0
 
-    .line 292
+    .line 299
     const-string v0, "K4HomeClock"
 
     const-string v1, "onDestroy"
 
     invoke-static {v0, v1, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 294
-    :goto_29
+    .line 301
+    :goto_35
     return-void
 .end method
 

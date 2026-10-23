@@ -74,33 +74,22 @@ open(os.path.join(os.path.dirname(f), "K4PowerKeyY.smali"), "w").write("""\
     return-void
 .end method
 
+# The reveal binder calls setRevealAmountOnScrim on every animation frame. The dimen is a panel constant and the
+# result depends only on the scrim size, so the resource id is looked up once (sId: 0 = not yet, -1 = missing) and
+# the result is kept for the last scrim short side (sSide/sY). Display.getMode() and the resource read run again only
+# when the scrim size changes (a resolution switch). Main thread only, like the caller.
+.field private static sId:I
+
+.field private static sSide:I
+
+.field private static sY:F
+
+
 # scrim: the full-screen LightRevealScrim; fallback: the value computed when SystemUI started
 .method public static y(Landroid/view/View;F)F
     .locals 6
 
     :try_start_0
-    invoke-virtual {p0}, Landroid/view/View;->getDisplay()Landroid/view/Display;
-
-    move-result-object v0
-
-    if-eqz v0, :cond_fallback
-
-    invoke-virtual {v0}, Landroid/view/Display;->getMode()Landroid/view/Display$Mode;
-
-    move-result-object v0
-
-    invoke-virtual {v0}, Landroid/view/Display$Mode;->getPhysicalWidth()I
-
-    move-result v1
-
-    invoke-virtual {v0}, Landroid/view/Display$Mode;->getPhysicalHeight()I
-
-    move-result v0
-
-    invoke-static {v1, v0}, Ljava/lang/Math;->min(II)I
-
-    move-result v0
-
     invoke-virtual {p0}, Landroid/view/View;->getWidth()I
 
     move-result v1
@@ -113,13 +102,48 @@ open(os.path.join(os.path.dirname(f), "K4PowerKeyY.smali"), "w").write("""\
 
     move-result v1
 
-    if-lez v0, :cond_fallback
-
     if-lez v1, :cond_fallback
+
+    sget v0, %(K4)s->sSide:I
+
+    if-ne v0, v1, :cond_compute
+
+    sget v2, %(K4)s->sY:F
+
+    goto :goto_ret
+
+    :cond_compute
+    invoke-virtual {p0}, Landroid/view/View;->getDisplay()Landroid/view/Display;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_fallback
+
+    invoke-virtual {v0}, Landroid/view/Display;->getMode()Landroid/view/Display$Mode;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Landroid/view/Display$Mode;->getPhysicalWidth()I
+
+    move-result v2
+
+    invoke-virtual {v0}, Landroid/view/Display$Mode;->getPhysicalHeight()I
+
+    move-result v0
+
+    invoke-static {v2, v0}, Ljava/lang/Math;->min(II)I
+
+    move-result v0
+
+    if-lez v0, :cond_fallback
 
     invoke-virtual {p0}, Landroid/view/View;->getResources()Landroid/content/res/Resources;
 
     move-result-object v2
+
+    sget v3, %(K4)s->sId:I
+
+    if-nez v3, :cond_have
 
     const-string v3, "physical_power_button_center_screen_location_y"
 
@@ -131,7 +155,15 @@ open(os.path.join(os.path.dirname(f), "K4PowerKeyY.smali"), "w").write("""\
 
     move-result v3
 
-    if-eqz v3, :cond_fallback
+    if-nez v3, :cond_store
+
+    const/4 v3, -0x1
+
+    :cond_store
+    sput v3, %(K4)s->sId:I
+
+    :cond_have
+    if-lez v3, :cond_fallback
 
     invoke-virtual {v2, v3}, Landroid/content/res/Resources;->getDimensionPixelSize(I)I
 
@@ -146,9 +178,14 @@ open(os.path.join(os.path.dirname(f), "K4PowerKeyY.smali"), "w").write("""\
     int-to-float v0, v0
 
     div-float/2addr v2, v0
+
+    sput v2, %(K4)s->sY:F
+
+    sput v1, %(K4)s->sSide:I
     :try_end_0
     .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
+    :goto_ret
     return v2
 
     :catch_0

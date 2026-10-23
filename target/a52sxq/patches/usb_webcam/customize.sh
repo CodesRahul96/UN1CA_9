@@ -46,6 +46,15 @@ else
     # is never started and UsbDeviceManager falls back to charging 3 s later (1 in ~10 first tries on 9.3.52).
     # ueventd sets the group atomically (setegid before mknod), so give the gadget node numbers group system.
     # Later rules win (ueventd searches its rules in reverse), and /vendor/ueventd.rc is the last file read.
+    # group camera instead would bring the race back: DeviceAsWebcam is android.uid.system and its gids do not include
+    # camera (checked on 9.3.72), and ueventd sets only the group before mknod. The rule matches by number, so any other
+    # V4L2 node on video2-9 (a USB host webcam: CONFIG_USB_VIDEO_CLASS=y) is system:system too. Nothing on this vendor
+    # opens such nodes (its only camera provider is Samsung's legacy/0); an external camera provider (group camera)
+    # would, so stop here if the vendor ever ships one.
+    if grep -rqs -e "ICameraProvider/external" -e "external_camera_config" "$WORK_DIR/vendor/etc/vintf" "$WORK_DIR/vendor/etc/init" || \
+            [ -e "$WORK_DIR/vendor/etc/external_camera_config.xml" ]; then
+        ABORT "usb_webcam: the vendor has an external camera provider, /dev/video2-9 must not be group system"
+    fi
     UEV="$WORK_DIR/vendor/etc/ueventd.rc"
     [ -f "$UEV" ] || UEV="$WORK_DIR/vendor/ueventd.rc"
     [ -f "$UEV" ] || ABORT "usb_webcam: vendor ueventd.rc not found"

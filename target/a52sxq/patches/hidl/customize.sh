@@ -1,4 +1,5 @@
-# The Fold8 Ultra system ships without HIDL: /system/bin/hwservicemanager is a dangling
+# The Fold8 system (the first source) shipped without HIDL; the S26 Ultra has a system_ext hwservicemanager again,
+# which the AOSP copy below replaces. On the Fold8: /system/bin/hwservicemanager is a dangling
 # symlink and the framework manifest lacks android.hidl.*. The A52s vendor (FCM 5) is
 # almost entirely HIDL, so bring back the AOSP CP2A.260605.016 pieces from ichthys32.
 ICHTHYS32="$SRC_DIR/prebuilts/ichthys32"

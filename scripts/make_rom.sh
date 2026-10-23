@@ -104,6 +104,9 @@ if $BUILD_ROM; then
     [ -f "$WORK_DIR/.completed" ] && rm -f "$WORK_DIR/.completed"
     # Patches report non-applicable hunks here: start each build with an empty list (it used to grow across builds)
     rm -f "$OUT_DIR/skipped_patches.txt"
+    # APKs staged for /system/preload by device patches (knox_kernel_compat, samsung_restore_apps): only
+    # unica/mods/preload removes the dir, so a build that stopped earlier would leave a stale or delisted APK behind
+    rm -rf "${WORK_DIR:?}/.extra_preload"
 
     if [ ! -f "$FW_DIR/$SOURCE_FIRMWARE_PATH/.extracted" ] || [ ! -f "$FW_DIR/$TARGET_FIRMWARE_PATH/.extracted" ]; then
         if [ ! -f "$ODIN_DIR/$SOURCE_FIRMWARE_PATH/.downloaded" ] || [ ! -f "$ODIN_DIR/$TARGET_FIRMWARE_PATH/.downloaded" ]; then

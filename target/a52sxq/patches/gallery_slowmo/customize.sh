@@ -187,8 +187,9 @@ PYEOF
 # Part 1b (framework.jar): Gallery's "Save slow-mo clip". The stock save goes SemMediaCapture -> VEKit and repeats every
 # frame four times. K4SlowMoCapture takes exactly that case (Gallery, one dynamic viewing section over the whole range,
 # capture type 89, eligible source, neural service registered, persist.sys.k4.slowmo_neural not 0) and lets
-# K4SlowMoExport record the neural playback of the section (off-screen SemMediaPlayer -> H.264 encoder surface -> MP4,
-# constant frame cadence, no audio track yet). Everything else and every failure - also one after the export has
+# K4SlowMoExport make the clip: an offline k4neuralmpp render session by default (persist.sys.k4.slowmo_save_film), else
+# a recording of the neural playback (off-screen SemMediaPlayer -> H.264 encoder surface -> MP4); constant frame
+# cadence, audio only with persist.sys.k4.slowmo_save_audio != 0. Everything else and every failure - also one after the export has
 # started: the output is cleared first - continues on the stock VEKit path. The helper classes are generated from
 # K4SlowMoCapture.java / K4SlowMoExport.java (save_smali/, recipe at the top of K4SlowMo.java).
 LOG "- Gallery \"Save slow-mo clip\": SemMediaCapture hands the instant slow-mo clip to K4SlowMoCapture (neural export)"

@@ -1,13 +1,14 @@
-# The source (Fold8) services.jar hardcodes Samsung's foldable device-state machine: the DeviceStateManagerService
+# A foldable source's services.jar (the Fold8 base this was written for) hardcodes Samsung's foldable device-state machine: the DeviceStateManagerService
 # constructor always builds FlexibleDeviceStatePolicy/FlexibleDeviceStateProvider with the six fold states
 # (CLOSED/TENT/HALF_OPENED/OPENED/CONCURRENT_INNER/OUTER_DEFAULT), and the AOSP DeviceStateProviderImpl/
 # DeviceStatePolicyImpl fallback was stripped by R8. Without the folding sensor (type 65695) the provider settles
 # on CLOSED, whose properties (FEATURE_REAR_DISPLAY, FOLD_IN_CLOSED, OUTER_PRIMARY, ...) make WindowManager
 # (FoldController mDeviceState=REAR), CameraServiceProxy (FRONT_FOLDED), AOD and every DeviceStateManager client
 # treat the phone as a folded foldable. The framework-res overlay (config_*DeviceStates) is ignored by this
-# property-based code. Hand the provider a single property-less DEFAULT state (identifier 0, exactly what AOSP's
-# default provider creates on non-foldables) through a small helper class, right before the provider is built.
-# Fold sources only: flat sources (S25) already use the AOSP DeviceStateProviderImpl (single DEFAULT state without a device state config)
+# property-based code. Hand the provider a single property-less DEFAULT state (like AOSP's default provider on
+# non-foldables, but identifier 3, not 0: see K4DeviceStates.single below) through a small helper class, right before
+# the provider is built.
+# Fold sources only: flat sources (S25, the current S26 Ultra) already use the AOSP DeviceStateProviderImpl (single DEFAULT state without a device state config)
 if [[ "$(GET_FLOATING_FEATURE_CONFIG "$FW_DIR/$SOURCE_FIRMWARE_PATH/system/system/etc/floating_feature.xml" \
         "SEC_FLOATING_FEATURE_FRAMEWORK_SUPPORT_FOLDABLE_TYPE_FOLD")" != "TRUE" ]]; then
     LOG "- Source is not a foldable, nothing to do"
