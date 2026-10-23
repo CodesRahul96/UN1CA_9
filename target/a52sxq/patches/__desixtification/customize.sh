@@ -166,7 +166,13 @@ PYEOF
     while IFS= read -r f; do
         REL="${f#"$ICHTHYS32/system/"}"
         if [ ! -e "$WORK_DIR/system/system/$REL" ] && [ ! -L "$WORK_DIR/system/system/$REL" ]; then
-            ADD_TO_WORK_DIR "$ICHTHYS32" "system" "system/$REL" 0 0 644 "u:object_r:system_lib_file:s0" > /dev/null
+            # the explicit mode lands on the top entry only: directories (bootstrap/, drm/) need the x bit
+            LIB_MODE=644
+            if [ -d "$f" ] && [ ! -L "$f" ]; then
+                LIB_MODE=755
+            fi
+            ADD_TO_WORK_DIR "$ICHTHYS32" "system" "system/$REL" 0 0 "$LIB_MODE" "u:object_r:system_lib_file:s0" > /dev/null \
+                || ABORT "Failed to add system/$REL"
         fi
     done < <(find "$ICHTHYS32/system/lib" -mindepth 1 -maxdepth 1)
     ADD_TO_WORK_DIR "$ICHTHYS32" "system" "system/bin/bootstrap/linker" 0 0 755 "u:object_r:system_linker_exec:s0"
@@ -186,5 +192,5 @@ SET_PROP "vendor" "ro.zygote" "zygote64"
 SET_PROP "vendor" "dalvik.vm.dex2oat64.enabled" "true"
 LOG_STEP_OUT
 
-unset ICHTHYS32 RUNTIME_APEX REL
+unset ICHTHYS32 RUNTIME_APEX REL LIB_MODE
 unset -f DECODE_APEX EXTRACT_PAYLOAD ADD_PAYLOAD_ENTRY BUILD_PAYLOAD SIGN_PAYLOAD BUILD_APEX SIGN_APEX
