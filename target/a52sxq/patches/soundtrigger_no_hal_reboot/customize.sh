@@ -1,6 +1,6 @@
 # See module.prop. Extends soundtrigger_load_no_reboot (load refusals, never a reboot) to every other HAL error and
 # callback mismatch and to SoundTriggerHalWatchdog deadlines: no HAL reboot while a call / VoIP is active, the stock
-# resync reboot once it has ended (a hung HAL call: only if it is still hung then, or after 10 min of it).
+# resync reboot once it has ended (a hung HAL call: only if it is still hung then, or 45 s past its deadline during the call).
 # Needs K4StRetry (halError / callbackError / watchdogExpired / watchdogClosed) from soundtrigger_load_no_reboot, which runs first (LC_ALL=C order).
 SERVICES="system/framework/services.jar"
 DECODE_APK "system" "$SERVICES" || ABORT "Failed to decode $SERVICES"
@@ -71,7 +71,7 @@ else:
     print("  - ModelCallbackEnforcer: 6 contract checks -> K4StRetry.callbackError (no reboot during calls)")
 # (3) SoundTriggerHalWatchdog deadline (a HAL call still running after 3 s): "log, this$0.reboot()" ->
 #     K4StRetry.watchdogExpired (no call: stock reboot now; call/VoIP: reboot after the call if still hung, or after
-#     10 min of it during the call)
+#     45 s past the deadline during the call: below the 60 s system_server Watchdog)
 f = one("com/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog$Watchdog$$ExternalSyntheticLambda0.smali")
 s = open(f).read()
 L = P + "SoundTriggerHalWatchdog$Watchdog$$ExternalSyntheticLambda0;"

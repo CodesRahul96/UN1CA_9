@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 398
+    .line 405
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -32,9 +32,9 @@
 .method public onModeChanged(I)V
     .registers 2
 
-    .line 401
+    .line 408
     invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonMode(I)V
 
-    .line 402
+    .line 409
     return-void
 .end method

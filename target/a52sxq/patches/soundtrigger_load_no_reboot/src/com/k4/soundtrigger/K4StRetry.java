@@ -73,8 +73,8 @@ import java.util.concurrent.Executor;
  *       policy's capture-state callback is oneway, AudioService and telephony never wait on it). If the call
  *       returns late (watchdogClosed()), nothing is rebooted: the result went through the enforcer as usual (an
  *       error there owes its own resync reboot). If it is still hung when the mode is NORMAL again (+5 s), or for
- *       10 minutes during the call (a dead HAL; bounds how long system_server threads can stay blocked), the HAL
- *       is rebooted.
+ *       45 s past the deadline during the call (a dead HAL; 48 s in all stays below the system_server Watchdog's
+ *       60 s, so blocked system_server threads can never get system_server killed), the HAL is rebooted.
  */
 public final class K4StRetry {
     private static final String TAG = "K4StRetry";
@@ -87,7 +87,13 @@ public final class K4StRetry {
     private static final long CALL_END_DELAY_MS = 5000;
     private static final long NORMAL_GRACE_MS = 3000;
     private static final long WATCHDOG_MS = 3000; // SoundTriggerHalWatchdog deadline (0xbb8)
-    private static final long HUNG_IN_CALL_MAX_MS = 10 * 60 * 1000;
+    /**
+     * A HAL call hung this long past its deadline during a call is a dead HAL: 3 s + 45 s = 48 s blocked in total, below
+     * the system_server Watchdog (60 s, also BinderThreadMonitor), so the threads waiting on the sound trigger stack can
+     * never get system_server killed (which would end the call and everything else). Trade-off: a sound trigger HAL
+     * call that is really hung costs a call its audio after ~48 s instead of 3 s (stock).
+     */
+    private static final long HUNG_IN_CALL_MAX_MS = 45 * 1000;
     private static final long REGISTER_RETRY_MS = 15000;
     /** sMode before the mode listener is registered: treated like a call (defer) for HAL errors. */
     private static final int MODE_UNKNOWN = -100;
@@ -381,8 +387,9 @@ public final class K4StRetry {
         }
         if (next != Long.MAX_VALUE) sHandler.postDelayed(CHECK_HUNG_MAX, next);
         if (dead.isEmpty()) return;
-        Slog.e(TAG, "sound trigger HAL call hung for " + (HUNG_IN_CALL_MAX_MS / 60000) + " min during a call:"
-                + " treating the HAL as dead, rebooting it now (this restarts the audio HAL)");
+        Slog.e(TAG, "sound trigger HAL call hung for " + ((HUNG_IN_CALL_MAX_MS + WATCHDOG_MS) / 1000) + " s during a"
+                + " call: treating the HAL as dead, rebooting it now before blocked system_server threads trip the"
+                + " system_server watchdog (this restarts the audio HAL)");
         rebootAll(new ArrayList<SoundTriggerHalEnforcer>(), dead);
     }
 
