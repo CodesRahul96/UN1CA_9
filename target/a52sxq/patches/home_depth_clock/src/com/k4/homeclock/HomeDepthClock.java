@@ -288,6 +288,13 @@ public final class HomeDepthClock {
             if (st != null) {
                 st.stop();
             }
+            // The shared presenter (h3.b) tears down through the final stock h3.f.d(), which never calls setClock(p,
+            // null), and its gated clock holds p strongly (DepthClock.owner), so the weak CLOCKS entry would keep p,
+            // the clock and its AodHost for the life of the process. A HomeClockPresenter clears its own entry in d().
+            h3.a p = engine.g;
+            if (p != null && !(p instanceof HomeClockPresenter)) {
+                setClock(p, null);
+            }
         } catch (Throwable t) {
             Log.e(TAG, "onDestroy", t);
         }
