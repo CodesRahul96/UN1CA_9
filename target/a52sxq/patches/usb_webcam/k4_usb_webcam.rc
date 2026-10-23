@@ -1,5 +1,6 @@
 # k4 usb_webcam (target/a52sxq/patches/usb_webcam): UVC gadget for "Use as webcam" (com.android.DeviceAsWebcam).
-# Descriptors and USB configurations as on the Galaxy S26 Ultra (SM-S948B vendor init.qcom.usb.rc), MJPEG only.
+# USB configurations as on the Galaxy S26 Ultra (SM-S948B vendor init.qcom.usb.rc); its MJPEG descriptors without
+# 640x360 and 60 fps (the A52s camera HAL rejects 640x360 and cannot feed 60 fps): 480p/720p/1080p at 30/24/15 fps.
 # /vendor/bin/init.qcom.usb.sh sets vendor.usb.uvc.function.init=1 once /config/usb_gadget/g1/functions/uvc.0 exists,
 # i.e. only with a kernel that has CONFIG_USB_CONFIGFS_F_UVC.
 
