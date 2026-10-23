@@ -128,6 +128,12 @@ public final class K4StRetry {
     private static final long CALL_END_DELAY_MS = 30000;
     /** Polls while only the live mode or an unknown signal says call (no event will report its end). */
     private static final long POLL_MS = 5000;
+    /**
+     * While reboots are owed: AudioService's own mode (not the listener's) and the call signals are re-checked this
+     * often; NORMAL with no signal on two checks in a row runs them, so a listener stuck on a call mode (a failed
+     * setPhoneState at hang-up leaves the dispatch at IN_CALL while getMode() says NORMAL) cannot keep them forever.
+     */
+    private static final long OWED_CHECK_MS = 60000;
     private static final long NORMAL_GRACE_MS = 3000;
     private static final long WATCHDOG_MS = 3000; // SoundTriggerHalWatchdog deadline (0xbb8)
     /**
@@ -255,6 +261,13 @@ public final class K4StRetry {
             resync();
         }
     };
+    private static final Runnable OWED_CHECK = new Runnable() {
+        @Override
+        public void run() {
+            owedCheck();
+        }
+    };
+    private static boolean sOwedSeenFree;
     private static final Runnable CHECK_HUNG = new Runnable() {
         @Override
         public void run() {
@@ -361,6 +374,7 @@ public final class K4StRetry {
             ensureHandlerLocked();
             mode = sMode;
             sOwed.put(enforcer, Boolean.TRUE);
+            if (!sHandler.hasCallbacks(OWED_CHECK)) sHandler.postDelayed(OWED_CHECK, OWED_CHECK_MS);
             if (!listenerSaysCall() && !signalWillReport() && !sHandler.hasCallbacks(RESYNC)) {
                 sHandler.postDelayed(RESYNC, NORMAL_GRACE_MS);
                 hold(NORMAL_GRACE_MS + 1000); // only posts to the state thread
@@ -486,6 +500,7 @@ public final class K4StRetry {
         }
         if (!deferred.isEmpty()) {
             if (!sHandler.hasCallbacks(CHECK_HUNG_MAX)) sHandler.postDelayed(CHECK_HUNG_MAX, HUNG_IN_CALL_MAX_MS);
+            if (!sHandler.hasCallbacks(OWED_CHECK)) sHandler.postDelayed(OWED_CHECK, OWED_CHECK_MS);
             // only the live mode (or an unknown signal) says call: resync() polls until it agrees
             if (!listenerSaysCall() && !signalWillReport() && !sHandler.hasCallbacks(RESYNC)) {
                 sHandler.postDelayed(RESYNC, POLL_MS);
@@ -859,6 +874,51 @@ public final class K4StRetry {
         if (owed.isEmpty() && hung.isEmpty()) return;
         Slog.w(TAG, "no call: rebooting the sound trigger HAL now to resync it with the middleware ("
                 + owed.size() + " HAL error(s), " + hung.size() + " hung HAL call(s))");
+        rebootAll(owed, hung);
+    }
+
+    /** Handler thread, every OWED_CHECK_MS while anything is owed: see OWED_CHECK_MS. */
+    private static void owedCheck() {
+        boolean any;
+        synchronized (sLock) {
+            any = !sOwed.isEmpty() || !sHung.isEmpty();
+        }
+        if (!any) {
+            sOwedSeenFree = false;
+            return;
+        }
+        sHandler.postDelayed(OWED_CHECK, OWED_CHECK_MS);
+        int live = MODE_UNKNOWN;
+        AudioManager am = sAm;
+        if (am != null) {
+            try {
+                live = am.getMode(); // AudioService's own mode, whatever the listener says
+            } catch (Throwable t) {
+                live = MODE_UNKNOWN;
+            }
+        }
+        if (live != AudioManager.MODE_NORMAL || callBySignals()) {
+            sOwedSeenFree = false;
+            return;
+        }
+        if (!sOwedSeenFree) {
+            sOwedSeenFree = true;
+            return;
+        }
+        if (!listenerSaysCall() && sHandler.hasCallbacks(RESYNC)) return; // the listener agrees, a resync is due
+        sOwedSeenFree = false;
+        List<SoundTriggerHalEnforcer> owed;
+        List<Hung> hung;
+        synchronized (sLock) {
+            owed = new ArrayList<>(sOwed.keySet());
+            hung = new ArrayList<>(sHung.values());
+            sOwed.clear();
+            sHung.clear();
+        }
+        if (owed.isEmpty() && hung.isEmpty()) return;
+        Slog.w(TAG, "owed for a while: the audio mode listener says mode " + sMode + ", AudioService has said NORMAL"
+                + " with no call signal for " + (OWED_CHECK_MS / 1000) + " s: rebooting the sound trigger HAL now (" + owed.size()
+                + " HAL error(s), " + hung.size() + " hung HAL call(s))");
         rebootAll(owed, hung);
     }
 

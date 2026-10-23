@@ -8,7 +8,7 @@
 
 # annotations
 .annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->fire()V
+    value = Lcom/k4/soundtrigger/K4StRetry;->hold(J)V
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -18,13 +18,11 @@
 
 
 # instance fields
-.field final synthetic val$cbs:Ljava/util/List;
-
-.field final synthetic val$reason:Ljava/lang/String;
+.field final synthetic val$until:J
 
 
 # direct methods
-.method constructor <init>(Ljava/util/List;Ljava/lang/String;)V
+.method constructor <init>(J)V
     .registers 3
     .annotation system Ldalvik/annotation/Signature;
         value = {
@@ -32,10 +30,8 @@
         }
     .end annotation
 
-    .line 981
-    iput-object p1, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$cbs:Ljava/util/List;
-
-    iput-object p2, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$reason:Ljava/lang/String;
+    .line 1001
+    iput-wide p1, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$until:J
 
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
@@ -45,76 +41,13 @@
 
 # virtual methods
 .method public run()V
-    .registers 5
+    .registers 3
 
-    .line 984
-    iget-object v0, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$cbs:Ljava/util/List;
+    .line 1004
+    iget-wide v0, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$until:J
 
-    invoke-interface {v0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
+    invoke-static {v0, v1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smacquire(J)V
 
-    move-result-object v0
-
-    :goto_6
-    invoke-interface {v0}, Ljava/util/Iterator;->hasNext()Z
-
-    move-result v1
-
-    if-eqz v1, :cond_37
-
-    invoke-interface {v0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
-
-    move-result-object v1
-
-    check-cast v1, Lcom/android/server/soundtrigger_middleware/ISoundTriggerHal$GlobalCallback;
-
-    .line 985
-    iget-object v2, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$reason:Ljava/lang/String;
-
-    new-instance v3, Ljava/lang/StringBuilder;
-
-    invoke-direct {v3}, Ljava/lang/StringBuilder;-><init>()V
-
-    invoke-virtual {v3, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    move-result-object v2
-
-    const-string v3, ": resources available, loading refused sound models again"
-
-    invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    move-result-object v2
-
-    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
-
-    move-result-object v2
-
-    const-string v3, "K4StRetry"
-
-    invoke-static {v3, v2}, Landroid/util/Slog;->i(Ljava/lang/String;Ljava/lang/String;)I
-
-    .line 987
-    :try_start_2c
-    invoke-interface {v1}, Lcom/android/server/soundtrigger_middleware/ISoundTriggerHal$GlobalCallback;->onResourcesAvailable()V
-    :try_end_2f
-    .catchall {:try_start_2c .. :try_end_2f} :catchall_30
-
-    .line 990
-    goto :goto_36
-
-    .line 988
-    :catchall_30
-    move-exception v1
-
-    .line 989
-    const-string v2, "onResourcesAvailable failed"
-
-    invoke-static {v3, v2, v1}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
-
-    .line 991
-    :goto_36
-    goto :goto_6
-
-    .line 992
-    :cond_37
+    .line 1005
     return-void
 .end method

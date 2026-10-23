@@ -3,7 +3,7 @@
 .source "K4StRetry.java"
 
 # interfaces
-.implements Ljava/lang/Runnable;
+.implements Landroid/media/AudioManager$OnModeChangedListener;
 
 
 # annotations
@@ -17,22 +17,11 @@
 .end annotation
 
 
-# instance fields
-.field final synthetic val$mode:I
-
-
 # direct methods
-.method constructor <init>(I)V
-    .registers 2
-    .annotation system Ldalvik/annotation/Signature;
-        value = {
-            "()V"
-        }
-    .end annotation
+.method constructor <init>()V
+    .registers 1
 
-    .line 558
-    iput p1, p0, Lcom/k4/soundtrigger/K4StRetry$10;->val$mode:I
-
+    .line 563
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -40,14 +29,12 @@
 
 
 # virtual methods
-.method public run()V
+.method public onModeChanged(I)V
     .registers 2
 
-    .line 561
-    iget v0, p0, Lcom/k4/soundtrigger/K4StRetry$10;->val$mode:I
+    .line 566
+    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonMode(I)V
 
-    invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonMode(I)V
-
-    .line 562
+    .line 567
     return-void
 .end method

@@ -1,14 +1,11 @@
 .class Lcom/k4/soundtrigger/K4StRetry$15;
-.super Ljava/lang/Object;
+.super Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;
 .source "K4StRetry.java"
-
-# interfaces
-.implements Ljava/lang/Runnable;
 
 
 # annotations
 .annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->syncSubscriptions()V
+    value = Lcom/k4/soundtrigger/K4StRetry;->registerTelephony(Landroid/content/Context;)Z
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -21,20 +18,20 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 701
-    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+    .line 673
+    invoke-direct {p0}, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public run()V
+.method public onSubscriptionsChanged()V
     .registers 1
 
-    .line 704
+    .line 676
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smsyncSubscriptions()V
 
-    .line 705
+    .line 677
     return-void
 .end method
