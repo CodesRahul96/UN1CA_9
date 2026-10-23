@@ -37,9 +37,12 @@
 #     subprograms get the same instruction and map checks,
 #   * no CO-RE relocations (.BTF.ext core_relo_len): libbpf resolves them against the running kernel's BTF, which
 #     this check cannot replay (the legacy path does not apply them at all), so they are refused until reviewed,
-#   * every map an in-window program references (its .rel<section> relocations into .maps) is created on 5.4.302:
-#     otherwise libbpf (autocreate off) / the legacy relocation (fd -1) leaves the program without its map and the
-#     verifier rejects it (load fails) - checked before, and independent of, the tolerated.txt pin filter below,
+#   * every relocation of an in-window program (and of the .text sub-programs it calls) is one its loader path
+#     handles: ld_imm64 into .maps for a map created on 5.4.302 (else libbpf autocreate off / legacy fd -1 -> the
+#     verifier rejects it), .rodata/.data/.bss only for libbpf objects (the legacy applyMapRelo ignores them),
+#     no extern variables (__ksym needs BTF ids, 5.10), no sub-program addresses; calls only into .text, with a
+#     relocation from a program section (libbpf 1.4 bpf_program__record_reloc / reloc_code) - checked before, and
+#     independent of, the tolerated.txt pin filter below,
 #   * every map/program pin it defines for API 37 (on any kernel) is created on 5.4.302 - unless the factory object
 #     of the same name does not create it on 5.4.302 either (the factory userspace runs without it: e.g. dscpPolicy's
 #     5.15+ program) or known/tolerated.txt lists it ("<obj> <pin>  # why", for a reviewed 5.10+-only addition).
@@ -160,14 +163,56 @@ def pin_dirs(r, create_at, pin_at):
 
 
 def relocs(e, syms, si):
-    """(insn offset, symbol name, symbol's section name) of the relocations of code section si"""
-    out = []
+    """insn offset -> (symbol name, symbol's section name ("" = undefined), symbol value) for code section si"""
+    out = {}
     for ri in e.rels_for(si):
         d = e.sh[ri]["data"]
         for i in range(0, len(d), 16):
             off, info = struct.unpack_from("<QQ", d, i); sym = syms[info >> 32]
-            out.append((off, sym[1], e.names[sym[4]] if 0 < sym[4] < len(e.names) else ""))
+            out[off] = (sym[1], e.names[sym[4]] if 0 < sym[4] < len(e.names) else "", sym[5])
     return out
+
+
+def code_problems(e, syms, si, typ, libbpf, maps_made, maps_all, seen=None):
+    """relocations and bpf-to-bpf calls of code section si, replayed the way the object's loader path handles them
+    (libbpf 1.4 bpf_program__record_reloc / bpf_object__reloc_code, or the legacy applyMapRelo), plus the
+    instruction checks of every .text sub-program it reaches"""
+    seen = set() if seen is None else seen; seen.add(si)
+    code = bytes(e.sh[si]["data"]); rels = relocs(e, syms, si); why = []
+    ti = e.idx(".text") if e.has(".text") else None
+    if e.names[si] == ".text": why += [f".text: {q}" for q in insn_problems(code, typ)]
+    i = 0
+    while i + 8 <= len(code):
+        op, src = code[i], code[i + 1] >> 4; imm, = struct.unpack_from("<i", code, i + 4)
+        r = rels.get(i)
+        if op == 0x85 and src == 1:                      # bpf-to-bpf (or, relocated to an undefined symbol, kfunc)
+            if r and r[1] == "": why.append(f"kfunc/extern call {r[0] or '?'}")
+            elif not libbpf: why.append("bpf-to-bpf call (the legacy loader links no subprograms)")
+            elif r and r[1] != ".text": why.append(f"call relocated into section {r[1]} (libbpf: bad call relo)")
+            else:
+                # with a relocation: .text offset sym_value/8 + imm + 1; without: only valid inside .text itself
+                tgt = (r[2] // 8 + imm + 1) if r else (i // 8 + imm + 1 if si == ti else None)
+                tsz = e.sh[ti]["size"] // 8 if ti is not None else 0
+                if tgt is None or not 0 <= tgt < tsz:
+                    why.append("sub-program call without a .text target (libbpf: no .text section found yet "
+                               "sub-program call exists)")
+                elif ti not in seen:
+                    why += code_problems(e, syms, ti, typ, libbpf, maps_made, maps_all, seen)
+        elif r and op == 0x18:                           # ld_imm64 with a relocation
+            name, sec, _ = r
+            if sec == ".maps":
+                if name not in maps_made:
+                    why.append(f"uses map {name}, which " + ("is not created on 5.4.302" if name in maps_all
+                                                             else "has no .android_maps definition"))
+            elif sec == "": why.append(f"extern variable {name} (__ksym/__kconfig: not verified for 5.4)")
+            elif re.match(r"\.(rodata|data|bss)\b", sec):
+                if not libbpf: why.append(f"global data relocation into {sec} (the legacy loader ignores it)")
+            elif sec == ".text": why.append("sub-program address (callback, 5.13)")
+            else: why.append(f"relocation into section {sec}")
+        elif r:
+            why.append(f"relocation on a non-call, non-ld_imm64 instruction (libbpf: invalid relo)")
+        i += 16 if op == 0x18 else 8
+    return why
 
 
 def parse_obj(path):
@@ -218,22 +263,7 @@ def parse_obj(path):
             if bad_dir:
                 probs.append(f"program {pin}: pins into {bad_dir}, which the frozen loader does not create (load fails)")
                 continue
-            rels = relocs(e, syms, code[o][2])
-            calls = [i for i in range(0, len(code[o][1]) - 7, 8) if code[o][1][i] == 0x85 and code[o][1][i + 1] >> 4 == 1]
-            if calls:
-                at = {off: (sym, sec) for off, sym, sec in rels}
-                for i in calls:
-                    sym, sec = at.get(i, ("", None))
-                    if sec == "": why.append(f"kfunc/extern call {sym or '?'}")
-                    elif not libbpf: why.append("bpf-to-bpf call (the legacy loader links no subprograms)")
-                if libbpf and e.has(".text") and e.sh[e.idx(".text")]["size"]:
-                    ti = e.idx(".text")
-                    why += [f".text: {q}" for q in insn_problems(bytes(e.sh[ti]["data"]), typ)]
-                    rels = rels + relocs(e, syms, ti)
-            for _, sym, sec in rels:
-                if sec == ".maps" and sym not in maps_made:
-                    why.append(f"uses map {sym}, which " + ("is not created on 5.4.302" if sym in maps_all
-                                                            else "has no .android_maps definition"))
+            why += code_problems(e, syms, code[o][2], typ, libbpf, maps_made, maps_all)
             if libbpf and opt:
                 probs.append(f"program {pin} ({code[o][0]}) is optional: the frozen loader's libbpf path refuses "
                              f"optional programs (load fails)")
