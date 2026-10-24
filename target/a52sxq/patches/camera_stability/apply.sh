@@ -4,7 +4,14 @@
 CAMERA_APK="system/priv-app/SamsungCamera/SamsungCamera.apk"
 [ -f "$WORK_DIR/system/$CAMERA_APK" ] || ABORT "camera_stability: /$CAMERA_APK not found"
 DECODE_APK "system" "$CAMERA_APK" || ABORT "camera_stability: failed to decode /$CAMERA_APK"
-LOG "- SamsungCamera: Single Take on the MediaRecorder path, vendor CaptureResult keys looked up once"
+# 1c turns the camera's Single Take stills back on because the service we ship is the stp1 SingleTakeService 6.2.00.27
+# from a73xqxx (unica/patches/camera), which picks its best shots only from those stills. A different service may pick
+# them from the video like the S26U one (singletake.capture.support.off): re-check 1c before shipping one.
+ST_APK="system/priv-app/SingleTakeService/SingleTakeService.apk"
+cmp -s "$WORK_DIR/system/$ST_APK" "$SRC_DIR/prebuilts/samsung/a73xqxx/$ST_APK" || \
+    ABORT "camera_stability: /$ST_APK is not the a73xqxx stp1 service 1c (SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT) was made for"
+unset ST_APK
+LOG "- SamsungCamera: Single Take on the MediaRecorder path with its stills, vendor CaptureResult keys looked up once"
 python3 - "$APKTOOL_DIR/system/${CAMERA_APK//system\//}" << 'PYEOF' || ABORT "camera_stability: failed to patch SamsungCamera"
 import glob, os, re, sys
 
@@ -161,6 +168,54 @@ else:
     s = s[:a] + body + s[b:]
     open(f, "w").write(s)
     print("  - RecordingSessionManagerImpl.prepareRecording(): no main session -> %s(2) instead of a crash" % exc)
+
+# 1c. Single Take best shots: SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT is filled by a static boolean getter (x1.e.n0 in this
+#     build) that returns FALSE when SEC_FLOATING_FEATURE_GALLERY_CONFIG_AI_EXPANSION contains
+#     "singletake.capture.support.off" (S26U value). Without it SingleTakeManager.getCaptureType() picks type 2
+#     ("video only"): no TAKE_MULTI_VIDEO_SNAPSHOT every REAR_/SINGLE_TAKE_CAPTURE_INTERVAL ms during the recording, no
+#     still is queued into the stp1 service's main_cap_surface, and the service ("count = 0/0", "Capture Empty", "BEST:
+#     null") makes only the fast forward clip. The S26U's own service picks its shots from the video; the legacy stp1
+#     6.2 Lite service we ship (a73xqxx) only scores the stills the camera sends it. Make the getter return TRUE, as it
+#     does on the S21 FE and stock A52s (AI_EXPANSION there is just "AI_Timelapse").
+SNAP_MARK = MARK + ": SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT"
+hits = sorted(set(files_containing('"singletake.capture.support.off"')) | set(files_containing(SNAP_MARK)))
+assert len(hits) == 1, "capture.support.off reader: %d files" % len(hits)
+f = hits[0]
+s = open(f).read()  # fresh: 1a may have rewritten this file (the getters live in the same feature map class)
+cls = re.search(r"^\.class [^\n]* (L[^;\s]+;)$", s, re.M).group(1)
+decls = [m for m in re.finditer(r"^\.method public static (\w+)\(\)Z$", s, re.M)
+         if "singletake.capture.support.off" in s[m.start():s.index("\n.end method\n", m.start())]
+         or SNAP_MARK in s[m.start():s.index("\n.end method\n", m.start())]]
+assert len(decls) == 1, "capture.support.off getter: %d" % len(decls)
+name = decls[0].group(1)
+a, b = method(s, decls[0].group(0))
+body = s[a:b]
+# its only caller must be the feature map entry for SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT
+call = "invoke-static {}, %s->%s()Z" % (cls, name)
+callers = files_containing(call)
+assert callers == [f] and s.count(call) == 1, "%s callers: %s" % (call, callers)
+assert re.search(r"sget-object v\d+, L[^;]+;->SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT:L[^;]+;\n\n    "
+                 + re.escape(call) + r"\n\n    move-result (v\d+)\n\n    invoke-static \{\1\}, "
+                 r"Ljava/lang/Boolean;->valueOf\(Z\)Ljava/lang/Boolean;\n", s), \
+    "capture.support.off getter is not the SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT feature map entry"
+# the reader of the flag must still be what picks the capture type: video only (2) <=> !SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT
+stm = open(one("com/sec/android/app/camera/engine/SingleTakeManager.smali")).read()
+a2, b2 = method(stm, ".method private isSingleTakeVideoOnlyMode()Z")
+assert "->SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT:" in stm[a2:b2], "isSingleTakeVideoOnlyMode() no longer reads SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT"
+new = ("%s\n    .locals 1\n\n    %s (the stp1 Single Take service we ship picks its best shots\n"
+       "    # from the stills the camera sends it; the S26U floating feature's singletake.capture.support.off sent none)\n"
+       "    const/4 v0, 0x1\n\n    return v0\n.end method\n") % (decls[0].group(0), SNAP_MARK)
+if SNAP_MARK in body:
+    assert body == new, "%s->%s carries another camera_stability version" % (cls, name)
+    print("  - %s->%s() already returns TRUE" % (cls, name))
+else:
+    assert body.count("SemFloatingFeature;->getInstance()") == 1 and \
+        '"SEC_FLOATING_FEATURE_GALLERY_CONFIG_AI_EXPANSION"' in body, "%s->%s: unexpected stock body" % (cls, name)
+    s = s[:a] + new + s[b:]
+    open(f, "w").write(s)
+    if all_smali is not None:
+        all_smali[f] = s
+    print("  - %s->%s(): SUPPORT_SINGLE_TAKE_VIDEO_SNAPSHOT = true" % (cls, name))
 
 # ---------------------------------------------------------------------------------------------------------------------
 # 2. SemCaptureResult.a(CaptureResult, Key): remember keys without a vendor tag on this HAL and stop asking for them.
