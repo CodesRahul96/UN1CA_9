@@ -3,7 +3,7 @@
 .source "K4StRetry.java"
 
 # interfaces
-.implements Ljava/util/concurrent/Executor;
+.implements Ljava/lang/Runnable;
 
 
 # annotations
@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 112
+    .line 273
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -29,16 +29,12 @@
 
 
 # virtual methods
-.method public execute(Ljava/lang/Runnable;)V
-    .registers 3
+.method public run()V
+    .registers 1
 
-    .line 115
-    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsHandler()Landroid/os/Handler;
+    .line 276
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smowedCheck()V
 
-    move-result-object v0
-
-    invoke-virtual {v0, p1}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
-
-    .line 116
+    .line 277
     return-void
 .end method
