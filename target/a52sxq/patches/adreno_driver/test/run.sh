@@ -540,5 +540,14 @@ wait $SPID
 has "crash result in boot.log" "system_server restarted (1 -> 2)" "$R/data/k4gpu/boot.log"
 eq "crash status prop" "$(prop sys.k4.gpu_settle)" "failed: system_server restarted (1 -> 2), trial stays testing"
 
+CASE="polish 4: persist.sys.k4.gpu_prev is cleared when it equals the current choice"
+device; setp persist.sys.k4.gpu_prev 530; boot
+eq "prev cleared (530 == 530)" "$(prop persist.sys.k4.gpu_prev)" ""
+device; ksu_module modules adreno_p V@0744.0; setp persist.sys.k4.gpu_driver 849; boot
+eq "prev kept while it differs (module auto-selected, prev 849)" "$(prop persist.sys.k4.gpu_prev)" 849
+rm -rf "$R/data/adb/modules/adreno_p"; boot
+eq "module gone: back to prev" "$(prop persist.sys.k4.gpu_driver)" 849
+eq "then prev cleared" "$(prop persist.sys.k4.gpu_prev)" ""
+
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]

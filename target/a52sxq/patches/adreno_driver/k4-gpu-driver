@@ -654,6 +654,9 @@ boot() {
         done
     } > "$LIST.new" && chmod 644 "$LIST.new" && mv "$LIST.new" "$LIST"
 
+    # "previous choice" is only kept while it differs from the current one (it is where a vanished module falls
+    # back to); equal to the selection it carries nothing, so it is cleared
+    [ "$prev" = "$sel" ] && prev=""
     spc ${P}driver "$sel"
     spc ${P}trial "$trial"
     spc ${P}failed "$failed"
