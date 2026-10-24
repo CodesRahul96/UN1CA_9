@@ -1,0 +1,26 @@
+meta-overlayfs 1.3.1-k4.1 (versionCode 13101): the K4_UN1CA ROM's build of meta-overlayfs v1.3.1
+
+This is a modified version of meta-overlayfs v1.3.1 by the KernelSU Developers,
+https://github.com/KernelSU-Modules-Repo/meta-overlayfs (tag v1.3.1, commit 7143eb79cc14d68f070081beed60ecf8344da3a8),
+licensed under the GNU General Public License v3.0. The modified scripts are under the same licence; you can
+redistribute and/or modify them under its terms. There is NO WARRANTY.
+
+Modified 2026-10-24 by kusti420 (K4_UN1CA, Galaxy A52s 5G). Changed files (each says what changed, look for "K4"):
+  metainstall.sh  - set_perm got a mode as its SELinux context ("chcon: invalid context: 0644"), the image's mnt/
+                    and mnt/<id> directories stayed unlabeled: fixed.
+                  - on a ROM with /system/bin/k4-gpu-driver, Adreno GPU driver modules are not copied into the image
+                    (the ROM's GPU driver selector imports them with the right labels and a trial boot).
+                  - directories that also exist on the partition get the partition's label.
+  metamount.sh    - on such a ROM, an Adreno GPU driver module's copy in the image (from an earlier install) is
+                    removed before mounting.
+                  - the copy of a module that was uninstalled is removed (metauninstall.sh runs before the image
+                    is mounted and skipped it; a reinstall of the same id then mounted the old leftovers too).
+  module.prop     - version 1.3.1-k4.1, versionCode 13101, description.
+  K4_CHANGES.txt  - this file.
+Unchanged: customize.sh, metauninstall.sh, uninstall.sh, post-mount.sh and the binaries meta-overlayfs-aarch64 /
+meta-overlayfs-x86_64 (the v1.3.1 release build of src/; source: the tag above).
+
+Why: with the unmodified build, an Adreno driver module without its own customize.sh labels (KernelSU labels
+everything under system/vendor vendor_file) was mounted over /vendor/lib64/egl with label vendor_file;
+SurfaceFlinger may only load same_process_hal_file from /vendor, so it aborted on every start ("couldn't find an
+OpenGL ES implementation"), Samsung's bootchecker rebooted the phone ("Infinite reset happened") until recovery.

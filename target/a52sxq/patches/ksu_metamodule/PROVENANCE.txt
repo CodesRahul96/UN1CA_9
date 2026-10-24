@@ -1,4 +1,13 @@
-meta-overlayfs 1.3.1 (versionCode 13100), the metamodule this patch ships (checked 2026-10-24)
+meta-overlayfs 1.3.1-k4.1 (versionCode 13101), the metamodule this patch ships: the official meta-overlayfs 1.3.1
+(versionCode 13100) with K4 changes to three scripts (checked 2026-10-24)
+
+The shipped zip, meta-overlayfs-13101-1.3.1-k4.1.zip (sha256 73695f19fd362620738955069306963ef9dde119ce509c3ce90aa27a76ff0669),
+is built by meta-overlayfs-k4/make_zip.sh from the official release zip below: the release's own entries in their
+order, with metainstall.sh, metamount.sh and module.prop replaced by the files in meta-overlayfs-k4/ and
+K4_CHANGES.txt added (the GPL-3.0 notice of the modification, inside the zip). The binaries and the other scripts
+are the release's files byte for byte (customize.sh checks each one's sha256 at build time, and that the changed
+files equal meta-overlayfs-k4/). Why the changes: see "K4 changes" at the end.
+
 
 Official sources only:
   - kernelsu.org/guide/metamodule.html (source: github.com/tiann/KernelSU website/docs/guide/metamodule.md):
@@ -9,13 +18,15 @@ Official sources only:
   - Release: https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases/tag/v1.3.1 (2025-12-02, the latest)
     asset meta-overlayfs-13100-1.3.1.zip, 451415 bytes,
     sha256 279d85a6a35724dfcf8aa1137a9630c7e989e154b94543517c539ee70f9b8811 (= GitHub's asset digest)
-    Unmodified; pinned in customize.sh and in k4-ksu-metamodule (both checked at build time).
+    The input of make_zip.sh (its sha256 is checked there); archived on the build PC:
+    /mnt/B1/OneUi9/scratch/metamodule/dl/meta-overlayfs-13100-1.3.1.zip
   - Source: https://github.com/KernelSU-Modules-Repo/meta-overlayfs tag v1.3.1 = commit
     7143eb79cc14d68f070081beed60ecf8344da3a8 ("Release v1.3.1", Wang Han). The zip's scripts and module.prop are
     byte-identical to metamodule/ at that commit; the two binaries (meta-overlayfs-aarch64 / -x86_64) are the
     release build of src/ (mount.rs, xcp.rs). Author "KernelSU Developers".
   - Licence: GPL-3.0 (Cargo.toml license = "GPL-3.0", README "License: GPL-3.0"; KernelSU itself is GPL-3.0).
-    Shipping the binary in the ROM is a distribution: the corresponding source is the tag above;
+    Shipping the binary in the ROM is a distribution: the corresponding source is the tag above (the binaries are
+    unmodified) plus the changed scripts themselves (meta-overlayfs-k4/, also inside the shipped zip, GPL-3.0);
     a copy is archived on the build PC: /mnt/B1/OneUi9/scratch/metamodule/meta-overlayfs-1.3.1-source.tar.gz
     (git archive of 7143eb7, sha256 55e09407d1f9aba4da236148dfad6f124fe54eab305b41263e28cdc8d0f3d436).
 
@@ -41,3 +52,27 @@ Alternatives looked at (all metamodules in the official KernelSU-Modules-Repo or
     the boot path.
   - hybrid_mount v6.2.0 (Apache-2.0): three mount engines (OverlayFS, magic mount, Kasumi), 3.4 MB, web UI: far
     more than "mount the modules", more to go wrong in a default.
+
+K4 changes (meta-overlayfs-k4/K4_CHANGES.txt; each changed script says what changed, look for "K4"):
+  Found on 9.3.81 (2026-10-24): with the unmodified 1.3.1 the phone bootlooped into recovery after an Adreno V@0849
+  driver module (no customize.sh) was installed through it. KernelSU's installer labels everything under
+  system/vendor vendor_file, metainstall.sh copies those labels into the image, so /vendor/lib64/egl/*.so (and the
+  merged lib64/hw and firmware directories) were vendor_file over /vendor; SurfaceFlinger may only read
+  same_process_hal_file there ("avc: denied { read } ... name=libEGL_adreno.so dev=overlay ... vendor_file"),
+  libEGL aborted it on every start ("couldn't find an OpenGL ES implementation"), and Samsung's bootchecker
+  rebooted ("Infinite reset happened ... count: 5") until recovery. Evidence: /mnt/B1/OneUi9/scratch/bootfail_9381/
+  phone/ksulog/{dmesg,logcat}.old.log (ksud's capture of the failing boot); the image copy on the phone had every
+  file and directory vendor_file and its mnt/ directories unlabeled.
+  1. metainstall.sh: set_perm got a mode in its SELinux-context argument (set_perm <dir> 0 0 0755 0644), which
+     printed "chcon: invalid context: 0644" on every install and left mnt/ and mnt/<id> unlabeled.
+  2. metainstall.sh: on a ROM with /system/bin/k4-gpu-driver, a module carrying an Adreno set
+     ({vendor,system/vendor}/{lib64,lib}/egl/libGLESv2_adreno.so) is not copied into the image; the GPU driver
+     selector imports it with the stock labels, its allowlist and a trial boot (also the first boot after the
+     install). metamount.sh removes such a module's copy that an earlier install left in the image.
+  3. metainstall.sh: a module directory that also exists on the partition gets that directory's label (an
+     overlayfs merged directory shows the topmost layer's label: the module's lib64/hw hid the stock
+     vendor_hal_file one, /vendor/etc the vendor_configs_file one). Files keep the module's labels.
+  4. metamount.sh: the image copy of an uninstalled module is removed (metauninstall.sh runs before the image is
+     mounted and skips it; a reinstall of the same id then also mounted the old version's leftover files).
+  k4-ksu-metamodule updates an installed meta-overlayfs with a lower versionCode (the unmodified 13100, installed
+  by 9.3.81) to this build.

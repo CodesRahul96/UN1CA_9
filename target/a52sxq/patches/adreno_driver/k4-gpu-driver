@@ -16,10 +16,13 @@
 #     module is imported (copied) into /data/k4gpu/store/m_<id>_<hash> and bound like a built-in set. If the module is
 #     already mounted (a metamodule, Magisk's magic mount, Mountify: the GLES library seen in /vendor is the module's
 #     file) nothing is mounted on top: the user's mount wins and the entry is reported as active and locked.
-#     The ROM installs meta-overlayfs by default (target/a52sxq/patches/ksu_metamodule): a driver module installed
-#     after it is in its image and mounted by ksud's post-fs-data (metamount.sh, inside the blocking init.rc exec that
-#     runs before this file's post-fs-data action), so it takes the "already mounted" path; a module installed before
-#     the metamodule is not in that image, stays unmounted and is imported as above (checked on the phone 2026-10-24).
+#     The ROM installs its build of meta-overlayfs by default (target/a52sxq/patches/ksu_metamodule, 1.3.1-k4.1): it
+#     never mounts a module that carries an Adreno set (its metainstall.sh keeps such a module out of its image, its
+#     metamount.sh drops one an older install put there), so a driver module is always imported here, with the stock
+#     labels, the allowlist and a trial boot - also on the very first boot after its install. The unmodified
+#     meta-overlayfs 1.3.1 mounted it with KernelSU's default label vendor_file instead, SurfaceFlinger could not
+#     load libEGL_adreno.so and the phone bootlooped into recovery (9.3.81, 2026-10-24); the "already mounted" path
+#     cannot help there, since the stock driver it would fall back to is hidden under the same mount.
 #   - Settings > K4_UN1CA > UI > GPU driver > Add driver: Settings validates the zip and stages the set in
 #     /data/k4gpu/incoming/u_<id>/ (+ "ready"); it is validated again and moved to /data/k4gpu/store/u_<id> here.
 #   - A driver flashed into /vendor itself (TWRP zip): no mount, the default entry is labeled with its version.

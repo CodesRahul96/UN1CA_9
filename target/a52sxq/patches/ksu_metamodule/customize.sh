@@ -1,6 +1,6 @@
 SKIPUNZIP=1
 
-# KernelSU metamodule by default (see module.prop and k4-ksu-metamodule). Ships the official meta-overlayfs zip in
+# KernelSU metamodule by default (see module.prop and k4-ksu-metamodule). Ships the ROM's meta-overlayfs build in
 # /system/etc/k4/ksu/, the boot hook /system/bin/k4-ksu-metamodule and /system/etc/init/k4_ksu_metamodule.rc:
 #   sys.boot_completed=1      -> k4_ksu_meta_gate (domain k4ksumeta, root uid, no capabilities used): is KernelSU
 #                                active? (sets sys.k4.ksu_meta_gate)
@@ -9,13 +9,34 @@ SKIPUNZIP=1
 #                                metamodule with `ksud module install` when there is none and the user did not opt
 #                                out; it is mounted from the next boot on.
 # Without KernelSU nothing but the gate runs (Magisk mounts modules itself).
-META_ZIP="meta-overlayfs-13100-1.3.1.zip"
-META_SHA256="279d85a6a35724dfcf8aa1137a9630c7e989e154b94543517c539ee70f9b8811"
-META_PROP="$(printf 'id=meta-overlayfs\nmetamodule=1\nname=OverlayFS MetaModule\nversion=1.3.1\nversionCode=13100\nauthor=KernelSU Developers\ndescription=An implementation of a metamodule using OverlayFS for KernelSU')"
+# meta-overlayfs 1.3.1-k4.1: the official v1.3.1 release zip with the files of meta-overlayfs-k4/ changed or added
+# (meta-overlayfs-k4/make_zip.sh, PROVENANCE.txt)
+META_ZIP="meta-overlayfs-13101-1.3.1-k4.1.zip"
+META_SHA256="73695f19fd362620738955069306963ef9dde119ce509c3ce90aa27a76ff0669"
+# the files the K4 build leaves as they are: sha256 of each in the official v1.3.1 release zip
+META_UPSTREAM="f8d62ca9523bb73216fa7d812f3bc07f4444f39f33bcb3c2b1bf00d65ef980ad uninstall.sh
+9524097461a391997df79b699c14afbcac4be6ce73bcfe6f27e6532d4cc1f147 customize.sh
+833e1299a4ff3ae2f2c629e0f8cebf9f54026c2efe8d9614e51a4fe64c472e3a metauninstall.sh
+d27f99f18f674f8f3d6ccaf3806321ac18264318d5b20e53397fb9103dce2773 post-mount.sh
+4ff9a64aaff1095ee172bd16189b8ffb37cacf522523edebadd191547ef125b6 meta-overlayfs-x86_64
+04ef286eb33dd6650be08c368cc16d06e369aeae2c582f8df520d0a7dcc2fa95 meta-overlayfs-aarch64"
+META_K4="metainstall.sh metamount.sh module.prop K4_CHANGES.txt"
 
 [ "$(sha256sum "$MODPATH/$META_ZIP" | cut -d " " -f 1)" = "$META_SHA256" ] || \
     ABORT "ksu_metamodule: $META_ZIP does not match the pinned sha256 (PROVENANCE.txt)"
-[ "$(unzip -p "$MODPATH/$META_ZIP" module.prop)" = "$META_PROP" ] || ABORT "ksu_metamodule: unexpected module.prop in $META_ZIP"
+[ "$(unzip -Z1 "$MODPATH/$META_ZIP" | LC_ALL=C sort | tr '\n' ' ')" = \
+    "$( (echo "$META_UPSTREAM" | cut -d " " -f 2; echo "$META_K4" | tr ' ' '\n') | LC_ALL=C sort | tr '\n' ' ')" ] || \
+    ABORT "ksu_metamodule: $META_ZIP does not hold exactly the expected files"
+while read -r h f; do
+    [ "$(unzip -p "$MODPATH/$META_ZIP" "$f" | sha256sum | cut -d " " -f 1)" = "$h" ] || \
+        ABORT "ksu_metamodule: $f in $META_ZIP is not the official v1.3.1 file"
+done <<< "$META_UPSTREAM"
+for f in $META_K4; do
+    unzip -p "$MODPATH/$META_ZIP" "$f" | cmp -s - "$MODPATH/meta-overlayfs-k4/$f" || \
+        ABORT "ksu_metamodule: $f in $META_ZIP differs from meta-overlayfs-k4/$f (rebuild it with make_zip.sh)"
+done
+grep -q -x -F "ZIP_VC=$(sed -n 's/^versionCode=//p' "$MODPATH/meta-overlayfs-k4/module.prop")" "$MODPATH/k4-ksu-metamodule" || \
+    ABORT "ksu_metamodule: ZIP_VC in k4-ksu-metamodule is not the versionCode of meta-overlayfs-k4/module.prop"
 grep -q -x -F "ZIP_SHA256=\"\${K4KSU_ZIP_SHA256:-$META_SHA256}\"" "$MODPATH/k4-ksu-metamodule" || \
     ABORT "ksu_metamodule: k4-ksu-metamodule pins another zip"
 
@@ -87,5 +108,5 @@ fi
 grep -q -x -F "(allow k4ksumeta k4_ksu_meta_status_prop (property_service (set)))" "$PLAT_CIL" || \
     ABORT "ksu_metamodule: k4ksumeta rules missing from plat_sepolicy.cil"
 
-LOG "- KernelSU metamodule by default: meta-overlayfs 1.3.1 in /system/etc/k4/ksu, installed by k4-ksu-metamodule"
-unset META_ZIP META_SHA256 META_PROP RC PLAT_CIL PLAT_PC t a n
+LOG "- KernelSU metamodule by default: meta-overlayfs 1.3.1-k4.1 in /system/etc/k4/ksu, installed by k4-ksu-metamodule"
+unset META_ZIP META_SHA256 META_UPSTREAM META_K4 RC PLAT_CIL PLAT_PC t a n h f
