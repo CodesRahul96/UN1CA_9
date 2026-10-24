@@ -18,8 +18,8 @@ import android.util.Log;
  *   persist.sys.k4.home_depth_clock_y      centre of the digits in % of the screen height; empty/"auto" = auto
  *   persist.sys.k4.home_depth_clock_color  empty/"white" = white (default), "accent" = theme (Monet) accent, light or
  *                                          dark by the wallpaper brightness under the clock, or #RRGGBB / #AARRGGBB
- * A gated clock ({@code owner} set: the shared home+lock instance) is drawn only while the keyguard is gone and the
- * display is ON; it follows the background's screen on/off zoom so it stays glued to the wallpaper.
+ * A gated clock (the shared home+lock instance, see {@link DepthClock#showing}) is drawn only while the keyguard is gone
+ * and the display is ON; it follows the background's screen on/off zoom so it stays glued to the wallpaper.
  */
 final class ClockNode extends DepthClock {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
@@ -29,8 +29,9 @@ final class ClockNode extends DepthClock {
     private final boolean accent;
     private final Integer fixedColor;
 
-    ClockNode(Context context, int w, int h, float subjectTop, Bitmap background, i3.c scaleRef, h3.a gatedOwner) {
-        super(context, "K4DepthClockNode", scaleRef, gatedOwner);
+    ClockNode(Context context, int w, int h, float subjectTop, Bitmap background, i3.c scaleRef, h3.a owner,
+            boolean gated) {
+        super(context, "K4DepthClockNode", scaleRef, owner, gated);
         paint.setTypeface(Typeface.create(Typeface.DEFAULT, 500, false));
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setFontFeatureSettings("tnum");
@@ -69,7 +70,7 @@ final class ClockNode extends DepthClock {
                 (int) (baseline - digitH), (int) (centerX + target / 2), (int) baseline) > 0.6f;
         Log.i(HomeDepthClock.TAG, "layout: textSize=" + paint.getTextSize() + ", digitH=" + digitH + ", baseline="
                 + baseline + " (subjectTop=" + subjectTop + "), color=" + (accent ? "accent" : Integer.toHexString(c))
-                + (owner != null ? ", gated" : ""));
+                + (gated ? ", gated" : ""));
     }
 
     @Override

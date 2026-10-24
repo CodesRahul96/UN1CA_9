@@ -1050,9 +1050,9 @@ public final class HomeClock {
             String json = (String) g.getClass().getMethod("toJson", Object.class, java.lang.reflect.Type.class).invoke(g, item, base);
             android.provider.Settings.System.putString(c.getContentResolver(), KEY_ITEM, json);
             android.os.SemSystemProperties.set(PROP, on ? "1" : "0");
-            // the wallpaper is applied right after this (its new engine reads the clock settings itself): the engine
-            // showing the old wallpaper waits for that instead of rebuilding with the old layers first, and rebuilds
-            // only if no new wallpaper engine arrives (an apply that failed)
+            // the wallpaper is applied right after this (normally a new engine, built from the settings written above):
+            // each home engine checks once it is shown again (or in 6 s) and rebuilds only if its clock was built from
+            // other settings (EngineState / ReloadPolicy in the wallpaper), so neither a double nor a stale build
             c.sendBroadcast(new android.content.Intent("com.k4.homeclock.action.RELOAD")
                     .putExtra("com.k4.homeclock.extra.WALLPAPER_PENDING", true)
                     .setPackage("com.samsung.android.wallpaper.live").addFlags(android.content.Intent.FLAG_RECEIVER_FOREGROUND));

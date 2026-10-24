@@ -17,14 +17,20 @@ import java.util.Locale;
 abstract class DepthClock extends i3.j {
     /** Background node whose screen on/off zoom the clock follows (shared home+lock instance), or null. */
     final i3.c scaleRef;
-    /** Set for the shared home+lock instance: draw only while the keyguard is gone and the display is ON. */
-    final h3.a owner;
+    /** The presenter whose layer list holds this clock (weak: the presenter holds the clock), to find its engine. */
+    private final java.lang.ref.WeakReference<h3.a> owner;
+    /**
+     * The shared home+lock instance (one surface for lock screen, AOD and home): draw only while the keyguard is gone,
+     * the display is ON, the engine still shows the home screen and is not a preview. Anything unknown: not drawn.
+     */
+    final boolean gated;
     volatile String lastDrawn = "";
 
-    DepthClock(Context context, String name, i3.c scaleRef, h3.a gatedOwner) {
+    DepthClock(Context context, String name, i3.c scaleRef, h3.a owner, boolean gated) {
         super(context, name);
         this.scaleRef = scaleRef;
-        this.owner = gatedOwner;
+        this.owner = new java.lang.ref.WeakReference<>(owner);
+        this.gated = gated;
     }
 
     /** The minute (and whatever else changes the picture) a draw now would show. */
@@ -33,20 +39,33 @@ abstract class DepthClock extends i3.j {
         return new SimpleDateFormat(is24 ? "HH:mm" : "h:mm", Locale.getDefault()).format(new Date());
     }
 
-    /** True unless this is the shared instance and the lock screen / AOD / screen-off is what it shows. */
+    /**
+     * Whether a draw now shows the clock.
+     * Home-only presenter (HomeClockPresenter, not gated): its wallpaper is never the lock screen's, and LayeredEngine
+     * rebuilds the engine at once when it becomes one (onWhichChanged 1 -> 3: stopSelf); until that has happened, and for
+     * any engine that no longer shows the home screen alone, nothing is drawn; nor in a preview engine (picker / editor
+     * previews never show the clock). An engine not found keeps the clock (the presenter is only ever made for a
+     * home-only engine).
+     * Gated (shared home+lock instance): only while the keyguard is known to be gone (KeyguardWatch, locked until
+     * known), the engine is found, is no preview (wallpaper picker / editor / Wallpaper and style previews have no
+     * keyguard to go by and may show the lock screen), still has the home flag and its display state is ON (not NONE,
+     * OFF or AOD, which also covers the screen on/off animations). Any failure: not drawn.
+     */
     boolean showing() {
-        if (owner == null) {
-            return true;
+        try {
+            h3.a p = owner.get();
+            f3.a e = p == null ? null : HomeDepthClock.engineOf(p);
+            if (!gated) {
+                return e == null || ((e.getWhich() & 3) == 1 && !e.isPreview());
+            }
+            if (KeyguardWatch.locked || e == null || e.isPreview() || (e.getWhich() & 1) == 0) {
+                return false;
+            }
+            Object state = e.getDisplayState();
+            return state instanceof Enum && "ON".equals(((Enum<?>) state).name());
+        } catch (Throwable t) {
+            return !gated;
         }
-        if (KeyguardWatch.locked) {
-            return false;
-        }
-        f3.a e = HomeDepthClock.engineOf(owner);
-        if (e == null) {
-            return false;
-        }
-        Object state = e.getDisplayState();
-        return state instanceof Enum && "ON".equals(((Enum<?>) state).name());
     }
 
     /** What a draw now would put on screen ("" = nothing). */

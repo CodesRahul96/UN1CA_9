@@ -19,7 +19,8 @@ import java.util.WeakHashMap;
  *  - h3.a.e (AbstractLayeredPresenter.updateSurfaceSize), right after the layer list is built: {@link #afterBuild}
  *    adds a gated {@link ClockNode} to the BgCachableLayeredPresenter (h3.b) of a home+lock shared wallpaper
  *    (which & 3 == 3). That presenter keeps its separate layers for the lock screen's own screen on/off animation, so it
- *    is not replaced; the clock is drawn only while the keyguard is gone and the display is ON.
+ *    is not replaced; the clock is drawn only while the keyguard is gone, the display is ON, the engine still shows the
+ *    home screen and is no preview (DepthClock.showing). On by default, persist.sys.k4.home_depth_clock_shared=0 = off.
  *  - f3.a (LayeredEngine) onCreate / onVisibilityChanged / onDestroy: {@link EngineState} (reload receiver, minute ticker).
  *    onCreate also appends {@link PostDim} to the engine's root node list, after its DarkModeNode, for a
  *    HomeClockPresenter: the clock is drawn above the dark mode wallpaper dim, like the editor's and the lock screen's;
@@ -35,7 +36,7 @@ public final class HomeDepthClock {
     static final String TAG = "K4HomeClock";
     static final String PROP = "persist.sys.k4.home_depth_clock";
     public static final String ACTION_RELOAD = "com.k4.homeclock.action.RELOAD";
-    /** RELOAD extra (boolean): the sender is about to apply a new wallpaper, whose new engine reads the settings itself. */
+    /** RELOAD extra (boolean): the sender is about to apply a wallpaper; checked when the engine is shown again or in 6 s. */
     public static final String EXTRA_WALLPAPER_PENDING = "com.k4.homeclock.extra.WALLPAPER_PENDING";
     /** Only senders holding this permission (Settings, shell) are heard. */
     static final String RELOAD_PERMISSION = "android.permission.WRITE_SECURE_SETTINGS";
@@ -60,11 +61,13 @@ public final class HomeDepthClock {
     }
 
     /**
-     * The shared home+lock path is opt-in until it has been checked on a phone with a shared layered wallpaper (lock
-     * screen / AOD / screen-off transitions must never show the clock): persist.sys.k4.home_depth_clock_shared=1.
+     * The shared home+lock path (a layered wallpaper set on both screens): on unless
+     * persist.sys.k4.home_depth_clock_shared is "0" (or "false"). Its clock is gated (DepthClock.showing): never on the
+     * lock screen, the AOD, the screen on/off animations or in previews; checked on 9.3.63 with which=7.
      */
     static boolean sharedEnabled() {
-        return "1".equals(prop(PROP + "_shared"));
+        String v = prop(PROP + "_shared");
+        return !("0".equals(v) || "false".equalsIgnoreCase(v));
     }
 
     /** The instance draws the home screen (FLAG_SYSTEM), alone (1) or shared with the lock screen (3). */
@@ -89,7 +92,15 @@ public final class HomeDepthClock {
     /** h3.a.e hook, after the presenter built its layer list. Only the shared home+lock instance's h3.b is touched. */
     public static void afterBuild(h3.a p) {
         try {
-            if (p.getClass() != h3.b.class || (p.c & 3) != 3 || !enabled() || !sharedEnabled()) {
+            if (p.getClass() != h3.b.class) {
+                return;
+            }
+            // h3.a.e has just cleared and rebuilt the layer list: a clock from an earlier build of p is no longer in
+            // it. Forget it (released) and what it was built from before any early return below, so no orphan clock
+            // keeps redrawing the engine on minute ticks / keyguard changes and a RELOAD sees the truth.
+            setClock(p, null);
+            built(p, null);
+            if ((p.c & 3) != 3 || !enabled() || !sharedEnabled()) {
                 return;
             }
             g0.a data = p.e;
@@ -101,12 +112,18 @@ public final class HomeDepthClock {
             if (at < 0) {
                 at = list.size();
             }
+            // the gate needs the keyguard state: without a working listener there is no clock at all
+            if (!KeyguardWatch.ensure(p.a)) {
+                Log.w(TAG, "shared home+lock wallpaper (which=" + p.c + "): keyguard state unavailable, no clock");
+                return;
+            }
             i3.c subject = data.d instanceof i3.c ? (i3.c) data.d : null;
             i3.c background = data.c instanceof i3.c ? (i3.c) data.c : null;
-            DepthClock clock = makeClock(p.a, p.g, p.h, HomeClockPresenter.subjectTop(subject), null, background, p);
+            String fp = fingerprint(p.a); // before makeClock reads the settings
+            DepthClock clock = makeClock(p.a, p.g, p.h, HomeClockPresenter.subjectTop(subject), null, background, p, true);
             list.add(at, clock);
             setClock(p, clock);
-            KeyguardWatch.ensure(p.a);
+            built(p, fp);
             Log.i(TAG, "shared home+lock wallpaper (which=" + p.c + "): gated clock at layer " + at + "/" + list.size());
         } catch (Throwable t) {
             Log.e(TAG, "afterBuild", t);
@@ -119,19 +136,58 @@ public final class HomeDepthClock {
      * clock cannot be created (logged).
      */
     static DepthClock makeClock(Context context, int w, int h, float subjectTop, android.graphics.Bitmap background,
-            i3.c scaleRef, h3.a gatedOwner) {
-        ClockNode plain = new ClockNode(context, w, h, subjectTop, background, scaleRef, gatedOwner);
+            i3.c scaleRef, h3.a owner, boolean gated) {
+        ClockNode plain = new ClockNode(context, w, h, subjectTop, background, scaleRef, owner, gated);
         HomeClockItem item = HomeClockItem.read(context);
         if (item == null) {
             Log.i(TAG, "no saved home clock item: plain clock");
             return plain;
         }
         try {
-            return AodClockNode.create(context, w, h, item, background, plain, scaleRef, gatedOwner);
+            return AodClockNode.create(context, w, h, item, background, plain, scaleRef, owner, gated);
         } catch (Throwable t) {
             Throwable cause = t instanceof java.lang.reflect.InvocationTargetException && t.getCause() != null ? t.getCause() : t;
             Log.e(TAG, "AOD clock unavailable, plain clock (" + item + ")", cause);
             return plain;
+        }
+    }
+
+    /** What each presenter's clock was built from (fingerprint), see {@link ReloadPolicy}. */
+    private static final Map<h3.a, String> BUILT = new WeakHashMap<>();
+
+    /**
+     * The settings a clock is built from, as one string (ReloadPolicy.fingerprint), or null if they cannot be read:
+     * the editor's clock (Settings.System k4_home_clock_item, _rect, _bundle) and the persist.sys.k4.home_depth_clock*
+     * props (switch, shared, plain clock place and colour).
+     */
+    static String fingerprint(Context context) {
+        try {
+            android.content.ContentResolver r = context.getContentResolver();
+            return ReloadPolicy.fingerprint(
+                    android.provider.Settings.System.getString(r, HomeClockItem.KEY),
+                    android.provider.Settings.System.getString(r, HomeClockItem.KEY + "_rect"),
+                    android.provider.Settings.System.getString(r, HomeClockItem.KEY_BUNDLE),
+                    prop(PROP), prop(PROP + "_shared"), prop(PROP + "_y"), prop(PROP + "_color"));
+        } catch (Throwable t) {
+            Log.w(TAG, "clock settings fingerprint", t);
+            return null;
+        }
+    }
+
+    /** A build of {@code p} made its clock from {@code fingerprint} (taken before it read the settings). */
+    static void built(h3.a p, String fingerprint) {
+        synchronized (BUILT) {
+            if (fingerprint == null) {
+                BUILT.remove(p);
+            } else {
+                BUILT.put(p, fingerprint);
+            }
+        }
+    }
+
+    static String builtFrom(h3.a p) {
+        synchronized (BUILT) {
+            return BUILT.get(p);
         }
     }
 
@@ -226,9 +282,6 @@ public final class HomeDepthClock {
             if (!homeCapable(engine.getWhich())) {
                 return;
             }
-            for (EngineState other : states()) {
-                other.newEngine();
-            }
             if (engine.g instanceof HomeClockPresenter) {
                 try {
                     // The engine sets its dark mode dim (DarkModeNode, and so PostDim's subject dim) only on a
@@ -289,8 +342,8 @@ public final class HomeDepthClock {
                 st.stop();
             }
             // The shared presenter (h3.b) tears down through the final stock h3.f.d(), which never calls setClock(p,
-            // null), and its gated clock holds p strongly (DepthClock.owner), so the weak CLOCKS entry would keep p,
-            // the clock and its AodHost for the life of the process. A HomeClockPresenter clears its own entry in d().
+            // null): clear its CLOCKS entry here, so the clock's AodHost is released with the engine and not when the
+            // presenter happens to be collected. A HomeClockPresenter clears its own entry in d().
             h3.a p = engine.g;
             if (p != null && !(p instanceof HomeClockPresenter)) {
                 setClock(p, null);

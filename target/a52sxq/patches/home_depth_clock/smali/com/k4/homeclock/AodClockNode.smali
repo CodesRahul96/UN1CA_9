@@ -38,33 +38,43 @@
 
 
 # direct methods
-.method private constructor <init>(Landroid/content/Context;IILcom/k4/homeclock/HomeClockItem;Landroid/graphics/Bitmap;Lcom/k4/homeclock/ClockNode;Li3/c;Lh3/a;)V
-    .registers 11
+.method private constructor <init>(Landroid/content/Context;IILcom/k4/homeclock/HomeClockItem;Landroid/graphics/Bitmap;Lcom/k4/homeclock/ClockNode;Li3/c;Lh3/a;Z)V
+    .registers 16
 
     .line 53
-    const-string v0, "K4AodClockNode"
+    const-string v2, "K4AodClockNode"
 
-    invoke-direct {p0, p1, v0, p7, p8}, Lcom/k4/homeclock/DepthClock;-><init>(Landroid/content/Context;Ljava/lang/String;Li3/c;Lh3/a;)V
+    move-object v0, p0
+
+    move-object v1, p1
+
+    move-object v3, p7
+
+    move-object v4, p8
+
+    move v5, p9
+
+    invoke-direct/range {v0 .. v5}, Lcom/k4/homeclock/DepthClock;-><init>(Landroid/content/Context;Ljava/lang/String;Li3/c;Lh3/a;Z)V
 
     .line 43
-    const-string p7, ""
+    const-string p1, ""
 
-    iput-object p7, p0, Lcom/k4/homeclock/AodClockNode;->builtFor:Ljava/lang/String;
+    iput-object p1, v0, Lcom/k4/homeclock/AodClockNode;->builtFor:Ljava/lang/String;
 
     .line 54
-    iput-object p4, p0, Lcom/k4/homeclock/AodClockNode;->item:Lcom/k4/homeclock/HomeClockItem;
+    iput-object p4, v0, Lcom/k4/homeclock/AodClockNode;->item:Lcom/k4/homeclock/HomeClockItem;
 
     .line 55
-    iput-object p6, p0, Lcom/k4/homeclock/AodClockNode;->fallback:Lcom/k4/homeclock/ClockNode;
+    iput-object p6, v0, Lcom/k4/homeclock/AodClockNode;->fallback:Lcom/k4/homeclock/ClockNode;
 
     .line 56
-    iput p2, p0, Lcom/k4/homeclock/AodClockNode;->w:I
+    iput p2, v0, Lcom/k4/homeclock/AodClockNode;->w:I
 
     .line 57
-    iput p3, p0, Lcom/k4/homeclock/AodClockNode;->h:I
+    iput p3, v0, Lcom/k4/homeclock/AodClockNode;->h:I
 
     .line 58
-    invoke-static {p1, p2, p3}, Lcom/k4/homeclock/AodClockNode;->screenFactors(Landroid/content/Context;II)[F
+    invoke-static {v1, p2, p3}, Lcom/k4/homeclock/AodClockNode;->screenFactors(Landroid/content/Context;II)[F
 
     move-result-object p1
 
@@ -109,38 +119,38 @@
 
     int-to-float p8, p8
 
-    aget v0, p1, p3
+    aget p9, p1, p3
 
-    mul-float/2addr p8, v0
+    mul-float/2addr p8, p9
 
     invoke-static {p8}, Ljava/lang/Math;->round(F)I
 
     move-result p8
 
     .line 62
-    iget-object v0, p4, Lcom/k4/homeclock/HomeClockItem;->rect:Landroid/graphics/Rect;
+    iget-object p9, p4, Lcom/k4/homeclock/HomeClockItem;->rect:Landroid/graphics/Rect;
 
-    iget v0, v0, Landroid/graphics/Rect;->bottom:I
+    iget p9, p9, Landroid/graphics/Rect;->bottom:I
 
-    int-to-float v0, v0
+    int-to-float p9, p9
 
     aget p1, p1, p7
 
-    mul-float/2addr v0, p1
+    mul-float/2addr p9, p1
 
-    invoke-static {v0}, Ljava/lang/Math;->round(F)I
+    invoke-static {p9}, Ljava/lang/Math;->round(F)I
 
     move-result p1
 
     .line 63
     invoke-static {p5, p2, p6, p8, p1}, Lcom/k4/homeclock/AodClockNode;->luminance(Landroid/graphics/Bitmap;IIII)F
 
-    move-result v0
+    move-result p9
 
     .line 66
     iget-object v1, p4, Lcom/k4/homeclock/HomeClockItem;->fontColorType:Ljava/lang/Integer;
 
-    if-eqz v1, :cond_56
+    if-eqz v1, :cond_5b
 
     iget-object p3, p4, Lcom/k4/homeclock/HomeClockItem;->fontColorType:Ljava/lang/Integer;
 
@@ -148,27 +158,27 @@
 
     move-result p3
 
-    goto :goto_5e
+    goto :goto_63
 
-    :cond_56
+    :cond_5b
     const p4, 0x3f19999a    # 0.6f
 
-    cmpl-float p4, v0, p4
+    cmpl-float p4, p9, p4
 
-    if-lez p4, :cond_5e
+    if-lez p4, :cond_63
 
     move p3, p7
 
-    :cond_5e
-    :goto_5e
-    iput p3, p0, Lcom/k4/homeclock/AodClockNode;->fontColorType:I
+    :cond_63
+    :goto_63
+    iput p3, v0, Lcom/k4/homeclock/AodClockNode;->fontColorType:I
 
     .line 67
     invoke-static {p5, p2, p6, p8, p1}, Lcom/k4/homeclock/AodClockNode;->meanColor(Landroid/graphics/Bitmap;IIII)I
 
     move-result p1
 
-    iput p1, p0, Lcom/k4/homeclock/AodClockNode;->areaColor:I
+    iput p1, v0, Lcom/k4/homeclock/AodClockNode;->areaColor:I
 
     .line 68
     return-void
@@ -1216,8 +1226,8 @@
     throw v0
 .end method
 
-.method static create(Landroid/content/Context;IILcom/k4/homeclock/HomeClockItem;Landroid/graphics/Bitmap;Lcom/k4/homeclock/ClockNode;Li3/c;Lh3/a;)Lcom/k4/homeclock/AodClockNode;
-    .registers 18
+.method static create(Landroid/content/Context;IILcom/k4/homeclock/HomeClockItem;Landroid/graphics/Bitmap;Lcom/k4/homeclock/ClockNode;Li3/c;Lh3/a;Z)Lcom/k4/homeclock/AodClockNode;
+    .registers 20
     .annotation system Ldalvik/annotation/Throws;
         value = {
             Ljava/lang/Exception;
@@ -1237,16 +1247,18 @@
 
     move-object v6, p4
 
-    move-object v7, p5
+    move-object/from16 v7, p5
 
     move-object/from16 v8, p6
 
     move-object/from16 v9, p7
 
-    invoke-direct/range {v1 .. v9}, Lcom/k4/homeclock/AodClockNode;-><init>(Landroid/content/Context;IILcom/k4/homeclock/HomeClockItem;Landroid/graphics/Bitmap;Lcom/k4/homeclock/ClockNode;Li3/c;Lh3/a;)V
+    move/from16 v10, p8
+
+    invoke-direct/range {v1 .. v10}, Lcom/k4/homeclock/AodClockNode;-><init>(Landroid/content/Context;IILcom/k4/homeclock/HomeClockItem;Landroid/graphics/Bitmap;Lcom/k4/homeclock/ClockNode;Li3/c;Lh3/a;Z)V
 
     .line 75
-    :try_start_f
+    :try_start_12
     invoke-static {p0}, Lcom/k4/homeclock/AodHost;->acquire(Landroid/content/Context;)Lcom/k4/homeclock/AodHost;
 
     move-result-object p0
@@ -1258,7 +1270,7 @@
 
     const/4 p1, 0x1
 
-    if-eqz p0, :cond_26
+    if-eqz p0, :cond_29
 
     iget-object p0, v1, Lcom/k4/homeclock/AodClockNode;->host:Lcom/k4/homeclock/AodHost;
 
@@ -1268,22 +1280,22 @@
 
     move-result p0
 
-    if-eqz p0, :cond_26
+    if-eqz p0, :cond_29
 
     move p0, p1
 
-    goto :goto_27
+    goto :goto_2a
 
-    :cond_26
+    :cond_29
     const/4 p0, 0x0
 
-    :goto_27
+    :goto_2a
     iput-boolean p0, v1, Lcom/k4/homeclock/AodClockNode;->weather:Z
 
     .line 77
     iget-boolean p0, v1, Lcom/k4/homeclock/AodClockNode;->weather:Z
 
-    if-eqz p0, :cond_32
+    if-eqz p0, :cond_35
 
     .line 78
     iget-object p0, v1, Lcom/k4/homeclock/AodClockNode;->host:Lcom/k4/homeclock/AodHost;
@@ -1291,13 +1303,13 @@
     invoke-virtual {p0}, Lcom/k4/homeclock/AodHost;->startWeather()V
 
     .line 80
-    :cond_32
+    :cond_35
     invoke-direct {v1}, Lcom/k4/homeclock/AodClockNode;->inflate()V
 
     .line 81
     invoke-direct {v1, p1}, Lcom/k4/homeclock/AodClockNode;->place(Z)V
-    :try_end_38
-    .catchall {:try_start_f .. :try_end_38} :catchall_3a
+    :try_end_3b
+    .catchall {:try_start_12 .. :try_end_3b} :catchall_3d
 
     .line 88
     nop
@@ -1306,7 +1318,7 @@
     return-object v1
 
     .line 82
-    :catchall_3a
+    :catchall_3d
     move-exception v0
 
     move-object p0, v0
@@ -1317,7 +1329,7 @@
     .line 84
     instance-of p1, p0, Ljava/lang/Exception;
 
-    if-eqz p1, :cond_46
+    if-eqz p1, :cond_49
 
     .line 85
     check-cast p0, Ljava/lang/Exception;
@@ -1325,7 +1337,7 @@
     throw p0
 
     .line 87
-    :cond_46
+    :cond_49
     new-instance p1, Ljava/lang/RuntimeException;
 
     invoke-direct {p1, p0}, Ljava/lang/RuntimeException;-><init>(Ljava/lang/Throwable;)V

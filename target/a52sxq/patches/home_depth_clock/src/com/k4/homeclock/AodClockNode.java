@@ -49,8 +49,8 @@ final class AodClockNode extends DepthClock {
     private String weatherApplied;
 
     private AodClockNode(Context context, int w, int h, HomeClockItem item, Bitmap background, ClockNode fallback,
-            i3.c scaleRef, h3.a gatedOwner) {
-        super(context, "K4AodClockNode", scaleRef, gatedOwner);
+            i3.c scaleRef, h3.a owner, boolean gated) {
+        super(context, "K4AodClockNode", scaleRef, owner, gated);
         this.item = item;
         this.fallback = fallback;
         this.w = w;
@@ -69,8 +69,8 @@ final class AodClockNode extends DepthClock {
 
     /** The AOD clock for this item, or an exception (the caller then uses {@code fallback} itself). */
     static AodClockNode create(Context context, int w, int h, HomeClockItem item, Bitmap background, ClockNode fallback,
-            i3.c scaleRef, h3.a gatedOwner) throws Exception {
-        AodClockNode n = new AodClockNode(context, w, h, item, background, fallback, scaleRef, gatedOwner);
+            i3.c scaleRef, h3.a owner, boolean gated) throws Exception {
+        AodClockNode n = new AodClockNode(context, w, h, item, background, fallback, scaleRef, owner, gated);
         try {
             n.host = AodHost.acquire(context);
             n.weather = item.showWeather && n.host.supportsWeather(item.clockType);

@@ -13,7 +13,7 @@
 .method static constructor <clinit>()V
     .registers 1
 
-    .line 14
+    .line 17
     const/4 v0, 0x1
 
     sput-boolean v0, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
@@ -24,35 +24,37 @@
 .method private constructor <init>()V
     .registers 1
 
-    .line 17
+    .line 20
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
 .end method
 
-.method static declared-synchronized ensure(Landroid/content/Context;)V
-    .registers 5
+.method static declared-synchronized ensure(Landroid/content/Context;)Z
+    .registers 6
 
     const-class v0, Lcom/k4/homeclock/KeyguardWatch;
 
     monitor-enter v0
 
-    .line 20
+    .line 24
     :try_start_3
     sget-boolean v1, Lcom/k4/homeclock/KeyguardWatch;->installed:Z
     :try_end_5
-    .catchall {:try_start_3 .. :try_end_5} :catchall_4a
+    .catchall {:try_start_3 .. :try_end_5} :catchall_60
 
-    if-eqz v1, :cond_9
+    const/4 v2, 0x1
 
-    .line 21
+    if-eqz v1, :cond_a
+
+    .line 25
     monitor-exit v0
 
-    return-void
+    return v2
 
-    .line 23
-    :cond_9
-    :try_start_9
+    .line 28
+    :cond_a
+    :try_start_a
     const-class v1, Landroid/app/KeyguardManager;
 
     invoke-virtual {p0, v1}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
@@ -60,27 +62,29 @@
     move-result-object v1
 
     check-cast v1, Landroid/app/KeyguardManager;
-    :try_end_11
-    .catchall {:try_start_9 .. :try_end_11} :catchall_4a
 
-    .line 24
-    if-nez v1, :cond_15
+    .line 29
+    if-nez v1, :cond_1e
 
-    .line 25
+    .line 30
+    const-string p0, "K4HomeClock"
+
+    const-string v1, "keyguard watch: no KeyguardManager"
+
+    invoke-static {p0, v1}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;)I
+    :try_end_1b
+    .catchall {:try_start_a .. :try_end_1b} :catchall_52
+
+    .line 31
     monitor-exit v0
 
-    return-void
+    const/4 p0, 0x0
 
-    .line 27
-    :cond_15
-    :try_start_15
-    invoke-virtual {v1}, Landroid/app/KeyguardManager;->isKeyguardLocked()Z
+    return p0
 
-    move-result v2
-
-    sput-boolean v2, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
-
-    .line 28
+    .line 34
+    :cond_1e
+    :try_start_1e
     invoke-virtual {p0}, Landroid/content/Context;->getApplicationContext()Landroid/content/Context;
 
     move-result-object p0
@@ -89,33 +93,38 @@
 
     move-result-object p0
 
-    new-instance v2, Lcom/k4/homeclock/KeyguardWatch$1;
+    new-instance v3, Lcom/k4/homeclock/KeyguardWatch$1;
 
-    invoke-direct {v2}, Lcom/k4/homeclock/KeyguardWatch$1;-><init>()V
+    invoke-direct {v3}, Lcom/k4/homeclock/KeyguardWatch$1;-><init>()V
 
-    invoke-virtual {v1, p0, v2}, Landroid/app/KeyguardManager;->addKeyguardLockedStateListener(Ljava/util/concurrent/Executor;Landroid/app/KeyguardManager$KeyguardLockedStateListener;)V
+    invoke-virtual {v1, p0, v3}, Landroid/app/KeyguardManager;->addKeyguardLockedStateListener(Ljava/util/concurrent/Executor;Landroid/app/KeyguardManager$KeyguardLockedStateListener;)V
 
-    .line 38
-    const/4 p0, 0x1
+    .line 46
+    sput-boolean v2, Lcom/k4/homeclock/KeyguardWatch;->installed:Z
 
-    sput-boolean p0, Lcom/k4/homeclock/KeyguardWatch;->installed:Z
+    .line 47
+    invoke-virtual {v1}, Landroid/app/KeyguardManager;->isKeyguardLocked()Z
 
-    .line 39
+    move-result p0
+
+    sput-boolean p0, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
+
+    .line 48
     const-string p0, "K4HomeClock"
 
     sget-boolean v1, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
 
-    new-instance v2, Ljava/lang/StringBuilder;
+    new-instance v3, Ljava/lang/StringBuilder;
 
-    invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
+    invoke-direct {v3}, Ljava/lang/StringBuilder;-><init>()V
 
-    const-string v3, "keyguard watch installed, locked="
+    const-string v4, "keyguard watch installed, locked="
 
-    invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    move-result-object v2
+    move-result-object v3
 
-    invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;
+    invoke-virtual {v3, v1}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;
 
     move-result-object v1
 
@@ -124,22 +133,46 @@
     move-result-object v1
 
     invoke-static {p0, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
-    :try_end_48
-    .catchall {:try_start_15 .. :try_end_48} :catchall_4a
+    :try_end_50
+    .catchall {:try_start_1e .. :try_end_50} :catchall_52
 
-    .line 40
+    .line 49
     monitor-exit v0
 
-    return-void
+    return v2
 
-    .line 19
-    :catchall_4a
+    .line 50
+    :catchall_52
     move-exception p0
 
-    :try_start_4b
+    .line 51
+    :try_start_53
+    sput-boolean v2, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
+
+    .line 52
+    const-string v1, "K4HomeClock"
+
+    const-string v2, "keyguard watch: not installed, the shared clock stays off"
+
+    invoke-static {v1, v2, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
+
+    .line 53
+    sget-boolean p0, Lcom/k4/homeclock/KeyguardWatch;->installed:Z
+    :try_end_5e
+    .catchall {:try_start_53 .. :try_end_5e} :catchall_60
+
     monitor-exit v0
-    :try_end_4c
-    .catchall {:try_start_4b .. :try_end_4c} :catchall_4a
+
+    return p0
+
+    .line 23
+    :catchall_60
+    move-exception p0
+
+    :try_start_61
+    monitor-exit v0
+    :try_end_62
+    .catchall {:try_start_61 .. :try_end_62} :catchall_60
 
     throw p0
 .end method

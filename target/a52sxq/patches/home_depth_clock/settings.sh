@@ -16,7 +16,7 @@ PARENTS = {SWITCH: "Lcom/android/settings/core/TogglePreferenceController;",
 
 STRINGS = (
     ("k4_home_depth_clock_title", "Home screen depth clock"),
-    ("k4_home_depth_clock_summary", "Big clock behind the person or object of a wallpaper made with the Gallery wallpaper editor"),
+    ("k4_home_depth_clock_summary", "Big clock behind the person or object of a wallpaper made with the Gallery wallpaper editor. Home screen only, also when the wallpaper is on both screens"),
     ("k4_home_depth_clock_position_title", "Clock position"),
     ("k4_home_depth_clock_color_title", "Clock colour"),
     ("k4_home_depth_clock_style_title", "Clock style"),
