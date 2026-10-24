@@ -25,6 +25,7 @@ public final class HostTest {
         editorReapplyFresh();
         editorReapplyStaleBuild();
         editorReapplyStaleNeverShown();
+        editorCheckOnlyOnScreen();
         editorNoReapplyUnchanged();
         editorNoReapplyChanged();
         previewDuringPendingReload();
@@ -200,11 +201,75 @@ public final class HostTest {
         HomeDepthClock.onVisibility(e, false);
         saveClock("{\"clockType\":2}", "1,2,3,4,1.0,0,");
         reload(true);
-        Looper.advance(5900);
-        check("editor, never shown: no check before 6 s", e.stops == 0);
-        Looper.advance(200);
-        check("editor, never shown: rebuilt after 6 s", e.stops == 1);
+        Looper.advance(60_000);
+        check("editor, never shown: no rebuild while hidden (stays pending)", e.stops == 0);
+        check("editor, never shown: says it waits", logged("not on screen (visible=false"));
+        HomeDepthClock.onVisibility(e, true);
+        Looper.advance(0);
+        check("editor, never shown: rebuilt once shown", e.stops == 1);
         HomeDepthClock.onDestroy(e);
+    }
+
+    /** The editor's check never rebuilds while the display is OFF / AOD, nor on the lock screen; then it runs. */
+    private static void editorCheckOnlyOnScreen() throws Exception {
+        reset();
+        f3.a e = homeEngine();
+        HomeDepthClock.onVisibility(e, false);
+        saveClock("{\"clockType\":2}", "1,2,3,4,1.0,0,");
+        reload(true);
+        e.display = B2.a.OFF; // power pressed from the editor
+        Looper.advance(6100);
+        check("on screen: no rebuild with the display OFF at 6 s", e.stops == 0);
+        e.display = B2.a.AOD_WITH_WALLPAPER;
+        HomeDepthClock.onVisibility(e, true); // visible, but on the AOD
+        Looper.advance(30_000);
+        check("on screen: no rebuild while visible on the AOD", e.stops == 0);
+        e.display = B2.a.ON;
+        Looper.advance(6100); // next 6 s look
+        check("on screen: rebuilt at the next look once the display is ON", e.stops == 1);
+        HomeDepthClock.onDestroy(e);
+
+        // polling is bounded: 10 looks, then only becoming visible re-arms it
+        reset();
+        e = homeEngine();
+        saveClock("{\"clockType\":2}", "1,2,3,4,1.0,0,");
+        e.display = B2.a.AOD_WITH_WALLPAPER;
+        HomeDepthClock.onVisibility(e, true);
+        reload(true);
+        Looper.advance(30 * 60_000L);
+        int left = 0;
+        for (Object[] m : queue()) {
+            left++;
+        }
+        check("on screen: polling stops after 10 looks (nothing queued)", left == 0 && e.stops == 0);
+        e.display = B2.a.ON;
+        HomeDepthClock.onVisibility(e, false);
+        HomeDepthClock.onVisibility(e, true);
+        Looper.advance(0);
+        check("on screen: becoming visible again re-arms it", e.stops == 1);
+        HomeDepthClock.onDestroy(e);
+
+        // a Settings RELOAD during the editor's wait keeps the editor's terms (no 300 ms rebuild before the apply)
+        reset();
+        e = homeEngine();
+        HomeDepthClock.onVisibility(e, false);
+        saveClock("{\"clockType\":2}", "1,2,3,4,1.0,0,");
+        reload(true);
+        Looper.advance(100);
+        reload(false);
+        Looper.advance(10_000);
+        check("on screen: a Settings RELOAD does not cut the editor's wait", e.stops == 0);
+        HomeDepthClock.onVisibility(e, true);
+        Looper.advance(0);
+        check("on screen: ... and the check runs when shown", e.stops == 1);
+        HomeDepthClock.onDestroy(e);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.List<Object[]> queue() throws Exception {
+        Field f = Looper.class.getDeclaredField("queue");
+        f.setAccessible(true);
+        return (java.util.List<Object[]>) f.get(Looper.getMainLooper());
     }
 
     /** Apply with nothing of the clock changed and no new engine: no rebuild. */
@@ -349,9 +414,15 @@ public final class HostTest {
         check("shared, nothing changed: no rebuild", e.stops == 0);
         saveClock("{\"clockType\":3}", "1,2,3,4,1.0,0,");
         reload(true);
-        HomeDepthClock.onVisibility(e, true);
+        HomeDepthClock.onVisibility(e, true); // shown as the lock screen (keyguard locked)
+        Looper.advance(30_000);
+        check("shared, clock style changed: not rebuilt on the lock screen", e.stops == 0);
+        KeyguardWatch.locked = false; // unlock: KeyguardWatch's listener calls redrawIfStale(.., true) on every state
+        for (EngineState st : HomeDepthClock.states()) {
+            st.redrawIfStale("keyguard gone", true);
+        }
         Looper.advance(0);
-        check("shared, clock style changed: rebuilt when shown", e.stops == 1);
+        check("shared, clock style changed: rebuilt as the keyguard goes away", e.stops == 1);
         HomeDepthClock.onDestroy(e);
 
         reset();

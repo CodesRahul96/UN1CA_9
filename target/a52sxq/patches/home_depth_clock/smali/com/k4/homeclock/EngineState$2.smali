@@ -30,7 +30,7 @@
         }
     .end annotation
 
-    .line 107
+    .line 136
     iput-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
@@ -43,7 +43,7 @@
 .method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
     .registers 6
 
-    .line 110
+    .line 139
     iget-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {p1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetmain(Lcom/k4/homeclock/EngineState;)Landroid/os/Handler;
@@ -58,7 +58,7 @@
 
     invoke-virtual {p1, v0}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 111
+    .line 140
     const-string p1, "com.k4.homeclock.extra.WALLPAPER_PENDING"
 
     const/4 v0, 0x0
@@ -67,17 +67,36 @@
 
     move-result p1
 
-    .line 112
+    .line 141
     iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
-    const/4 v0, 0x1
+    const/4 v1, 0x1
 
-    invoke-static {p2, v0}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputreloadPending(Lcom/k4/homeclock/EngineState;Z)V
+    invoke-static {p2, v1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputreloadPending(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 113
-    if-eqz p1, :cond_50
+    .line 142
+    iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
-    .line 114
+    invoke-static {p2, v0}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputdeferrals(Lcom/k4/homeclock/EngineState;I)V
+
+    .line 144
+    iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
+
+    invoke-static {p2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgeteditorPending(Lcom/k4/homeclock/EngineState;)Z
+
+    move-result p2
+
+    or-int/2addr p1, p2
+
+    .line 145
+    iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
+
+    invoke-static {p2, p1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputeditorPending(Lcom/k4/homeclock/EngineState;Z)V
+
+    .line 146
+    if-eqz p1, :cond_61
+
+    .line 147
     iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {p2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetengine(Lcom/k4/homeclock/EngineState;)Ljava/lang/ref/WeakReference;
@@ -90,19 +109,19 @@
 
     check-cast p2, Lf3/a;
 
-    .line 115
-    if-nez p2, :cond_2e
+    .line 148
+    if-nez p2, :cond_3f
 
     const/4 p2, -0x1
 
-    goto :goto_32
+    goto :goto_43
 
-    :cond_2e
+    :cond_3f
     invoke-virtual {p2}, Lf3/a;->getWhich()I
 
     move-result p2
 
-    :goto_32
+    :goto_43
     new-instance v0, Ljava/lang/StringBuilder;
 
     invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
@@ -131,8 +150,8 @@
 
     invoke-static {v0, p2}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 118
-    :cond_50
+    .line 151
+    :cond_61
     iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {p2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetmain(Lcom/k4/homeclock/EngineState;)Landroid/os/Handler;
@@ -151,6 +170,6 @@
 
     invoke-virtual {p2, v0, v1, v2}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 119
+    .line 152
     return-void
 .end method

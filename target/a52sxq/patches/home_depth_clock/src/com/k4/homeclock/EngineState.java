@@ -18,7 +18,11 @@ import java.lang.ref.WeakReference;
  *    ones (each build records what it read, HomeDepthClock.built). The editor's RELOAD (EXTRA_WALLPAPER_PENDING)
  *    comes before its wallpaper apply, which normally replaces this engine in-process (reapply: the old sub engine is
  *    destroyed, so its check never runs, then the new one is built from the settings written by then); the check runs
- *    when this engine is shown again (the editor has closed, the apply is done) or after 6 s, whichever comes first.
+ *    when this engine is shown again (the editor has closed, the apply is done) or after 6 s, whichever comes first,
+ *    but only while it is really on screen: visible, display ON and, for an engine that is also the lock screen and
+ *    has a gated clock, the keyguard gone. Until then it stays pending (no rebuild during the AOD, the screen-on
+ *    animation or on the lock screen): a visible engine looks again every 6 s (10 times at most), and becoming
+ *    visible again or the keyguard going away re-arm it. A Settings RELOAD meanwhile keeps the editor's terms.
  *    A new engine elsewhere (a preview, another connection) no longer cancels it.
  *  - minute ticker (TIME_TICK, TIME_SET, TIMEZONE_CHANGED, LOCALE_CHANGED): registered only while the engine has a
  *    clock and is visible. ACTION_TIME_TICK is not a wakeup broadcast, so nothing here wakes the CPU or draws per
@@ -34,18 +38,43 @@ final class EngineState {
     private boolean reloadOn;
     /** A RELOAD arrived and its check has not run yet. */
     private boolean reloadPending;
+    /** That RELOAD (or one before it, still pending) came from the editor: check only while on screen. */
+    private boolean editorPending;
+    /** Looks at a pending editor check that found the engine not on screen (log once, poll at most 10 times). */
+    private int deferrals;
 
     private final Runnable reload = new Runnable() {
         @Override
         public void run() {
-            reloadPending = false;
             f3.a e = engine.get();
             if (e == null) {
+                reloadPending = false;
                 return;
             }
             try {
+                int which = e.getWhich();
+                if (editorPending && (which & 1) != 0) {
+                    Object state = e.getDisplayState();
+                    boolean on = state instanceof Enum && "ON".equals(((Enum<?>) state).name());
+                    boolean keyguard = (which & 2) != 0 && HomeDepthClock.clockOf(e) != null && KeyguardWatch.locked;
+                    if (!visible || !on || keyguard) {
+                        if (deferrals++ == 0) {
+                            Log.i(HomeDepthClock.TAG, "reload from the editor (which=" + which + "): not on screen (visible="
+                                    + visible + ", display=" + state + ", keyguard=" + keyguard + "), checked once it is");
+                        }
+                        if (visible && deferrals <= 10) {
+                            main.postDelayed(this, ReloadPolicy.WALLPAPER_WAIT_MS);
+                        }
+                        return; // still pending: setVisible(true) / the keyguard going away run it again
+                    }
+                }
+                reloadPending = false;
+                editorPending = false;
+                deferrals = 0;
                 check(e);
             } catch (Throwable t) {
+                reloadPending = false;
+                editorPending = false;
                 Log.e(HomeDepthClock.TAG, "reload", t);
             }
         }
@@ -110,6 +139,10 @@ final class EngineState {
             main.removeCallbacks(reload);
             boolean wallpaperPending = intent.getBooleanExtra(HomeDepthClock.EXTRA_WALLPAPER_PENDING, false);
             reloadPending = true;
+            deferrals = 0;
+            // a Settings RELOAD while the editor's check waits keeps the editor's terms (its apply may still come)
+            wallpaperPending |= editorPending;
+            editorPending = wallpaperPending;
             if (wallpaperPending) {
                 f3.a e = engine.get();
                 Log.i(HomeDepthClock.TAG, "reload from the editor (which=" + (e == null ? -1 : e.getWhich())
@@ -140,6 +173,7 @@ final class EngineState {
     void stop() {
         main.removeCallbacks(reload);
         reloadPending = false;
+        editorPending = false;
         setVisible(false);
         if (reloadOn) {
             unregister(reloadReceiver);
@@ -151,9 +185,10 @@ final class EngineState {
         visible = v;
         if (v && reloadPending) {
             // shown after a RELOAD (the editor closed): check now, posted so a rebuild never runs inside the engine's
-            // own visibility dispatch
+            // own visibility dispatch; a deferred editor check gets its polls back, its log line stays said
             main.removeCallbacks(reload);
             main.post(reload);
+            deferrals = Math.min(deferrals, 1);
         }
         f3.a e = engine.get();
         boolean want = v && e != null && HomeDepthClock.clockOf(e) != null;
@@ -193,6 +228,11 @@ final class EngineState {
 
     /** anyVisibility: also draw while hidden (keyguard changes, so the next frame shown is already right). */
     void redrawIfStale(String why, boolean anyVisibility) {
+        if (anyVisibility && reloadPending && !KeyguardWatch.locked) {
+            // keyguard gone (KeyguardWatch): a pending editor check deferred on the lock screen can run now
+            main.removeCallbacks(reload);
+            main.post(reload);
+        }
         try {
             f3.a e = engine.get();
             DepthClock clock = e == null ? null : HomeDepthClock.clockOf(e);
