@@ -1,0 +1,43 @@
+meta-overlayfs 1.3.1 (versionCode 13100), the metamodule this patch ships (checked 2026-10-24)
+
+Official sources only:
+  - kernelsu.org/guide/metamodule.html (source: github.com/tiann/KernelSU website/docs/guide/metamodule.md):
+    "The meta-overlayfs metamodule is the official reference implementation"; every KernelSU doc page that names a
+    metamodule names meta-overlayfs. The ReSukiSU fork (github.com/ReSukiSU/ReSukiSU, now github.com/Baka-SU/BakaSU)
+    ships no metamodule and links the same kernelsu.org guide; its ksud (the phone's 4.2.0-rc3-51-g5b76b884 =
+    commit 5b76b884) implements exactly that API (userspace/ksud/src/android/module/metamodule.rs).
+  - Release: https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases/tag/v1.3.1 (2025-12-02, the latest)
+    asset meta-overlayfs-13100-1.3.1.zip, 451415 bytes,
+    sha256 279d85a6a35724dfcf8aa1137a9630c7e989e154b94543517c539ee70f9b8811 (= GitHub's asset digest)
+    Unmodified; pinned in customize.sh and in k4-ksu-metamodule (both checked at build time).
+  - Source: https://github.com/KernelSU-Modules-Repo/meta-overlayfs tag v1.3.1 = commit
+    7143eb79cc14d68f070081beed60ecf8344da3a8 ("Release v1.3.1", Wang Han). The zip's scripts and module.prop are
+    byte-identical to metamodule/ at that commit; the two binaries (meta-overlayfs-aarch64 / -x86_64) are the
+    release build of src/ (mount.rs, xcp.rs). Author "KernelSU Developers".
+  - Licence: GPL-3.0 (Cargo.toml license = "GPL-3.0", README "License: GPL-3.0"; KernelSU itself is GPL-3.0).
+    Shipping the binary in the ROM is a distribution: the corresponding source is the tag above;
+    a copy is archived on the build PC: /mnt/B1/OneUi9/scratch/metamodule/meta-overlayfs-1.3.1-source.tar.gz
+    (git archive of 7143eb7, sha256 55e09407d1f9aba4da236148dfad6f124fe54eab305b41263e28cdc8d0f3d436).
+
+What it does on this phone (5.4 kernel, erofs system/vendor/product/odm):
+  - install (customize.sh, run by ksud): picks the aarch64 binary, creates a sparse 2 GB ext4 image modules.img
+    (mke2fs -O ^has_journal) in /data/adb/modules/meta-overlayfs.
+  - metainstall.sh (sourced by ksud for every later module install): copies the module's system/ vendor/ ...
+    into the image (labels copied), the module itself stays in /data/adb/modules/<id>.
+  - metamount.sh (ksud post-fs-data, after all post-fs-data scripts, before init's /system/etc/init post-fs-data
+    actions such as k4-gpu-driver): loop-mounts the image and overlays /system, /vendor, /product, /odm with the
+    enabled modules' content as lower layers (source "KSU", so KernelSU's umount feature recognises the mounts);
+    child mounts are re-bound. Needs CONFIG_OVERLAY_FS, CONFIG_BLK_DEV_LOOP, CONFIG_EXT4_FS: all =y in the
+    bone-machine 5.4.302 kernel (/proc/config.gz). erofs lower layers are fine (overlayfs only needs an upper/work
+    dir on a writable fs, which it does not use here unless /data/adb/modules/.rw exists).
+  - post-mount.sh: ksud kernel nuke-ext4-sysfs (supported by this ksud).
+  Known limit: a module installed before the metamodule is not in the image and stays unmounted until reinstalled.
+
+Alternatives looked at (all metamodules in the official KernelSU-Modules-Repo org):
+  - meta-mm (Magic Mount, 7a72) v1.0.1-sprout: GitHub repo is a placeholder, its sourceUrl
+    codeberg.org/ovo/meta-magic_mount is gone (404): no source for a GPL-3.0 binary, cannot be redistributed.
+  - magic_mount_rs v4.0.2 (Apache-2.0): its mount binary dlopens libs/arm64-v8a/libchecker.so, a 2.4 MB Go blob
+    without source in the repo, to verify a signature of the module and panics if that fails - an opaque binary in
+    the boot path.
+  - hybrid_mount v6.2.0 (Apache-2.0): three mount engines (OverlayFS, magic mount, Kasumi), 3.4 MB, web UI: far
+    more than "mount the modules", more to go wrong in a default.
