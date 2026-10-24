@@ -15,15 +15,21 @@ SKIPUNZIP=1
 #     /dev/kgsl-3d0 open, by the camera provider / SurfaceFlinger at boot, i.e. after early-boot),
 #   - for V@07xx and newer builds, android.hardware.vulkan.version 1.3 bound over the vendor's 1.1 feature file (the flag
 #     must match the driver: V@0530 builds report Vulkan 1.1, V@0849 / V@0863 1.3).
-# Selection: persist.sys.k4.gpu_driver = 530 | <id>. Failsafe: Settings sets
+# Selection: persist.sys.k4.gpu_driver = 530 | <id> | m_<module> | u_<added>. Failsafe: Settings sets
 # persist.sys.k4.gpu_trial=pending; the rc turns it into "testing" for that boot and "ok" at boot_completed; "testing" at
 # the next boot means that boot never finished, so the stock V@0530 is used, persist.sys.k4.gpu_failed records the
 # driver and the trial is set to "failed". sys.k4.gpu_active reports what this boot actually uses.
+#
+# Drivers the user brings (k4-gpu-driver, run by the rc at post-fs-data in its own SELinux domain k4gpu): KernelSU /
+# Magisk driver modules and drivers added in Settings ("Add driver") are kept in /data/k4gpu/store and bound the same
+# way, at post-fs-data (before zygote-start). A module already mounted over /vendor by the root manager (metamodule,
+# magic mount, Mountify) is left alone and reported as active. See k4-gpu-driver for the details.
 GPU_DEFAULT="530"
 VK13=4206592
 
 # The stock driver must still be the one in /vendor (an older build of this patch replaced it in place). Exact
-# version: "V@0530." alone would also match the V@0530.55 set.
+# version: "V@0530." alone would also match the V@0530.55 set. k4-gpu-driver gets it to tell a driver flashed into
+# /vendor from the stock one.
 GPU_STOCK_VER="V@0530.0"
 GPU_STOCK="$(grep -a -o -m 1 -E 'V@[0-9]{3,4}\.[0-9]+(\.[0-9]+)?' "$WORK_DIR/vendor/lib64/egl/libGLESv2_adreno.so" | head -n 1)"
 [ "$GPU_STOCK" = "$GPU_STOCK_VER" ] || \
@@ -93,11 +99,24 @@ EVAL "sed 's|version=\"4198400\"|version=\"$VK13\"|' \"$VKXML\" > \"$WORK_DIR/ve
 grep -q "version=\"$VK13\"" "$WORK_DIR/vendor/k4gpu/vulkan.version-1_3.xml" || ABORT "adreno_driver: Vulkan 1.3 feature file"
 SET_METADATA "vendor" "k4gpu/vulkan.version-1_3.xml" 0 0 644 "u:object_r:vendor_configs_file:s0"
 
+# user drivers: the boot-time part (modules, "Add driver" imports, failsafe for them, mounts)
+EVAL "cp -f \"$MODPATH/k4-gpu-driver\" \"$WORK_DIR/system/system/bin/k4-gpu-driver\""
+SET_METADATA "system" "system/bin/k4-gpu-driver" 0 2000 755 "u:object_r:system_file:s0"
+
 RC="$WORK_DIR/system/system/etc/init/k4_gpu_driver.rc"
 {
     echo "# GPU driver selector (target/a52sxq/patches/adreno_driver). V@0$GPU_DEFAULT = stock, nothing to mount."
+    echo "# User drivers (driver modules, Settings > Add driver): k4-gpu-driver, after the root manager's post-fs-data"
+    echo "# (KernelSU / Magisk run theirs from init.rc, which comes first) and before zygote-start. It also does the"
+    echo "# failsafe below first, for every driver, and selects a newly installed driver module with a trial boot."
+    echo "on post-fs-data"
+    echo "    mkdir /data/k4gpu 0751 root system"
+    echo "    mkdir /data/k4gpu/store 0755 root root"
+    echo "    mkdir /data/k4gpu/incoming 0770 system system"
+    echo "    exec u:r:k4gpu:s0 root system -- /system/bin/sh /system/bin/k4-gpu-driver boot $GPU_STOCK"
+    echo
     echo "on early-boot"
-    echo "    setprop sys.k4.gpu_active $GPU_DEFAULT"
+    echo "    setprop sys.k4.gpu_active \${sys.k4.gpu_user_active:-$GPU_DEFAULT}"
     echo
     echo "# The previous boot with a newly selected driver never reached boot_completed: back to the stock driver."
     echo "on early-boot && property:persist.sys.k4.gpu_trial=testing"
@@ -142,8 +161,55 @@ if ! grep -q "^; k4 gpu driver selector" "$PLAT_CIL"; then
     } >> "$PLAT_CIL"
 fi
 
+# User drivers: the k4gpu domain (k4-gpu-driver), the /data/k4gpu types and the selector's own property type
+# (persist.sys.k4.gpu_* and sys.k4.gpu_*, set by Settings, k4-gpu-driver and init; they were system_prop before).
+# init compiles the split policy at boot, so a rule naming a type that does not exist would stop the boot: check
+# every type first.
+PLAT_FC="$WORK_DIR/system/system/etc/selinux/plat_file_contexts"
+PLAT_PC="$WORK_DIR/system/system/etc/selinux/plat_property_contexts"
+if ! grep -q -x -F "(type k4gpu)" "$PLAT_CIL"; then
+    for t in init shell_exec toolbox_exec system_file kmsg_device system_data_root_file adb_data_file \
+        same_process_hal_file vendor_file vendor_hal_file vendor_configs_file labeledfs \
+        property_socket default_prop system_app shell; do
+        grep -q -x -F "(type $t)" "$PLAT_CIL" || ABORT "adreno_driver: type $t not in plat_sepolicy.cil, review sepolicy.cil"
+    done
+    # the SQE label is the vendor's own type (Qualcomm vendor_sepolicy.cil), like the early-boot rule above uses it
+    grep -q -x -F "(type vendor_firmware_file)" "$WORK_DIR/vendor/etc/selinux/vendor_sepolicy.cil" || \
+        ABORT "adreno_driver: type vendor_firmware_file not in vendor_sepolicy.cil, review sepolicy.cil"
+    # secilc rejects a second typeattributeset for an attribute, so extend the existing ones
+    for a in "domain k4gpu" "file_type k4_gpu_data_file k4_gpu_incoming_file" \
+        "data_file_type k4_gpu_data_file k4_gpu_incoming_file" "core_data_file_type k4_gpu_data_file k4_gpu_incoming_file" \
+        "property_type k4_gpu_prop" "system_property_type k4_gpu_prop"; do
+        n="${a%% *}"
+        [ "$(grep -c "^(typeattributeset $n (" "$PLAT_CIL")" = 1 ] || ABORT "adreno_driver: no single $n attribute set in plat_sepolicy.cil"
+        sed -i "s/^(typeattributeset $n (/(typeattributeset $n (${a#* } /" "$PLAT_CIL"
+        grep -q "^(typeattributeset $n (${a#* } " "$PLAT_CIL" || ABORT "adreno_driver: failed to extend $n"
+    done
+    [ -z "$(tail -c 1 "$PLAT_CIL")" ] || echo >> "$PLAT_CIL"
+    echo "; k4 gpu user drivers (target/a52sxq/patches/adreno_driver/sepolicy.cil)" >> "$PLAT_CIL"
+    cat "$MODPATH/sepolicy.cil" >> "$PLAT_CIL"
+
+    grep -q "^/data/k4gpu" "$PLAT_FC" && ABORT "adreno_driver: /data/k4gpu already in plat_file_contexts"
+    [ -z "$(tail -c 1 "$PLAT_FC")" ] || echo >> "$PLAT_FC"
+    {
+        echo "/data/k4gpu(/.*)?                                 u:object_r:k4_gpu_data_file:s0"
+        echo "/data/k4gpu/incoming(/.*)?                        u:object_r:k4_gpu_incoming_file:s0"
+        echo "/data/k4gpu/store/[^/]+/(egl|lib64)(/.*)?         u:object_r:same_process_hal_file:s0"
+        echo "/data/k4gpu/store/[^/]+/firmware(/.*)?            u:object_r:vendor_firmware_file:s0"
+    } >> "$PLAT_FC"
+
+    grep -q -E "^(persist\.)?sys\.k4\.gpu" "$PLAT_PC" && ABORT "adreno_driver: sys.k4.gpu already in plat_property_contexts"
+    [ -z "$(tail -c 1 "$PLAT_PC")" ] || echo >> "$PLAT_PC"
+    {
+        echo "persist.sys.k4.gpu_      u:object_r:k4_gpu_prop:s0"
+        echo "sys.k4.gpu_              u:object_r:k4_gpu_prop:s0"
+    } >> "$PLAT_PC"
+fi
+grep -q -x -F "(allow system_app k4_gpu_prop (property_service (set)))" "$PLAT_CIL" || \
+    ABORT "adreno_driver: k4gpu rules missing from plat_sepolicy.cil"
+
 # read by Settings (GpuDriverPreferenceController): a system prop; init does not load ro.k4.* from the vendor build.prop
 SET_PROP "system" "ro.k4.gpu_drivers" "$GPU_DEFAULT $GPU_SETS"
-LOG "- GPU driver selector: stock $GPU_STOCK default, $(sed "s/_/./g; s/^/V@0/; s/ /, V@0/g" <<< "$GPU_SETS") selectable"
+LOG "- GPU driver selector: stock $GPU_STOCK default, $(sed "s/_/./g; s/^/V@0/; s/ /, V@0/g" <<< "$GPU_SETS") selectable, user drivers via k4-gpu-driver"
 for v in $GPU_SETS; do unset "GPU_BINDS_$v" "GPU_SQE_$v" "GPU_VK_$v"; done
-unset GPU_DEFAULT GPU_SETS GPU_STOCK GPU_STOCK_VER VK13 SRC DST VER BINDS B LABEL VKXML RC PLAT_CIL v t d f
+unset GPU_DEFAULT GPU_SETS GPU_STOCK GPU_STOCK_VER VK13 SRC DST VER BINDS B LABEL VKXML RC PLAT_CIL PLAT_FC PLAT_PC v t d f n a
