@@ -28,6 +28,12 @@
 #       anything before boot_completed, and its mount step runs long before that).
 #       It never touches another metamodule or any other module; a failed install is cleaned up (only what this
 #       run created) and retried on the next boot, at most 3 times.
+#       Update: the shipped zip is the ROM's build 1.3.1-k4.1 (versionCode 13101; Adreno GPU driver modules are
+#       left to the GPU driver selector, label fixes, see meta-overlayfs-k4/K4_CHANGES.txt). An installed
+#       meta-overlayfs with a lower versionCode (the unmodified 1.3.1 = 13100, which an earlier build installed and
+#       which bootlooped the phone with a GPU driver module) is updated the same way (ksud module install over it,
+#       its modules image is kept), unless it is disabled, marked for removal or already has an update pending.
+#       A newer one (a later upstream release the user installed) is left alone.
 #       Result: sys.k4.ksu_meta, log /data/adb/.k4_metamodule.log and the kernel log.
 #
 # Host tests: K4KSU_ROOT (path prefix), K4KSU_PROPFILE (properties in a file), K4KSU_KSUD (ksud to run),
@@ -38,8 +44,10 @@ R="${K4KSU_ROOT:-}"
 ADB="$R/data/adb"
 ID=meta-overlayfs
 ZIP="${K4KSU_ZIP:-/system/etc/k4/ksu/meta-overlayfs.zip}"
-# meta-overlayfs v1.3.1 (versionCode 13100), KernelSU-Modules-Repo release asset (checked by the build as well)
-ZIP_SHA256="${K4KSU_ZIP_SHA256:-279d85a6a35724dfcf8aa1137a9630c7e989e154b94543517c539ee70f9b8811}"
+# meta-overlayfs 1.3.1-k4.1 (versionCode 13101): the official v1.3.1 release with the K4 changes
+# (meta-overlayfs-k4/, built by meta-overlayfs-k4/make_zip.sh; checked by the build as well)
+ZIP_SHA256="${K4KSU_ZIP_SHA256:-73695f19fd362620738955069306963ef9dde119ce509c3ce90aa27a76ff0669}"
+ZIP_VC=13101
 KSUD="${K4KSU_KSUD:-$ADB/ksud}"
 OPT="$ADB/.k4_metamodule_optout"
 SEEN="$ADB/.k4_metamodule_seen"
@@ -120,6 +128,52 @@ gate() {
     fi
 }
 
+# versionCode of a module.prop (digits only, empty if none)
+vc_of() {
+    sed -n 's/^versionCode=//p' "$1" 2> /dev/null | head -n 1 | tr -dc 0-9
+}
+
+zip_ok() {
+    [ -f "$ZIP" ] && [ "$(sha256sum "$ZIP" 2> /dev/null | cut -d ' ' -f 1)" = "$ZIP_SHA256" ]
+}
+
+# the installed meta-overlayfs is older than the shipped build: update it (see the header). Returns 1 when there
+# is nothing to update (the caller reports "active"), 0 when it handled the status itself.
+update() {
+    m="$ADB/modules/$ID"
+    vc="$(vc_of "$m/module.prop")"
+    [ -n "$vc" ] && [ "$vc" -lt "$ZIP_VC" ] || return 1
+    if [ -e "$m/disable" ] || [ -e "$m/remove" ] || [ -e "$ADB/modules_update/$ID" ]; then
+        log "$ID $vc is disabled, marked for removal or has an update pending: not updated"
+        return 1
+    fi
+    tries="$(cat "$TRIES" 2> /dev/null)"
+    case "$tries" in "" | *[!0-9]*) tries=0 ;; esac
+    if [ "$tries" -ge "$MAX_TRIES" ]; then
+        status active "metamodule $ID $vc installed; its update failed $tries times, not tried again"
+        return 0
+    fi
+    if ! zip_ok; then
+        status active "metamodule $ID $vc installed; $ZIP missing or not the pinned build, not updated"
+        return 0
+    fi
+    echo $((tries + 1)) > "$TRIES"
+    log "updating $ID $vc to $ZIP_VC (try $((tries + 1))): $KSUD module install $ZIP"
+    # the modules image is mounted read-write: flush it before the installer copies it
+    sync
+    "$KSUD" module install "$ZIP" >> "$LOGF" 2>&1
+    rc=$?
+    if [ "$rc" = 0 ] && [ "$(vc_of "$ADB/modules_update/$ID/module.prop")" = "$ZIP_VC" ]; then
+        rm -f "$TRIES"
+        status updated "$ID updated from $vc to $ZIP_VC: active from the next boot on"
+    else
+        # only the pending update is ours to remove; the installed metamodule stays as it was
+        rm -rf "${ADB:?}/modules_update/$ID"
+        status active "metamodule $ID $vc installed; update to $ZIP_VC failed (exit $rc), retried next boot"
+    fi
+    return 0
+}
+
 # undo what a failed `ksud module install` of $ID left behind (only called when none of it existed before)
 cleanup_failed() {
     rm -rf "${ADB:?}/modules_update/$ID" "${ADB:?}/modules/$ID"
@@ -157,10 +211,12 @@ apply() {
     meta="$(find_meta)"
     if [ -n "$meta" ]; then
         [ "$(cat "$SEEN" 2> /dev/null)" = "$meta" ] || echo "$meta" > "$SEEN"
-        rm -f "$TRIES"
         if [ "$meta" = "$ID" ]; then
+            update && return
+            rm -f "$TRIES"
             status active "metamodule $ID installed"
         else
+            rm -f "$TRIES"
             status "other:$meta" "the user's metamodule $meta is installed, nothing done"
         fi
         return
@@ -187,7 +243,7 @@ apply() {
         status failed "install failed $tries times, not tried again (persist.sys.k4.ksu_metamodule=1 retries)"
         return
     fi
-    if [ ! -f "$ZIP" ] || [ "$(sha256sum "$ZIP" 2> /dev/null | cut -d ' ' -f 1)" != "$ZIP_SHA256" ]; then
+    if ! zip_ok; then
         status failed "$ZIP missing or not the pinned build"
         return
     fi
