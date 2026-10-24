@@ -26,6 +26,7 @@ public final class HostTest {
         editorReapplyStaleBuild();
         editorReapplyStaleNeverShown();
         editorCheckOnlyOnScreen();
+        editorDonePowerOff();
         editorNoReapplyUnchanged();
         editorNoReapplyChanged();
         previewDuringPendingReload();
@@ -73,6 +74,7 @@ public final class HostTest {
         Settings.System.S.clear();
         Log.LINES.clear();
         KeyguardWatch.locked = true;
+        android.os.PowerManager.interactive = true;
         SemSystemProperties.P.put(HomeDepthClock.PROP, "1");
         saveClock("{\"clockType\":1,\"style\":\"A\"}", "100,200,900,500,1.0,0,");
     }
@@ -262,6 +264,58 @@ public final class HostTest {
         HomeDepthClock.onVisibility(e, true);
         Looper.advance(0);
         check("on screen: ... and the check runs when shown", e.stops == 1);
+        HomeDepthClock.onDestroy(e);
+    }
+
+    /**
+     * Plan 3a' as seen on the device (9.3.75, devtest_9375/1_homeclock/k4homeclock_live.log): Done, then the power key
+     * at once. The display state SpriteWallpaper reports is cached and still says ON for ~1 s after the power key, and
+     * the editor closing in that time shows the home engine behind the screen-off fade: no rebuild then, only once
+     * home is really on screen again.
+     */
+    private static void editorDonePowerOff() throws Exception {
+        reset();
+        f3.a e = homeEngine();
+        HomeDepthClock.onVisibility(e, false); // 11:34:03 editor opened over home
+        saveClock("{\"clockType\":2}", "1,2,3,4,1.0,0,"); // 11:34:33.329 "home apply: clock on"
+        reload(true); // 11:34:33.330 "reload from the editor (which=5): checked when shown, or in 6000 ms"
+        Looper.advance(400);
+        android.os.PowerManager.interactive = false; // ~11:34:33.7 power key: going to sleep, display state still ON
+        Looper.advance(850); // 11:34:34.551 "home editor closed"
+        HomeDepthClock.onVisibility(e, true); // ~11:34:34.9 home engine shown behind the screen-off fade
+        Looper.advance(0);
+        check("Done + power off: no rebuild while going to sleep (display state still ON)", e.stops == 0);
+        check("Done + power off: says it waits (interactive=false)",
+                logged("not on screen (visible=true, display=ON, interactive=false, keyguard=false)"));
+        Looper.advance(500);
+        e.display = B2.a.AOD_WITH_WALLPAPER; // the AOD is shown: the engine is hidden
+        HomeDepthClock.onVisibility(e, false);
+        Looper.advance(10_000); // past the 6 s look
+        check("Done + power off: no rebuild on the AOD after 6 s", e.stops == 0);
+        android.os.PowerManager.interactive = true; // power key: awake, lock screen (the home engine stays hidden)
+        e.display = B2.a.ON;
+        Looper.advance(2000);
+        check("Done + power off: no rebuild on the lock screen", e.stops == 0);
+        HomeDepthClock.onVisibility(e, true); // unlocked: home shown
+        Looper.advance(0);
+        check("Done + power off: rebuilt once home is shown", e.stops == 1 && count("rebuilding the engine") == 1);
+        check("Done + power off: the wait was logged once", count("not on screen") == 1);
+        HomeDepthClock.onDestroy(e);
+
+        // off and on again before the AOD (still visible, no visibility change): the next 6 s look runs it
+        reset();
+        e = homeEngine();
+        HomeDepthClock.onVisibility(e, false);
+        saveClock("{\"clockType\":2}", "1,2,3,4,1.0,0,");
+        reload(true);
+        Looper.advance(400);
+        android.os.PowerManager.interactive = false;
+        HomeDepthClock.onVisibility(e, true);
+        Looper.advance(1000);
+        check("power off and on during the fade: no rebuild while not interactive", e.stops == 0);
+        android.os.PowerManager.interactive = true;
+        Looper.advance(6000);
+        check("power off and on during the fade: rebuilt at the next look", e.stops == 1);
         HomeDepthClock.onDestroy(e);
     }
 

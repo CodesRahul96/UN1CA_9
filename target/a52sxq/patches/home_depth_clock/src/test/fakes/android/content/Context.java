@@ -8,6 +8,9 @@ public class Context {
     public Context() {}
     public Context getApplicationContext() { return this; }
     public ContentResolver getContentResolver() { return resolver; }
+    private final android.os.PowerManager power = new android.os.PowerManager();
+    @SuppressWarnings("unchecked")
+    public <T> T getSystemService(Class<T> c) { return c == android.os.PowerManager.class ? (T) power : null; }
     public Intent registerReceiver(BroadcastReceiver r, IntentFilter f, String perm, android.os.Handler h, int flags) { RECEIVERS.put(r, f); return null; }
     public Intent registerReceiver(BroadcastReceiver r, IntentFilter f, int flags) { RECEIVERS.put(r, f); return null; }
     public void unregisterReceiver(BroadcastReceiver r) { if (RECEIVERS.remove(r) == null) throw new IllegalArgumentException("not registered"); }

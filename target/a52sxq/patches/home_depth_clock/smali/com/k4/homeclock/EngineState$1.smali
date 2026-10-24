@@ -33,7 +33,7 @@
         }
     .end annotation
 
-    .line 46
+    .line 48
     iput-object p1, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
@@ -44,9 +44,9 @@
 
 # virtual methods
 .method public run()V
-    .registers 9
+    .registers 10
 
-    .line 49
+    .line 51
     const-string v0, "K4HomeClock"
 
     iget-object v1, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
@@ -61,45 +61,45 @@
 
     check-cast v1, Lf3/a;
 
-    .line 50
+    .line 52
     const/4 v2, 0x0
 
     if-nez v1, :cond_17
 
-    .line 51
+    .line 53
     iget-object v0, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v0, v2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputreloadPending(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 52
+    .line 54
     return-void
 
-    .line 55
+    .line 57
     :cond_17
     :try_start_17
     invoke-virtual {v1}, Lf3/a;->getWhich()I
 
     move-result v3
 
-    .line 56
+    .line 58
     iget-object v4, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v4}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgeteditorPending(Lcom/k4/homeclock/EngineState;)Z
 
     move-result v4
 
-    if-eqz v4, :cond_cd
+    if-eqz v4, :cond_df
 
     and-int/lit8 v4, v3, 0x1
 
-    if-eqz v4, :cond_cd
+    if-eqz v4, :cond_df
 
-    .line 57
+    .line 59
     invoke-virtual {v1}, Lf3/a;->getDisplayState()LB2/a;
 
     move-result-object v4
 
-    .line 58
+    .line 60
     instance-of v5, v4, Ljava/lang/Enum;
 
     const/4 v6, 0x1
@@ -129,7 +129,7 @@
     :cond_41
     move v5, v2
 
-    .line 59
+    .line 61
     :goto_42
     and-int/lit8 v7, v3, 0x2
 
@@ -150,35 +150,44 @@
     :cond_51
     move v6, v2
 
-    .line 60
+    .line 65
     :goto_52
     iget-object v7, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
-    invoke-static {v7}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetvisible(Lcom/k4/homeclock/EngineState;)Z
+    invoke-static {v7}, Lcom/k4/homeclock/EngineState;->-$$Nest$minteractive(Lcom/k4/homeclock/EngineState;)Z
 
     move-result v7
 
-    if-eqz v7, :cond_5e
+    .line 66
+    iget-object v8, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
-    if-eqz v5, :cond_5e
+    invoke-static {v8}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetvisible(Lcom/k4/homeclock/EngineState;)Z
 
-    if-eqz v6, :cond_cd
+    move-result v8
 
-    .line 61
-    :cond_5e
+    if-eqz v8, :cond_66
+
+    if-eqz v5, :cond_66
+
+    if-eqz v7, :cond_66
+
+    if-eqz v6, :cond_df
+
+    .line 67
+    :cond_66
     iget-object v1, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetdeferrals(Lcom/k4/homeclock/EngineState;)I
 
     move-result v5
 
-    add-int/lit8 v7, v5, 0x1
+    add-int/lit8 v8, v5, 0x1
 
-    invoke-static {v1, v7}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputdeferrals(Lcom/k4/homeclock/EngineState;I)V
+    invoke-static {v1, v8}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputdeferrals(Lcom/k4/homeclock/EngineState;I)V
 
-    if-nez v5, :cond_af
+    if-nez v5, :cond_c1
 
-    .line 62
+    .line 68
     iget-object v1, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetvisible(Lcom/k4/homeclock/EngineState;)Z
@@ -193,9 +202,9 @@
 
     invoke-direct {v5}, Ljava/lang/StringBuilder;-><init>()V
 
-    const-string v7, "reload from the editor (which="
+    const-string v8, "reload from the editor (which="
 
-    invoke-virtual {v5, v7}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v5, v8}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
     move-result-object v5
 
@@ -223,6 +232,16 @@
 
     move-result-object v1
 
+    const-string v3, ", interactive="
+
+    invoke-virtual {v1, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    invoke-virtual {v1, v7}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
     const-string v3, ", keyguard="
 
     invoke-virtual {v1, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
@@ -245,15 +264,15 @@
 
     invoke-static {v0, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 65
-    :cond_af
+    .line 72
+    :cond_c1
     iget-object v1, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetvisible(Lcom/k4/homeclock/EngineState;)Z
 
     move-result v1
 
-    if-eqz v1, :cond_cc
+    if-eqz v1, :cond_de
 
     iget-object v1, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
@@ -263,9 +282,9 @@
 
     const/16 v3, 0xa
 
-    if-gt v1, v3, :cond_cc
+    if-gt v1, v3, :cond_de
 
-    .line 66
+    .line 73
     iget-object v1, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetmain(Lcom/k4/homeclock/EngineState;)Landroid/os/Handler;
@@ -276,56 +295,56 @@
 
     invoke-virtual {v1, p0, v3, v4}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 68
-    :cond_cc
+    .line 75
+    :cond_de
     return-void
 
-    .line 71
-    :cond_cd
+    .line 78
+    :cond_df
     iget-object v3, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v3, v2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputreloadPending(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 72
+    .line 79
     iget-object v3, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v3, v2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputeditorPending(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 73
+    .line 80
     iget-object v3, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v3, v2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputdeferrals(Lcom/k4/homeclock/EngineState;I)V
 
-    .line 74
+    .line 81
     iget-object v3, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v3, v1}, Lcom/k4/homeclock/EngineState;->-$$Nest$mcheck(Lcom/k4/homeclock/EngineState;Lf3/a;)V
-    :try_end_e1
-    .catchall {:try_start_17 .. :try_end_e1} :catchall_e2
+    :try_end_f3
+    .catchall {:try_start_17 .. :try_end_f3} :catchall_f4
 
-    .line 79
-    goto :goto_f2
+    .line 86
+    goto :goto_104
 
-    .line 75
-    :catchall_e2
+    .line 82
+    :catchall_f4
     move-exception v1
 
-    .line 76
+    .line 83
     iget-object v3, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v3, v2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputreloadPending(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 77
+    .line 84
     iget-object v3, p0, Lcom/k4/homeclock/EngineState$1;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {v3, v2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputeditorPending(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 78
+    .line 85
     const-string v2, "reload"
 
     invoke-static {v0, v2, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 80
-    :goto_f2
+    .line 87
+    :goto_104
     return-void
 .end method

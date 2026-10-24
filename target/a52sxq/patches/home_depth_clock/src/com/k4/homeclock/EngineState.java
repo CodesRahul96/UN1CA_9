@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
@@ -19,8 +20,9 @@ import java.lang.ref.WeakReference;
  *    comes before its wallpaper apply, which normally replaces this engine in-process (reapply: the old sub engine is
  *    destroyed, so its check never runs, then the new one is built from the settings written by then); the check runs
  *    when this engine is shown again (the editor has closed, the apply is done) or after 6 s, whichever comes first,
- *    but only while it is really on screen: visible, display ON and, for an engine that is also the lock screen and
- *    has a gated clock, the keyguard gone. Until then it stays pending (no rebuild during the AOD, the screen-on
+ *    but only while it is really on screen: visible, display ON, the device interactive (the display state still says ON
+ *    for a moment after the power key) and, for an engine that is also the lock screen and has a gated clock, the
+ *    keyguard gone. Until then it stays pending (no rebuild during the screen-off fade, the AOD, the screen-on
  *    animation or on the lock screen): a visible engine looks again every 6 s (10 times at most), and becoming
  *    visible again or the keyguard going away re-arm it. A Settings RELOAD meanwhile keeps the editor's terms.
  *    A new engine elsewhere (a preview, another connection) no longer cancels it.
@@ -57,10 +59,15 @@ final class EngineState {
                     Object state = e.getDisplayState();
                     boolean on = state instanceof Enum && "ON".equals(((Enum<?>) state).name());
                     boolean keyguard = (which & 2) != 0 && HomeDepthClock.clockOf(e) != null && KeyguardWatch.locked;
-                    if (!visible || !on || keyguard) {
+                    // SpriteWallpaper's display state is a cached value: it stays ON from the power key until the AOD
+                    // (or the screen off) is reported, ~1 s later, and the engine can still be made visible in that
+                    // time (the editor closing behind the screen-off fade): the device must also be interactive
+                    boolean awake = interactive();
+                    if (!visible || !on || !awake || keyguard) {
                         if (deferrals++ == 0) {
                             Log.i(HomeDepthClock.TAG, "reload from the editor (which=" + which + "): not on screen (visible="
-                                    + visible + ", display=" + state + ", keyguard=" + keyguard + "), checked once it is");
+                                    + visible + ", display=" + state + ", interactive=" + awake + ", keyguard=" + keyguard
+                                    + "), checked once it is");
                         }
                         if (visible && deferrals <= 10) {
                             main.postDelayed(this, ReloadPolicy.WALLPAPER_WAIT_MS);
@@ -79,6 +86,16 @@ final class EngineState {
             }
         }
     };
+
+    /** PowerManager.isInteractive: false from the moment the device starts going to sleep. Unknown: true. */
+    private boolean interactive() {
+        try {
+            PowerManager pm = context.getSystemService(PowerManager.class);
+            return pm == null || pm.isInteractive();
+        } catch (Throwable t) {
+            return true;
+        }
+    }
 
     private void check(f3.a e) {
         int which = e.getWhich();

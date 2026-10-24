@@ -22,7 +22,7 @@
 .method static constructor <clinit>()V
     .registers 3
 
-    .line 101
+    .line 118
     invoke-static {}, Lcom/k4/homeclock/ReloadPolicy$Action;->values()[Lcom/k4/homeclock/ReloadPolicy$Action;
 
     move-result-object v0
