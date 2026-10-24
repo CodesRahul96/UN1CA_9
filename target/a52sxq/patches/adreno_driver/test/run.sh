@@ -21,6 +21,9 @@ eq() { [ "$2" = "$3" ] && ok || bad "$1: expected '$3', got '$2'"; }
 has() { grep -q -F -- "$2" "$3" && ok || bad "$1: '$2' not in $(basename "$3")"; }
 hasnt() { grep -q -F -- "$2" "$3" && bad "$1: '$2' unexpectedly in $(basename "$3")" || ok; }
 
+# the store/incoming slot name the script derives for a module id (slot_name in k4-gpu-driver)
+mslot() { printf 'm_%s_%s' "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._+-' '_' | cut -c 1-30)" "$(printf '%s' "$1" | sha1sum | cut -c 1-8)"; }
+
 # fake_lib <file> <version or -> [32]: 20-byte ELF header (aarch64 or 32-bit ARM), a version string, padding
 fake_lib() {
     mkdir -p "$(dirname "$1")"
@@ -145,12 +148,12 @@ CASE="KernelSU module, first boot (still in modules_update)"
 device; setp persist.sys.k4.gpu_driver 863
 ksu_module modules_update adreno_test V@0744.0
 boot
-S="$R/data/k4gpu/store/m_adreno_test"
-eq driver "$(prop persist.sys.k4.gpu_driver)" m_adreno_test
+S="$R/data/k4gpu/store/$(mslot adreno_test)"
+eq driver "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_test)
 eq trial "$(prop persist.sys.k4.gpu_trial)" pending
 eq prev "$(prop persist.sys.k4.gpu_prev)" 863
-eq user_active "$(prop sys.k4.gpu_user_active)" m_adreno_test
-has list "m_adreno_test	module	-	V@0744.0 (module adreno_test)" "$(L)"
+eq user_active "$(prop sys.k4.gpu_user_active)" $(mslot adreno_test)
+has list "$(mslot adreno_test)	module	-	V@0744.0 (module adreno_test)" "$(L)"
 has egl "bind $S/egl $R/vendor/lib64/egl" "$M"
 has gsl "bind $S/lib64/libgsl.so $R/vendor/lib64/libgsl.so" "$M"
 has kcl "bind $S/lib64/libkcl.so $R/vendor/lib64/libkcl.so" "$M"
@@ -164,13 +167,13 @@ grep -q "V@0530" "$S/egl/libGLESv2_adreno.so" && bad "stock GLES copied over the
 hasnt "no 530 libs bound" "libOpenCL" "$M"
 rc_early_boot; boot_completed
 eq "trial after boot" "$(prop persist.sys.k4.gpu_trial)" ok
-eq active "$(prop sys.k4.gpu_active)" m_adreno_test
+eq active "$(prop sys.k4.gpu_active)" $(mslot adreno_test)
 
 CASE="next boot: module moved to modules/, unchanged files"
 mv "$R/data/adb/modules_update/adreno_test" "$R/data/adb/modules/"
 boot
 hasnt "no re-import" "imported" "$R/data/k4gpu/boot.log"
-eq driver "$(prop persist.sys.k4.gpu_driver)" m_adreno_test
+eq driver "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_test)
 eq trial "$(prop persist.sys.k4.gpu_trial)" ok
 has "mounted again" "bind $S/egl" "$M"
 
@@ -180,7 +183,7 @@ touch -d '2026-01-01' "$R/data/adb/modules/adreno_test/vendor/lib64/egl/libGLESv
 setp persist.sys.k4.gpu_driver 849
 boot
 has "re-import" "imported V@0762.0" "$R/data/k4gpu/boot.log"
-eq driver "$(prop persist.sys.k4.gpu_driver)" m_adreno_test
+eq driver "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_test)
 eq trial "$(prop persist.sys.k4.gpu_trial)" pending
 eq prev "$(prop persist.sys.k4.gpu_prev)" 849
 has list "V@0762.0 (module adreno_test)" "$(L)"
@@ -189,17 +192,17 @@ CASE="trial boot never completed"
 rc_early_boot   # pending -> testing, then the phone hangs: no boot_completed
 boot
 eq driver "$(prop persist.sys.k4.gpu_driver)" 530
-eq failed "$(prop persist.sys.k4.gpu_failed)" m_adreno_test
+eq failed "$(prop persist.sys.k4.gpu_failed)" $(mslot adreno_test)
 eq trial "$(prop persist.sys.k4.gpu_trial)" failed
 eq "no mounts" "$(wc -l < "$M")" 0
 rc_early_boot
-eq "rc leaves it" "$(prop persist.sys.k4.gpu_failed)" m_adreno_test
+eq "rc leaves it" "$(prop persist.sys.k4.gpu_failed)" $(mslot adreno_test)
 boot
 eq "not selected again" "$(prop persist.sys.k4.gpu_driver)" 530
-has "still listed" "m_adreno_test" "$(L)"
+has "still listed" "$(mslot adreno_test)" "$(L)"
 
 CASE="user selects the module again, then uninstalls it"
-setp persist.sys.k4.gpu_driver m_adreno_test; setp persist.sys.k4.gpu_trial ok; setp persist.sys.k4.gpu_prev 863
+setp persist.sys.k4.gpu_driver $(mslot adreno_test); setp persist.sys.k4.gpu_trial ok; setp persist.sys.k4.gpu_prev 863
 boot
 has mounted "bind $S/egl" "$M"
 rm -rf "$R/data/adb/modules/adreno_test"
@@ -211,7 +214,7 @@ eq "no mounts" "$(wc -l < "$M")" 0
 
 CASE="module disabled"
 device; ksu_module modules adreno_test V@0744.0; boot
-eq driver "$(prop persist.sys.k4.gpu_driver)" m_adreno_test
+eq driver "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_test)
 : > "$R/data/adb/modules/adreno_test/disable"
 boot
 eq "back to previous" "$(prop persist.sys.k4.gpu_driver)" 530
@@ -227,22 +230,22 @@ device; setp persist.sys.k4.gpu_driver 849
 ksu_module modules adreno_test V@0744.0
 cp "$R/data/adb/modules/adreno_test/vendor/lib64/egl/libGLESv2_adreno.so" "$R/vendor/lib64/egl/libGLESv2_adreno.so"
 boot
-eq driver "$(prop persist.sys.k4.gpu_driver)" m_adreno_test
-eq external "$(prop sys.k4.gpu_external)" m_adreno_test
+eq driver "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_test)
+eq external "$(prop sys.k4.gpu_external)" $(mslot adreno_test)
 eq trial "$(prop persist.sys.k4.gpu_trial)" ok
 eq prev "$(prop persist.sys.k4.gpu_prev)" 849
 eq "nothing mounted on top" "$(wc -l < "$M")" 0
-eq user_active "$(prop sys.k4.gpu_user_active)" m_adreno_test
-has list "m_adreno_test	module	external	V@0744.0 (module adreno_test)" "$(L)"
+eq user_active "$(prop sys.k4.gpu_user_active)" $(mslot adreno_test)
+has list "$(mslot adreno_test)	module	external	V@0744.0 (module adreno_test)" "$(L)"
 eq vendor "$(prop sys.k4.gpu_vendor)" ""
 setp persist.sys.k4.gpu_driver 863   # Settings refuses this; even if it were set, the module's mount wins
 boot
-eq "locked" "$(prop persist.sys.k4.gpu_driver)" m_adreno_test
+eq "locked" "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_test)
 
 CASE="Magisk module"
 device; magisk_module adreno_magisk V@0849.0; boot
 eq root "$(prop sys.k4.gpu_root)" Magisk
-eq driver "$(prop persist.sys.k4.gpu_driver)" m_adreno_magisk
+eq driver "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_magisk)
 has list "V@0849.0 (module adreno_magisk)" "$(L)"
 
 CASE="module with only 32-bit libraries"
@@ -314,17 +317,17 @@ eq "empty list" "$(wc -c < "$(L)")" 0
 CASE="hide a module"
 device; ksu_module modules adreno_test V@0744.0; boot
 setp persist.sys.k4.gpu_driver 530   # Settings moves the selection away when it hides the selected entry
-: > "$R/data/k4gpu/incoming/m_adreno_test.hide"
+: > "$R/data/k4gpu/incoming/$(mslot adreno_test).hide"
 boot
 eq "empty list" "$(wc -c < "$(L)")" 0
-[ -e "$R/data/k4gpu/store/m_adreno_test" ] && bad "stored copy deleted" || ok
+[ -e "$R/data/k4gpu/store/$(mslot adreno_test)" ] && bad "stored copy deleted" || ok
 boot
 hasnt "not imported again" "imported" "$R/data/k4gpu/boot.log"
 eq driver "$(prop persist.sys.k4.gpu_driver)" 530
 rm -rf "$R/data/adb/modules/adreno_test"; boot
 eq "forgotten when uninstalled" "$(wc -c < "$R/data/k4gpu/hidden")" 0
 ksu_module modules adreno_test V@0744.0; boot
-eq "listed again after a new install" "$(prop persist.sys.k4.gpu_driver)" m_adreno_test
+eq "listed again after a new install" "$(prop persist.sys.k4.gpu_driver)" $(mslot adreno_test)
 
 CASE="driver flashed into /vendor (TWRP)"
 device; setp persist.sys.k4.gpu_driver 849
@@ -343,7 +346,7 @@ eq "seen cleared" "$(prop persist.sys.k4.gpu_vendor_seen)" ""
 
 CASE="mount fails half way"
 device; ksu_module modules adreno_test V@0744.0
-setp persist.sys.k4.gpu_driver m_adreno_test; setp persist.sys.k4.gpu_trial ok
+setp persist.sys.k4.gpu_driver $(mslot adreno_test); setp persist.sys.k4.gpu_trial ok
 cat > "$T/failmount" << 'EOF'
 EOF
 K4GPU_FAKEMOUNT_FAIL=libgsl.so
@@ -351,13 +354,156 @@ export K4GPU_FAKEMOUNT_FAIL
 boot
 unset K4GPU_FAKEMOUNT_FAIL
 eq driver "$(prop persist.sys.k4.gpu_driver)" 530
-eq missing "$(prop sys.k4.gpu_missing)" m_adreno_test
+eq missing "$(prop sys.k4.gpu_missing)" $(mslot adreno_test)
 has "undone" "umount $R/vendor/lib64/egl" "$M"
 eq user_active "$(prop sys.k4.gpu_user_active)" ""
 
 CASE="unknown selection value"
 device; setp persist.sys.k4.gpu_driver 999; boot
 eq driver "$(prop persist.sys.k4.gpu_driver)" 530
+
+# ---- REVIEW1 fixes ----
+
+CASE="M2 a module must not replace an unrelated /vendor library"
+device; fake_lib "$R/vendor/lib64/libsec-ril.so" -; fake_lib "$R/vendor/lib64/libQSEEComAPI.so" -
+ksu_module modules adreno_ril V@0744.0
+fake_lib "$R/data/adb/modules/adreno_ril/vendor/lib64/libsec-ril.so" -
+fake_lib "$R/data/adb/modules/adreno_ril/vendor/lib64/libQSEEComAPI.so" -
+boot
+hasnt "libsec-ril.so never bound" "/vendor/lib64/libsec-ril.so" "$M"
+hasnt "libQSEEComAPI.so never bound" "/vendor/lib64/libQSEEComAPI.so" "$M"
+eq "the set is rejected" "$(prop persist.sys.k4.gpu_driver)" 530
+has "with an unexpected-file reason" "unexpected file:" "$R/data/k4gpu/boot.log"
+
+CASE="M2 an unexpected library in lib64/egl is rejected too"
+device; ksu_module modules adreno_e V@0744.0
+fake_lib "$R/data/adb/modules/adreno_e/vendor/lib64/egl/libEGL_mali.so" -
+boot
+eq "rejected" "$(prop persist.sys.k4.gpu_driver)" 530
+has reason "unexpected file: libEGL_mali.so" "$R/data/k4gpu/boot.log"
+
+CASE="M2 a file in lib64/hw other than vulkan.adreno.so is rejected"
+device; ksu_module modules adreno_hw V@0744.0
+fake_lib "$R/data/adb/modules/adreno_hw/vendor/lib64/hw/gralloc.default.so" -
+boot
+eq "rejected" "$(prop persist.sys.k4.gpu_driver)" 530
+
+CASE="M3 a library name with a space is rejected (device shell: must not break the run or re-import forever)"
+device; ksu_module modules adreno_sp V@0744.0
+fake_lib "$R/data/adb/modules/adreno_sp/vendor/lib64/lib extra.so" -
+boot
+eq "run still finishes" "$(prop sys.k4.gpu_scan)" 1
+eq "rejected, stock stays" "$(prop persist.sys.k4.gpu_driver)" 530
+[ -z "$(ls "$R/data/k4gpu/store" 2> /dev/null)" ] && ok || bad "a set with a whitespace name must not be stored"
+boot
+eq "no re-import loop (second boot clean)" "$(prop sys.k4.gpu_scan)" 1
+
+CASE="M3 check_set fails closed (a glob character in a name is rejected, not accepted)"
+device; ksu_module modules adreno_g V@0744.0
+fake_lib "$R/data/adb/modules/adreno_g/vendor/lib64/lib*.so" -
+boot
+eq "rejected" "$(prop persist.sys.k4.gpu_driver)" 530
+
+CASE="M3 the reviewer's bypass: a 32-bit libgsl with no version and a spaced name is NOT stored"
+device; ksu_module modules adreno_bp V@0744.0
+fake_lib "$R/data/adb/modules/adreno_bp/vendor/lib64/libgsl.so" - 32
+fake_lib "$R/data/adb/modules/adreno_bp/vendor/lib64/egl/libGLESv2_adreno.so" -
+fake_lib "$R/data/adb/modules/adreno_bp/vendor/lib64/lib x.so" -
+boot
+[ -z "$(ls "$R/data/k4gpu/store" 2> /dev/null)" ] && ok || bad "the poisoned set was stored"
+eq "stock stays" "$(prop persist.sys.k4.gpu_driver)" 530
+
+CASE="L7 a module that ships the stock driver (vendor symlinked to /vendor) is ignored, not auto-selected"
+device; mkdir -p "$R/data/adb/modules/evil"; ln -s "$R/vendor" "$R/data/adb/modules/evil/vendor"
+boot
+eq "not auto-selected" "$(prop persist.sys.k4.gpu_driver)" 530
+eq "nothing stored" "$(ls "$R/data/k4gpu/store" 2> /dev/null | wc -l)" 0
+eq "empty list" "$(wc -c < "$(L)")" 0
+
+CASE="L5 two ids sharing the first 30 characters get distinct slots (the hash disambiguates), no overwrite/churn"
+id1="adreno.driver.very.long.name.aaa"; id2="adreno.driver.very.long.name.bbb"
+device; ksu_module modules "$id1" V@0744.0; ksu_module modules "$id2" V@0762.0
+boot
+eq "two entries" "$(wc -l < "$(L)")" 2
+n1="$(mslot "$id1")"; n2="$(mslot "$id2")"
+[ "$n1" != "$n2" ] && ok || bad "slot collision"
+has "slot for id1" "$n1" "$(L)"
+has "slot for id2" "$n2" "$(L)"
+boot
+eq "no re-import on an unchanged second boot" "$(grep -c imported "$R/data/k4gpu/boot.log")" 0
+
+CASE="L5 a hand-made module directory with an odd id (space) is skipped cleanly"
+device; ksu_module modules 'drv a' V@0744.0; boot
+eq "not listed" "$(wc -c < "$(L)")" 0
+eq "nothing stored" "$(ls "$R/data/k4gpu/store" 2> /dev/null | wc -l)" 0
+
+CASE="L6 a module id with a newline cannot inject lines into the drivers list (skipped, nothing stored)"
+device; ksu_module modules "$(printf 'nl\nsig=x')" V@0744.0
+boot
+eq "run finishes" "$(prop sys.k4.gpu_scan)" 1
+eq "nothing listed (no injection)" "$(wc -c < "$(L)")" 0
+eq "nothing stored" "$(ls "$R/data/k4gpu/store" 2> /dev/null | wc -l)" 0
+
+CASE="L3 a new module on a failsafe boot does not erase the undone record or auto-select"
+device; setp persist.sys.k4.gpu_driver 863; setp persist.sys.k4.gpu_trial testing
+ksu_module modules_update adreno_new V@0744.0
+boot
+eq "failed=863 kept" "$(prop persist.sys.k4.gpu_failed)" 863
+eq "trial failed" "$(prop persist.sys.k4.gpu_trial)" failed
+eq "stock, not the new module" "$(prop persist.sys.k4.gpu_driver)" 530
+has "but the new module is listed" "$(mslot adreno_new)" "$(L)"
+
+CASE="L4 a hidden module disabled for a boot stays hidden and does not override the user's choice when re-enabled"
+device; ksu_module modules adreno_h V@0744.0; boot
+setp persist.sys.k4.gpu_driver 849; : > "$R/data/k4gpu/incoming/$(mslot adreno_h).hide"; boot
+eq "hidden now" "$(wc -c < "$(L)")" 0
+: > "$R/data/adb/modules/adreno_h/disable"; boot
+rm "$R/data/adb/modules/adreno_h/disable"; boot
+eq "still hidden after re-enable" "$(wc -c < "$(L)")" 0
+eq "user's choice (849) survives" "$(prop persist.sys.k4.gpu_driver)" 849
+
+CASE="L2 an empty/unreadable ro.k4.gpu_drivers must not destroy a built-in choice"
+device; grep -v '^ro.k4.gpu_drivers=' "$T/props" > "$T/p2"; mv "$T/p2" "$T/props"
+setp persist.sys.k4.gpu_driver 849; boot
+eq "849 kept" "$(prop persist.sys.k4.gpu_driver)" 849
+
+CASE="M4 safe mode runs the stock driver this boot without changing the selection"
+device; ksu_module modules adreno_sm V@0744.0; boot
+eq "module selected" "$(prop persist.sys.k4.gpu_driver)" "$(mslot adreno_sm)"
+setp persist.sys.safemode 1; boot
+eq "selection unchanged" "$(prop persist.sys.k4.gpu_driver)" "$(mslot adreno_sm)"
+eq "but nothing mounted this boot" "$(wc -l < "$M")" 0
+eq "active reports stock" "$(prop sys.k4.gpu_user_active)" ""
+device; ksu_module modules adreno_sm V@0744.0; setp persist.sys.safemode 0; boot
+eq "normal boot mounts again" "$(prop sys.k4.gpu_user_active)" "$(mslot adreno_sm)"
+
+CASE="M4 the reset prop (settable from adb shell) reverts to the stock driver on the next boot"
+device; ksu_module modules adreno_rs V@0744.0; boot
+setp persist.sys.k4.gpu_driver "$(mslot adreno_rs)"; setp persist.sys.k4.gpu_trial ok
+setp persist.sys.k4.gpu_reset 1; boot
+eq "back to stock" "$(prop persist.sys.k4.gpu_driver)" 530
+eq "reset flag cleared" "$(prop persist.sys.k4.gpu_reset)" ""
+eq "nothing mounted" "$(wc -l < "$M")" 0
+
+CASE="M4 settle promotes a trial to ok only after the window with no system_server restart"
+device
+printf 'persist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\nsys.system_server.start_count=1\n' > "$T/props"
+K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=0 "$SH" "$SCRIPT" settle 20 > /dev/null 2>&1
+eq "stable -> ok" "$(prop persist.sys.k4.gpu_trial)" ok
+
+CASE="M4 settle leaves the trial testing if system_server restarts in the window"
+device
+printf 'persist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\nsys.system_server.start_count=1\n' > "$T/props"
+( K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=0.3 "$SH" "$SCRIPT" settle 500 > /dev/null 2>&1 ) &
+SPID=$!
+sleep 0.5; setp sys.system_server.start_count 2
+wait $SPID
+eq "crash -> still testing" "$(prop persist.sys.k4.gpu_trial)" testing
+
+CASE="L1 best-effort: more than MAX_NEW new modules are not all imported in one boot"
+device; for i in 1 2 3 4 5 6; do ksu_module modules "big$i" V@0744.0; done; boot
+imp="$(grep -c imported "$R/data/k4gpu/boot.log")"
+[ "$imp" -le 4 ] && ok || bad "imported $imp new modules in one boot (cap is 4)"
 
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]

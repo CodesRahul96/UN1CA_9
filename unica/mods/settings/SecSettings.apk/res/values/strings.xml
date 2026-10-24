@@ -101,6 +101,7 @@
     <string name="k4_gpu_driver_err_32bit">This driver has only 32-bit libraries (lib/). The phone needs the 64-bit ones (lib64/).%1$s</string>
     <string name="k4_gpu_driver_err_missing">The driver is incomplete. Missing: %1$s</string>
     <string name="k4_gpu_driver_err_not_arm64">%1$s is not a 64-bit ARM library.</string>
+    <string name="k4_gpu_driver_err_unexpected">This file is not an Adreno driver library: %1$s</string>
     <string name="k4_gpu_driver_err_no_version">%1$s has no Adreno version (V@…).</string>
     <string name="k4_gpu_driver_err_too_large">The driver is too large (more than %1$s MB).</string>
     <string name="k4_gpu_driver_err_not_zip">This is not a zip file.%1$s</string>

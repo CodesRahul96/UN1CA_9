@@ -56,7 +56,7 @@ public final class GpuDriverHostTest {
                 "META-INF/com/google/android/update-binary", "module.prop", "customize.sh",
                 "system/vendor/lib64/egl/libGLESv2_adreno.so", "system/vendor/lib64/egl/libEGL_adreno.so",
                 "system/vendor/lib64/egl/libGLESv1_CM_adreno.so", "system/vendor/lib64/hw/vulkan.adreno.so",
-                "system/vendor/lib64/hw/gralloc.default.so", "system/vendor/lib64/libgsl.so",
+                "system/vendor/lib64/libgsl.so", "system/vendor/lib64/libadreno_app_profiles.so",
                 "system/vendor/lib64/libllvm-glnext.so", "system/vendor/lib64/sub/x.so", "system/vendor/lib64/README",
                 "system/vendor/lib/egl/libGLESv2_adreno.so", "system/vendor/lib/libgsl.so",
                 "system/vendor/firmware/a660_sqe.fw", "system/vendor/firmware/a650_sqe.fw",
@@ -66,11 +66,22 @@ public final class GpuDriverHostTest {
         eq("vulkan", p.files.get("system/vendor/lib64/hw/vulkan.adreno.so"), "lib64/hw/vulkan.adreno.so");
         eq("gsl", p.files.get("system/vendor/lib64/libgsl.so"), "lib64/libgsl.so");
         eq("sqe", p.files.get("system/vendor/firmware/a660_sqe.fw"), "firmware/a660_sqe.fw");
-        eq("no other hw module", p.files.containsKey("system/vendor/lib64/hw/gralloc.default.so"), false);
         eq("no subdirectories", p.files.containsKey("system/vendor/lib64/sub/x.so"), false);
         eq("no 32-bit", p.files.containsKey("system/vendor/lib/libgsl.so"), false);
         eq("no other GPU's microcode", p.files.containsKey("system/vendor/firmware/a650_sqe.fw"), false);
-        eq("count", p.files.size(), 7);
+        eq("count", p.files.size(), 8);
+
+        section = "plan: an unrelated vendor library in the layout is rejected (M2)";
+        p = GpuDriverPackage.plan(Arrays.asList("system/vendor/lib64/egl/libGLESv2_adreno.so",
+                "system/vendor/lib64/libsec-ril.so"));
+        eq("error", p.error, GpuDriverPackage.ERR_UNEXPECTED);
+        eq("detail", p.detail, "libsec-ril.so");
+        eq("nothing staged", p.files.size(), 0);
+        p = GpuDriverPackage.plan(Arrays.asList("system/vendor/lib64/egl/libGLESv2_adreno.so",
+                "system/vendor/lib64/hw/gralloc.default.so"));
+        eq("unexpected hw file", p.error, GpuDriverPackage.ERR_UNEXPECTED);
+        p = GpuDriverPackage.plan(Arrays.asList("Adreno/libGLESv2_adreno.so", "Adreno/libmali.so"));
+        eq("unexpected flat lib", p.error, GpuDriverPackage.ERR_UNEXPECTED);
 
         section = "plan: vendor/ at the root, microcode elsewhere";
         p = GpuDriverPackage.plan(Arrays.asList("drv/vendor/lib64/egl/libGLESv2_adreno.so", "drv/vendor/lib64/libgsl.so",

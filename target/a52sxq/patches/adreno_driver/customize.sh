@@ -16,9 +16,12 @@ SKIPUNZIP=1
 #   - for V@07xx and newer builds, android.hardware.vulkan.version 1.3 bound over the vendor's 1.1 feature file (the flag
 #     must match the driver: V@0530 builds report Vulkan 1.1, V@0849 / V@0863 1.3).
 # Selection: persist.sys.k4.gpu_driver = 530 | <id> | m_<module> | u_<added>. Failsafe: Settings sets
-# persist.sys.k4.gpu_trial=pending; the rc turns it into "testing" for that boot and "ok" at boot_completed; "testing" at
-# the next boot means that boot never finished, so the stock V@0530 is used, persist.sys.k4.gpu_failed records the
-# driver and the trial is set to "failed". sys.k4.gpu_active reports what this boot actually uses.
+# persist.sys.k4.gpu_trial=pending; the rc turns it into "testing" for that boot; k4-gpu-driver settle turns it into
+# "ok" only after 150 s past boot_completed with no system_server restart; "testing" still set at the next boot means
+# that boot never settled (a bootloop, or a crash/reboot inside the window), so the stock V@0530 is used,
+# persist.sys.k4.gpu_failed records the driver and the trial is set to "failed". sys.k4.gpu_active reports what this
+# boot actually uses. Escapes that need no root: persist.sys.safemode=1 (Android safe mode) runs the stock driver for
+# that boot; `setprop persist.sys.k4.gpu_reset 1` (settable from adb shell) resets to the stock driver next boot.
 #
 # Drivers the user brings (k4-gpu-driver, run by the rc at post-fs-data in its own SELinux domain k4gpu): KernelSU /
 # Magisk driver modules and drivers added in Settings ("Add driver") are kept in /data/k4gpu/store and bound the same
@@ -109,11 +112,26 @@ RC="$WORK_DIR/system/system/etc/init/k4_gpu_driver.rc"
     echo "# User drivers (driver modules, Settings > Add driver): k4-gpu-driver, after the root manager's post-fs-data"
     echo "# (KernelSU / Magisk run theirs from init.rc, which comes first) and before zygote-start. It also does the"
     echo "# failsafe below first, for every driver, and selects a newly installed driver module with a trial boot."
+    echo "# The import is bounded by a 180 s timeout (init waits for it) so a bad / huge module cannot hang the boot."
     echo "on post-fs-data"
     echo "    mkdir /data/k4gpu 0751 root system"
     echo "    mkdir /data/k4gpu/store 0755 root root"
     echo "    mkdir /data/k4gpu/incoming 0770 system system"
-    echo "    exec u:r:k4gpu:s0 root system -- /system/bin/sh /system/bin/k4-gpu-driver boot $GPU_STOCK"
+    echo "    exec u:r:k4gpu:s0 root system -- /system/bin/timeout 180 /system/bin/sh /system/bin/k4-gpu-driver boot $GPU_STOCK"
+    echo
+    echo "# A newly selected user driver is on trial: the trial becomes ok only once the device has run 150 s past"
+    echo "# boot_completed with no system_server restart (k4-gpu-driver settle). A reboot or a system_server crash"
+    echo "# inside that window leaves the trial = testing, so the next boot reverts to the stock driver (failsafe)."
+    echo "# This recovers a user driver that boots but then breaks SystemUI / the launcher, not only one that bootloops."
+    echo "service k4_gpu_settle /system/bin/timeout 200 /system/bin/sh /system/bin/k4-gpu-driver settle 150"
+    echo "    user system"
+    echo "    group system"
+    echo "    seclabel u:r:k4gpu:s0"
+    echo "    oneshot"
+    echo "    disabled"
+    echo
+    echo "on property:sys.boot_completed=1 && property:persist.sys.k4.gpu_trial=testing"
+    echo "    start k4_gpu_settle"
     echo
     echo "on early-boot"
     echo "    setprop sys.k4.gpu_active \${sys.k4.gpu_user_active:-$GPU_DEFAULT}"
@@ -142,9 +160,6 @@ RC="$WORK_DIR/system/system/etc/init/k4_gpu_driver.rc"
             echo "    setprop sys.k4.gpu_active $v"
         done
     done
-    echo
-    echo "on property:sys.boot_completed=1 && property:persist.sys.k4.gpu_trial=testing"
-    echo "    setprop persist.sys.k4.gpu_trial ok"
 } > "$RC"
 SET_METADATA "system" "system/etc/init/k4_gpu_driver.rc" 0 0 644 "u:object_r:system_file:s0"
 
@@ -170,7 +185,7 @@ PLAT_PC="$WORK_DIR/system/system/etc/selinux/plat_property_contexts"
 if ! grep -q -x -F "(type k4gpu)" "$PLAT_CIL"; then
     for t in init shell_exec toolbox_exec system_file kmsg_device system_data_root_file adb_data_file \
         same_process_hal_file vendor_file vendor_hal_file vendor_configs_file labeledfs \
-        property_socket default_prop system_app shell; do
+        property_socket default_prop system_prop safemode_prop boot_status_prop system_app shell; do
         grep -q -x -F "(type $t)" "$PLAT_CIL" || ABORT "adreno_driver: type $t not in plat_sepolicy.cil, review sepolicy.cil"
     done
     # the SQE label is the vendor's own type (Qualcomm vendor_sepolicy.cil), like the early-boot rule above uses it
@@ -179,7 +194,7 @@ if ! grep -q -x -F "(type k4gpu)" "$PLAT_CIL"; then
     # secilc rejects a second typeattributeset for an attribute, so extend the existing ones
     for a in "domain k4gpu" "file_type k4_gpu_data_file k4_gpu_incoming_file" \
         "data_file_type k4_gpu_data_file k4_gpu_incoming_file" "core_data_file_type k4_gpu_data_file k4_gpu_incoming_file" \
-        "property_type k4_gpu_prop" "system_property_type k4_gpu_prop"; do
+        "property_type k4_gpu_prop k4_gpu_reset_prop" "system_property_type k4_gpu_prop k4_gpu_reset_prop"; do
         n="${a%% *}"
         [ "$(grep -c "^(typeattributeset $n (" "$PLAT_CIL")" = 1 ] || ABORT "adreno_driver: no single $n attribute set in plat_sepolicy.cil"
         sed -i "s/^(typeattributeset $n (/(typeattributeset $n (${a#* } /" "$PLAT_CIL"
@@ -203,6 +218,7 @@ if ! grep -q -x -F "(type k4gpu)" "$PLAT_CIL"; then
     {
         echo "persist.sys.k4.gpu_      u:object_r:k4_gpu_prop:s0"
         echo "sys.k4.gpu_              u:object_r:k4_gpu_prop:s0"
+        echo "persist.sys.k4.gpu_reset u:object_r:k4_gpu_reset_prop:s0"
     } >> "$PLAT_PC"
 fi
 grep -q -x -F "(allow system_app k4_gpu_prop (property_service (set)))" "$PLAT_CIL" || \

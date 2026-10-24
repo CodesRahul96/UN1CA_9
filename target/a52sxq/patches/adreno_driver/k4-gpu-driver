@@ -2,32 +2,41 @@
 # GPU driver selector: drivers the user brings (target/a52sxq/patches/adreno_driver, see module.prop).
 #
 #   k4-gpu-driver boot <stock version>      (init, k4_gpu_driver.rc, post-fs-data, domain k4gpu, blocking)
+#   k4-gpu-driver settle <seconds>          (init, on boot_completed with trial=testing; promotes the trial to ok
+#                                            only after the device has run <seconds> with no system_server restart)
 #
-# Runs after the root manager's own post-fs-data step (KernelSU's ksud and Magisk add theirs to init.rc, which init
-# processes before /system/etc/init/*.rc), so whatever a metamodule / magic mount / Mountify mounted over /vendor is
-# already in place, and before zygote-start, early-boot (the built-in sets) and boot (SurfaceFlinger, HALs).
+# "boot" runs after the root manager's own post-fs-data step (KernelSU's ksud and Magisk add theirs to init.rc, which
+# init processes before /system/etc/init/*.rc), so whatever a metamodule / magic mount / Mountify mounted over /vendor
+# is already in place, and before zygote-start, early-boot (the built-in sets) and boot (SurfaceFlinger, HALs).
 #
 # Sources of user drivers:
 #   - KernelSU / Magisk modules (/data/adb/modules/<id>, a fresh install still in /data/adb/modules_update/<id>)
 #     with a 64-bit Adreno set under vendor/ or system/vendor/ (lib64/egl, lib64/hw/vulkan.adreno.so, lib64/*.so,
 #     firmware/a660_sqe.fw). Metamodule-era KernelSU (ksud 4.x) mounts nothing without a metamodule, so a driver
-#     module is imported (copied) into /data/k4gpu/store/m_<id> and bound like a built-in set. If the module is
+#     module is imported (copied) into /data/k4gpu/store/m_<id>_<hash> and bound like a built-in set. If the module is
 #     already mounted (a metamodule, Magisk's magic mount, Mountify: the GLES library seen in /vendor is the module's
 #     file) nothing is mounted on top: the user's mount wins and the entry is reported as active and locked.
 #   - Settings > K4_UN1CA > UI > GPU driver > Add driver: Settings validates the zip and stages the set in
 #     /data/k4gpu/incoming/u_<id>/ (+ "ready"); it is validated again and moved to /data/k4gpu/store/u_<id> here.
 #   - A driver flashed into /vendor itself (TWRP zip): no mount, the default entry is labeled with its version.
 # Requests from Settings: incoming/<slot>.remove (delete an added driver), incoming/<slot>.hide (hide a module).
-# Only userspace libraries (lib64/egl/*.so, lib64/*.so, lib64/hw/vulkan.adreno.so) and the unsigned a660 SQE microcode
-# (firmware/a660_sqe.fw) are ever imported or bound; signed firmware a driver package may carry (zap shader, GMU, other
-# GPUs' files) is never touched.
 #
-# Selection and failsafe are the built-in ones (persist.sys.k4.gpu_driver / gpu_trial / gpu_failed): a new module
-# driver is selected with a trial boot, the rc's early-boot turns "pending" into "testing", boot_completed into "ok",
-# and a "testing" left over from a boot that never completed falls back to the stock driver (done here first, so a
-# new module found on the same boot cannot overwrite the record; the rc does the same if this script never ran).
+# Only an allowlist of Adreno file names is ever imported or bound (ALLOW_EGL / ALLOW_LIB + hw/vulkan.adreno.so +
+# firmware/a660_sqe.fw): a set that carries any other .so in lib64 or lib64/egl is rejected, so a "driver" cannot
+# replace an unrelated /vendor library. Only the unsigned a660 SQE microcode is bound from firmware; signed firmware
+# a package may carry (zap shader, GMU, other GPUs' files) is never imported or bound.
+#
+# Selection and failsafe (persist.sys.k4.gpu_driver / gpu_trial / gpu_failed): a new module driver is selected with a
+# trial boot, the rc's early-boot turns "pending" into "testing"; the trial becomes "ok" only once the device has run
+# <window> seconds past boot_completed with no system_server restart (k4-gpu-driver settle). A "testing" left over at
+# the next boot means that boot never settled (a bootloop, or a crash/reboot inside the window), so the stock driver
+# is used, persist.sys.k4.gpu_failed records the driver and the trial is set to "failed" (done here first, so a new
+# module found on the same boot cannot overwrite the record; the rc does the same if this script never ran).
 # A selected user driver that is missing, damaged or cannot be mounted falls back to the stock driver
 # (sys.k4.gpu_missing, Settings shows a banner). A module that went away falls back to the previous choice.
+# Escapes that need no root: Android safe mode (persist.sys.safemode=1) runs the stock driver for that boot without
+# changing the selection; `setprop persist.sys.k4.gpu_reset 1` (settable from adb shell) resets to the stock driver
+# on the next boot.
 #
 # Output: /data/k4gpu/drivers (one line per user driver: slot, kind, flags, label; read by Settings),
 # sys.k4.gpu_scan=1 when this ran to the end, sys.k4.gpu_user_active, sys.k4.gpu_external, sys.k4.gpu_root,
@@ -50,10 +59,15 @@ STOCK="${2:-V@0530.0}"
 DEF=530
 P=persist.sys.k4.gpu_
 S=sys.k4.gpu_
+# Adreno file names a set may contain (the union of the built-in v*/ sets; nothing else is imported or bound).
+ALLOW_EGL="eglSubDriverAndroid.so libEGL_adreno.so libGLESv1_CM_adreno.so libGLESv2_adreno.so libq3dtools_adreno.so libq3dtools_esx.so libVkLayer_ADRENO_qprofiler.so"
+ALLOW_LIB="libadreno_app_profiles.so libadreno_compiler_cl.so libadreno_utils.so libCB.so libdmabufheap.so libgame_enhance.so libgpudataproducer.so libgpu_tonemapper.so libgsl.so libkcl.so libkernelmanager.so libllvm-glnext.so libllvm-qcom.so libllvm-qgl.so libOpenCL.so libVkLayer_q3dtools.so"
 REQ="lib64/egl/libGLESv2_adreno.so lib64/egl/libEGL_adreno.so lib64/egl/libGLESv1_CM_adreno.so lib64/hw/vulkan.adreno.so lib64/libgsl.so lib64/libllvm-glnext.so"
 L_LIB=u:object_r:same_process_hal_file:s0
 L_FW=u:object_r:vendor_firmware_file:s0
 MAX_KB=307200
+STORE_CAP_KB=921600
+MAX_NEW=4
 VK13="$VND/k4gpu/vulkan.version-1_3.xml"
 VKXML="$VND/etc/permissions/android.hardware.vulkan.version-1_1.xml"
 
@@ -105,49 +119,113 @@ has_word() {
     return 1
 }
 
-# the files of a set (relative to its vendor-like root) that are imported
+# only a basename made of [A-Za-z0-9._+-] (no whitespace, glob or control characters)
+name_ok() {
+    case "$1" in
+        "" | *[!A-Za-z0-9._+-]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+allowed_lib() {
+    has_word "$ALLOW_EGL $ALLOW_LIB" "$1"
+}
+
+# a valid store/incoming slot directory name
+slot_ok_name() {
+    case "$1" in
+        m_* | u_*) name_ok "$1" ;;
+        *) return 1 ;;
+    esac
+}
+
+# the files of a set (relative to its vendor-like root) that are imported - only allowlisted names, so the output
+# never contains whitespace and the callers can word-split it safely
 files_of() {
-    for f in "$1"/lib64/egl/*.so "$1"/lib64/*.so "$1"/lib64/hw/vulkan.adreno.so "$1"/firmware/a660_sqe.fw; do
-        [ -f "$f" ] && [ ! -L "$f" ] && echo "${f#"$1"/}"
+    for n in $ALLOW_EGL; do
+        [ -f "$1/lib64/egl/$n" ] && [ ! -L "$1/lib64/egl/$n" ] && echo "lib64/egl/$n"
     done
+    for n in $ALLOW_LIB; do
+        [ -f "$1/lib64/$n" ] && [ ! -L "$1/lib64/$n" ] && echo "lib64/$n"
+    done
+    [ -f "$1/lib64/hw/vulkan.adreno.so" ] && [ ! -L "$1/lib64/hw/vulkan.adreno.so" ] && echo "lib64/hw/vulkan.adreno.so"
+    [ -f "$1/firmware/a660_sqe.fw" ] && [ ! -L "$1/firmware/a660_sqe.fw" ] && echo "firmware/a660_sqe.fw"
 }
 
 sig_of() {
     for f in $(files_of "$1"); do
-        stat -c "$f %s %Y" "$1/$f"
+        stat -c "$f %s %Y" "$1/$f" 2> /dev/null
     done | sha1sum | cut -c 1-40
 }
 
-# check_set <root>: prints why the set cannot be used, or nothing
+# any .so directly in lib64/ or lib64/egl/, or any file in lib64/hw/, whose name is not on the allowlist (handles
+# whitespace / odd names: they are not on the allowlist, so they are reported here instead of breaking a loop)
+unexpected_lib() {
+    find "$1/lib64" "$1/lib64/egl" -maxdepth 1 -type f -name '*.so' 2> /dev/null | while IFS= read -r f; do
+        n="${f##*/}"
+        allowed_lib "$n" || { echo "$n"; break; }
+    done
+    find "$1/lib64/hw" -maxdepth 1 -type f 2> /dev/null | while IFS= read -r f; do
+        [ "${f##*/}" = vulkan.adreno.so ] || { echo "${f##*/}"; break; }
+    done
+}
+
+# check_set <root>: prints exactly "ok", or a one-line reason. Fails closed: any step that cannot run prints a reason,
+# and the caller treats anything other than "ok" as a rejection, so a subshell that dies mid-way is a rejection too.
 check_set() {
+    # a library directory that is a symlink would let a set point its files outside the staging area
+    for d in lib64 lib64/egl lib64/hw firmware; do
+        [ -L "$1/$d" ] && { echo "a driver directory is a symlink ($d)"; return; }
+    done
+    if [ ! -d "$1/lib64" ] && [ -f "$1/lib/egl/libGLESv2_adreno.so" ]; then
+        echo "only 32-bit libraries"
+        return
+    fi
+    u="$(unexpected_lib "$1")"
+    [ -z "$u" ] || { echo "unexpected file: $u"; return; }
     miss=""
     for f in $REQ; do
         [ -f "$1/$f" ] && [ ! -L "$1/$f" ] || miss="$miss ${f##*/}"
     done
-    if [ -n "$miss" ]; then
-        if [ ! -d "$1/lib64" ] && [ -f "$1/lib/egl/libGLESv2_adreno.so" ]; then
-            echo "only 32-bit libraries"
-        else
-            echo "missing$miss"
-        fi
-        return
-    fi
+    [ -z "$miss" ] || { echo "missing$miss"; return; }
     kb=0
     for f in $(files_of "$1"); do
         case "$f" in
             *.so) is_elf64_arm "$1/$f" || { echo "not a 64-bit ARM library: ${f##*/}"; return; } ;;
         esac
-        kb=$((kb + $(stat -c %s "$1/$f") / 1024))
+        sz="$(stat -c %s "$1/$f" 2> /dev/null)"
+        case "$sz" in
+            "" | *[!0-9]*) echo "cannot read ${f##*/}"; return ;;
+        esac
+        kb=$((kb + sz / 1024))
     done
     [ "$kb" -le "$MAX_KB" ] || { echo "too large (${kb} KB)"; return; }
-    [ -n "$(ver_of "$1/lib64/egl/libGLESv2_adreno.so")" ] || echo "no Adreno version string in libGLESv2_adreno.so"
+    v="$(ver_of "$1/lib64/egl/libGLESv2_adreno.so")"
+    [ -n "$v" ] || { echo "no Adreno version string in libGLESv2_adreno.so"; return; }
+    [ "$v" != "$STOCK" ] || { echo "same as the stock driver"; return; }
+    echo ok
 }
 
 info_get() {
     sed -n "s/^$2=//p" "$1" 2> /dev/null | head -n 1
 }
 
-# install_set <slot> <root> <source> <name>: copies the set into the store in the layout the mount uses:
+# a display name without control characters, at most 48 bytes
+clean_name() {
+    printf '%s' "$1" | tr -d '\000-\037\177' | cut -c 1-48
+}
+
+# free kilobytes on the data filesystem (empty if df cannot tell, e.g. host tests); margin added by the caller
+free_kb() {
+    df -k "$BASE" 2> /dev/null | awk 'NR==2 { print $4; exit }'
+}
+
+store_kb() {
+    du -sk "$STORE" 2> /dev/null | awk '{ print $1; exit }'
+}
+
+# install_set <slot> <root> <source> <name> <sig>: copies the allowlisted files into the store in the layout the
+# mount uses:
 #   egl/            bound over /vendor/lib64/egl (lib64/egl/*, plus lib64/*.so with no stock counterpart, plus the
 #                   stock egl libraries the set does not have - the same result a module overlay would give)
 #   lib64/<lib>     bound over /vendor/lib64/<lib>, lib64/hw/vulkan.adreno.so over /vendor/lib64/hw/
@@ -156,18 +234,19 @@ install_set() {
     t="$STORE/.tmp.$1"
     rm -rf "$t"
     mkdir -p "$t/egl" "$t/lib64/hw" "$t/firmware" || return 1
-    for f in "$2"/lib64/*.so; do
+    for n in $ALLOW_LIB; do
+        f="$2/lib64/$n"
         [ -f "$f" ] && [ ! -L "$f" ] || continue
-        n="${f##*/}"
         if [ -f "$VND/lib64/$n" ]; then
             cp "$f" "$t/lib64/$n" || return 1
         else
             cp "$f" "$t/egl/$n" || return 1
         fi
     done
-    for f in "$2"/lib64/egl/*.so; do
+    for n in $ALLOW_EGL; do
+        f="$2/lib64/egl/$n"
         [ -f "$f" ] && [ ! -L "$f" ] || continue
-        cp "$f" "$t/egl/" || return 1
+        cp "$f" "$t/egl/$n" || return 1
     done
     for f in "$VND"/lib64/egl/*; do
         [ -f "$f" ] && [ ! -e "$t/egl/${f##*/}" ] || continue
@@ -185,9 +264,9 @@ install_set() {
     {
         echo "version=$v"
         echo "source=$3"
-        echo "name=$4"
+        echo "name=$(clean_name "$4")"
         echo "sig=$5"
-        (cd "$t" && find egl lib64 firmware -type f | LC_ALL=C sort | while read -r f; do echo "f $f $(stat -c %s "$f")"; done)
+        (cd "$t" && find egl lib64 firmware -type f | LC_ALL=C sort | while IFS= read -r f; do echo "f $f $(stat -c %s "$f")"; done)
     } > "$t/info" || return 1
     chmod 644 "$t/info"
     rm -rf "${STORE:?}/$1" && mv "$t" "$STORE/$1"
@@ -270,8 +349,11 @@ valid_choice() {
     esac
 }
 
+# a stable, collision-free slot name for a module id: sanitized id + "_" + a short hash of the full id
 slot_name() {
-    printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_' | cut -c 1-40
+    h="$(printf '%s' "$1" | sha1sum | cut -c 1-8)"
+    b="$(printf '%s' "$1" | tr -c 'A-Za-z0-9._+-' '_' | cut -c 1-30)"
+    echo "${b}_${h}"
 }
 
 boot() {
@@ -291,13 +373,27 @@ boot() {
     [ -n "$sel" ] || sel=$DEF
     missing=""
     rejected=""
+    failsafe=""
+    have_list=""
+    [ -n "$(gp ro.k4.gpu_drivers)" ] && have_list=1
 
-    # a boot with a newly selected driver never completed: same as the rc's early-boot failsafe
+    # one-shot reset from adb shell (persist.sys.k4.gpu_reset=1): back to the stock driver
+    if [ "$(gp ${P}reset)" = 1 ]; then
+        log "reset requested: back to V@0$DEF"
+        [ "$sel" != "$DEF" ] && prev="$sel"
+        sel=$DEF
+        trial=ok
+        failed=""
+        sp ${P}reset ""
+    fi
+
+    # a boot with a newly selected driver never settled: same as the rc's early-boot failsafe
     if [ "$trial" = testing ]; then
-        log "previous boot with $sel never completed: back to V@0$DEF"
+        log "previous boot with $sel never settled: back to V@0$DEF"
         failed="$sel"
         sel=$DEF
         trial=failed
+        failsafe=1
     fi
 
     # leftovers of an interrupted run or of Settings (no "ready": the copy never finished)
@@ -308,7 +404,7 @@ boot() {
         [ -f "$r" ] || continue
         s="${r##*/}"
         s="${s%.remove}"
-        case "$s" in u_*) ;; *) rm -f "$r"; continue ;; esac
+        slot_ok_name "$s" && [ "${s#u_}" != "$s" ] || { rm -f "$r"; continue; }
         rm -rf "${STORE:?}/$s" "${IN:?}/$s" "$r"
         log "$s: removed"
     done
@@ -317,29 +413,30 @@ boot() {
         [ -f "$r" ] || continue
         s="${r##*/}"
         s="${s%.hide}"
-        case "$s" in
-            m_*) grep -q -x -F "$s" "$HIDDEN" || echo "$s" >> "$HIDDEN"
-                 rm -rf "${STORE:?}/$s"
-                 log "$s: hidden" ;;
-        esac
+        if slot_ok_name "$s" && [ "${s#m_}" != "$s" ]; then
+            grep -q -x -F "$s" "$HIDDEN" || echo "$s" >> "$HIDDEN"
+            rm -rf "${STORE:?}/$s"
+            log "$s: hidden"
+        fi
         rm -f "$r"
     done
 
     # drivers added in Settings
     newslot=""
+    newcount=0
     for d in "$IN"/u_*; do
         [ -d "$d" ] || continue
         s="${d##*/}"
-        if [ ! -f "$d/ready" ]; then
+        if ! slot_ok_name "$s" || [ ! -f "$d/ready" ]; then
             rm -rf "$d"
             continue
         fi
         why="$(check_set "$d")"
         name="$(info_get "$d/info" name)"
-        if [ -z "$why" ] && install_set "$s" "$d" added "${name:-zip}" "$(sig_of "$d")"; then
+        if [ "$why" = ok ] && space_ok "$d" && install_set "$s" "$d" added "${name:-zip}" "$(sig_of "$d")"; then
             log "$s: added $(info_get "$STORE/$s/info" version) ($name)"
         else
-            [ -n "$why" ] || why="copy failed"
+            [ "$why" = ok ] && why="not enough free storage or copy failed"
             log "$s: not installed: $why"
             rejected="${name:-$s}: $why"
             rm -rf "${STORE:?}/$s" "${STORE:?}/.tmp.$s"
@@ -353,6 +450,7 @@ boot() {
     ext=""
     extid=""
     modslots=""
+    allmodslots=""
     HID_SEEN=""
     root=none
     [ -d "$ADB/ksu" ] && root=KernelSU
@@ -363,25 +461,32 @@ boot() {
         case "$m" in
             */modules/*) [ -d "$ADB/modules_update/$id" ] && continue ;;  # an update is waiting: that one counts
         esac
-        [ -e "$m/disable" ] || [ -e "$m/remove" ] || [ -e "$ADB/modules/$id/disable" ] || [ -e "$ADB/modules/$id/remove" ] && continue
         src=""
+        is32=""
         for v in "$m/vendor" "$m/system/vendor"; do
             if [ -f "$v/lib64/egl/libGLESv2_adreno.so" ]; then
                 src="$v"
                 break
             fi
-            [ -f "$v/lib/egl/libGLESv2_adreno.so" ] && [ -z "$src" ] && src="32:$v"
+            [ -f "$v/lib/egl/libGLESv2_adreno.so" ] && [ -z "$src" ] && { src="$v"; is32=1; }
         done
         [ -n "$src" ] || continue
+        # module ids are [A-Za-z0-9._+-] (what KernelSU/Magisk allow); anything else is a hand-made directory - skip it
+        name_ok "$id" || { log "skip module with an unusable id"; continue; }
         s="m_$(slot_name "$id")"
-        if [ "${src#32:}" != "$src" ]; then
+        allmodslots="$allmodslots $s"
+        # a module that is turned off still keeps its slot registered (so a hidden module is not forgotten while off)
+        if [ -e "$m/disable" ] || [ -e "$m/remove" ] || [ -e "$ADB/modules/$id/disable" ] || [ -e "$ADB/modules/$id/remove" ]; then
+            continue
+        fi
+        if [ -n "$is32" ]; then
             log "$s: only 32-bit libraries, ignored"
             rejected="module $id: only 32-bit libraries"
             continue
         fi
         # already mounted by the root manager (metamodule, magic mount, Mountify)?
         if [ -z "$ext" ] && [ -n "$visver" ] && [ "$visver" != "$STOCK" ] && \
-                [ "$(stat -c %s "$src/lib64/egl/libGLESv2_adreno.so")" = "$(stat -c %s "$vis" 2> /dev/null)" ] && \
+                [ "$(stat -c %s "$src/lib64/egl/libGLESv2_adreno.so" 2> /dev/null)" = "$(stat -c %s "$vis" 2> /dev/null)" ] && \
                 cmp -s "$src/lib64/egl/libGLESv2_adreno.so" "$vis"; then
             ext="$s"
             extid="$id"
@@ -399,36 +504,40 @@ boot() {
             continue
         fi
         why="$(check_set "$src")"
-        if [ -z "$why" ] && install_set "$s" "$src" module "$id" "$sig"; then
+        if [ "$why" = ok ] && [ "$newcount" -lt "$MAX_NEW" ] && space_ok "$src" && install_set "$s" "$src" module "$id" "$sig"; then
             log "$s: imported $(info_get "$STORE/$s/info" version) from module $id"
             modslots="$modslots $s"
-            newslot="$s"
+            newcount=$((newcount + 1))
+            # do not auto-select a freshly imported module on a boot that just reverted a failed trial
+            [ -z "$failsafe" ] && newslot="$s"
         else
-            [ -n "$why" ] || why="copy failed"
+            [ "$why" = ok ] && why="too many new drivers, no free storage, or copy failed"
             log "$s: module $id not usable: $why"
             rejected="module $id: $why"
             rm -rf "${STORE:?}/$s" "${STORE:?}/.tmp.$s"
         fi
     done
-    # hidden modules that are gone are forgotten (installed again: listed again)
+    # hidden list: keep only entries whose module still exists (enabled or disabled); drop ones whose module is gone
     if [ -s "$HIDDEN" ]; then
         : > "$HIDDEN.new"
-        for s in $HID_SEEN; do echo "$s" >> "$HIDDEN.new"; done
+        while IFS= read -r s; do
+            has_word "$allmodslots" "$s" && echo "$s" >> "$HIDDEN.new"
+        done < "$HIDDEN"
         mv "$HIDDEN.new" "$HIDDEN"
     fi
 
-    # stored module drivers whose module is gone, disabled or hidden
+    # stored module drivers whose module is gone (not merely disabled or hidden)
     for d in "$STORE"/m_*; do
         [ -d "$d" ] || continue
         s="${d##*/}"
-        has_word "$modslots" "$s" && continue
+        has_word "$allmodslots" "$s" && continue
         rm -rf "$d"
         log "$s: module gone, stored copy deleted"
     done
 
     SLOTS="$modslots"
     for d in "$STORE"/u_*; do
-        [ -d "$d" ] && SLOTS="$SLOTS ${d##*/}"
+        [ -d "$d" ] && slot_ok_name "${d##*/}" && SLOTS="$SLOTS ${d##*/}"
     done
 
     # the selection
@@ -479,13 +588,23 @@ boot() {
             fi
             ;;
         *)
-            is_builtin "$sel" || { sel=$DEF; trial=ok; }
+            # an unknown built-in value falls back to the default, but only when the list is readable: an empty or
+            # unreadable ro.k4.gpu_drivers must not destroy a valid built-in choice
+            if [ -n "$have_list" ]; then
+                is_builtin "$sel" || { sel=$DEF; trial=ok; }
+            fi
             ;;
     esac
 
+    # safe mode: run the stock driver this boot without changing the stored selection
+    safemode=""
+    [ "$(gp persist.sys.safemode)" = 1 ] && safemode=1
+
     # mount the selected user driver (the built-in sets are mounted by the rc at early-boot)
     active=""
-    if [ -n "$ext" ]; then
+    if [ -n "$safemode" ]; then
+        log "safe mode: the stock driver is used this boot"
+    elif [ -n "$ext" ]; then
         active="$ext"
     else
         case "$sel" in
@@ -511,12 +630,12 @@ boot() {
     {
         for s in $SLOTS; do
             if [ "$s" = "$ext" ]; then
-                echo "$s	module	external	$visver (module $extid)"
+                printf '%s\tmodule\texternal\t%s (module %s)\n' "$s" "$visver" "$(clean_name "$extid")"
             else
                 i="$STORE/$s/info"
                 case "$s" in
-                    m_*) echo "$s	module	-	$(info_get "$i" version) (module $(info_get "$i" name))" ;;
-                    u_*) echo "$s	added	-	$(info_get "$i" version) (added: $(info_get "$i" name))" ;;
+                    m_*) printf '%s\tmodule\t-\t%s (module %s)\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
+                    u_*) printf '%s\tadded\t-\t%s (added: %s)\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
                 esac
             fi
         done
@@ -536,8 +655,48 @@ boot() {
     log "done: selected $sel, trial $trial, user driver mounted: ${active:-none}"
 }
 
+# space_ok <source set>: enough free storage for a copy (the set size plus a 64 MB margin), and the store stays under
+# its cap. Best-effort: if df/du cannot tell (host tests), allow.
+space_ok() {
+    _need=0
+    for _f in $(files_of "$1"); do
+        _fsz="$(stat -c %s "$1/$_f" 2> /dev/null)"
+        case "$_fsz" in "" | *[!0-9]*) ;; *) _need=$((_need + _fsz / 1024)) ;; esac
+    done
+    _used="$(store_kb)"
+    case "$_used" in *[0-9]*) [ "$((_used + _need))" -le "$STORE_CAP_KB" ] || { log "store full (${_used} KB)"; return 1; } ;; esac
+    _avail="$(free_kb)"
+    case "$_avail" in *[0-9]*) [ "$_avail" -ge "$((_need + 65536))" ] || { log "low on storage (${_avail} KB free)"; return 1; } ;; esac
+    return 0
+}
+
+# settle <seconds>: run from the rc on boot_completed when trial=testing. Promote the trial to "ok" only after the
+# device has run <seconds> past boot_completed with no system_server restart. If the device reboots or system_server
+# crashes inside the window, the trial stays "testing" and the next boot reverts to the stock driver (failsafe).
+settle() {
+    [ "$(gp ${P}trial)" = testing ] || return 0
+    window="${1:-150}"
+    step="${K4GPU_SLEEP:-10}"
+    base_count="$(gp sys.system_server.start_count)"
+    waited=0
+    while [ "$waited" -lt "$window" ]; do
+        sleep "$step"
+        waited=$((waited + 10))
+        [ "$(gp sys.boot_completed)" = 1 ] || return 0
+        c="$(gp sys.system_server.start_count)"
+        [ -z "$base_count" ] || [ -z "$c" ] || [ "$c" = "$base_count" ] || {
+            log "settle: system_server restarted ($base_count -> $c), trial stays testing"
+            return 0
+        }
+    done
+    [ "$(gp ${P}trial)" = testing ] || return 0
+    spc ${P}trial ok
+    log "settle: ${window}s stable, trial ok"
+}
+
 case "$1" in
     boot) boot ;;
-    *) echo "usage: k4-gpu-driver boot [<stock version>]" >&2; exit 2 ;;
+    settle) settle "$2" ;;
+    *) echo "usage: k4-gpu-driver boot|settle [<arg>]" >&2; exit 2 ;;
 esac
 exit 0

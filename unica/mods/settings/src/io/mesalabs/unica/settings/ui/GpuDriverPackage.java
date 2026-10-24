@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +28,17 @@ final class GpuDriverPackage {
     static final String SQE = "a660_sqe.fw";
     static final long MAX_BYTES = 300L << 20;
 
+    /** Adreno library names a set may contain (the union of the built-in sets; nothing else is staged). Keep in
+     *  sync with ALLOW_EGL / ALLOW_LIB in target/a52sxq/patches/adreno_driver/k4-gpu-driver. */
+    static final java.util.Set<String> ALLOW_EGL = new java.util.HashSet<>(Arrays.asList(
+        "eglSubDriverAndroid.so", "libEGL_adreno.so", "libGLESv1_CM_adreno.so", "libGLESv2_adreno.so",
+        "libq3dtools_adreno.so", "libq3dtools_esx.so", "libVkLayer_ADRENO_qprofiler.so"));
+    static final java.util.Set<String> ALLOW_LIB = new java.util.HashSet<>(Arrays.asList(
+        "libadreno_app_profiles.so", "libadreno_compiler_cl.so", "libadreno_utils.so", "libCB.so",
+        "libdmabufheap.so", "libgame_enhance.so", "libgpudataproducer.so", "libgpu_tonemapper.so", "libgsl.so",
+        "libkcl.so", "libkernelmanager.so", "libllvm-glnext.so", "libllvm-qcom.so", "libllvm-qgl.so",
+        "libOpenCL.so", "libVkLayer_q3dtools.so"));
+
     // error codes: string k4_gpu_driver_err_<code>, the detail (a file name) is the format argument
     static final String ERR_NO_DRIVER = "no_driver";
     static final String ERR_32BIT = "32bit";
@@ -34,6 +46,7 @@ final class GpuDriverPackage {
     static final String ERR_NOT_ARM64 = "not_arm64";
     static final String ERR_NO_VERSION = "no_version";
     static final String ERR_TOO_LARGE = "too_large";
+    static final String ERR_UNEXPECTED = "unexpected";
 
     static final class Plan {
         /** zip entry name -> path in the staged set */
@@ -67,9 +80,18 @@ final class GpuDriverPackage {
             for (String n : names) {
                 if (!n.startsWith(prefix)) continue;
                 String rel = n.substring(prefix.length());
-                if (isDirectChild(rel, "lib64/egl/") || isDirectChild(rel, "lib64/") || rel.equals("lib64/hw/vulkan.adreno.so")
-                        || rel.equals("firmware/" + SQE)) {
+                if (rel.equals("lib64/hw/vulkan.adreno.so") || rel.equals("firmware/" + SQE)) {
                     p.files.put(n, rel);
+                } else if (isDirectChild(rel, "lib64/egl/")) {
+                    String base = rel.substring("lib64/egl/".length());
+                    if (ALLOW_EGL.contains(base) || ALLOW_LIB.contains(base)) p.files.put(n, rel);
+                    else return unexpected(p, base);
+                } else if (isDirectChild(rel, "lib64/")) {
+                    String base = rel.substring("lib64/".length());
+                    if (ALLOW_LIB.contains(base) || ALLOW_EGL.contains(base)) p.files.put(n, rel);
+                    else return unexpected(p, base);
+                } else if (isDirectChild(rel, "lib64/hw/")) {
+                    return unexpected(p, rel.substring("lib64/hw/".length()));
                 }
             }
         } else if (only32) {
@@ -91,7 +113,11 @@ final class GpuDriverPackage {
                 if (!n.startsWith(dir)) continue;
                 String base = n.substring(dir.length());
                 if (base.contains("/") || !base.endsWith(".so")) continue;
-                p.files.put(n, flatTarget(base));
+                if (base.equals("vulkan.adreno.so") || ALLOW_EGL.contains(base) || ALLOW_LIB.contains(base)) {
+                    p.files.put(n, flatTarget(base));
+                } else {
+                    return unexpected(p, base);
+                }
             }
         }
         if (!p.files.containsValue("firmware/" + SQE)) {
@@ -106,13 +132,17 @@ final class GpuDriverPackage {
         return p;
     }
 
-    /** Flat sets: the Adreno GL/EGL libraries go to egl/, the Vulkan driver to hw/, everything else to lib64/. */
+    private static Plan unexpected(Plan p, String base) {
+        p.files.clear();
+        p.error = ERR_UNEXPECTED;
+        p.detail = base;
+        return p;
+    }
+
+    /** Flat sets: the Adreno GL/EGL libraries go to egl/, the Vulkan driver to hw/, the rest of the allowlist to lib64/. */
     static String flatTarget(String name) {
         if (name.equals("vulkan.adreno.so")) return "lib64/hw/" + name;
-        if (name.equals("libEGL_adreno.so") || name.equals("libGLESv1_CM_adreno.so") || name.equals("libGLESv2_adreno.so")
-                || name.equals("eglSubDriverAndroid.so") || name.startsWith("libq3dtools_") || name.startsWith("libVkLayer_")) {
-            return "lib64/egl/" + name;
-        }
+        if (ALLOW_EGL.contains(name)) return "lib64/egl/" + name;
         return "lib64/" + name;
     }
 

@@ -35,17 +35,17 @@
 .method constructor <init>()V
     .registers 2
 
-    .line 38
+    .line 51
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
-    .line 40
+    .line 53
     new-instance v0, Ljava/util/LinkedHashMap;
 
     invoke-direct {v0}, Ljava/util/LinkedHashMap;-><init>()V
 
     iput-object v0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverPackage$Plan;->files:Ljava/util/Map;
 
-    .line 42
+    .line 55
     const-string v0, ""
 
     iput-object v0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverPackage$Plan;->detail:Ljava/lang/String;
