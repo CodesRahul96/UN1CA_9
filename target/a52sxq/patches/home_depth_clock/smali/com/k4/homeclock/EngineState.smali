@@ -122,6 +122,16 @@
     return-void
 .end method
 
+.method static bridge synthetic -$$Nest$minteractive(Lcom/k4/homeclock/EngineState;)Z
+    .registers 1
+
+    invoke-direct {p0}, Lcom/k4/homeclock/EngineState;->interactive()Z
+
+    move-result p0
+
+    return p0
+.end method
+
 .method static bridge synthetic -$$Nest$mretryWeather(Lcom/k4/homeclock/EngineState;Ljava/lang/String;)V
     .registers 2
 
@@ -133,10 +143,10 @@
 .method constructor <init>(Lf3/a;)V
     .registers 4
 
-    .line 162
+    .line 179
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
-    .line 35
+    .line 37
     new-instance v0, Landroid/os/Handler;
 
     invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
@@ -147,35 +157,35 @@
 
     iput-object v0, p0, Lcom/k4/homeclock/EngineState;->main:Landroid/os/Handler;
 
-    .line 46
+    .line 48
     new-instance v0, Lcom/k4/homeclock/EngineState$1;
 
     invoke-direct {v0, p0}, Lcom/k4/homeclock/EngineState$1;-><init>(Lcom/k4/homeclock/EngineState;)V
 
     iput-object v0, p0, Lcom/k4/homeclock/EngineState;->reload:Ljava/lang/Runnable;
 
-    .line 136
+    .line 153
     new-instance v0, Lcom/k4/homeclock/EngineState$2;
 
     invoke-direct {v0, p0}, Lcom/k4/homeclock/EngineState$2;-><init>(Lcom/k4/homeclock/EngineState;)V
 
     iput-object v0, p0, Lcom/k4/homeclock/EngineState;->reloadReceiver:Landroid/content/BroadcastReceiver;
 
-    .line 154
+    .line 171
     new-instance v0, Lcom/k4/homeclock/EngineState$3;
 
     invoke-direct {v0, p0}, Lcom/k4/homeclock/EngineState$3;-><init>(Lcom/k4/homeclock/EngineState;)V
 
     iput-object v0, p0, Lcom/k4/homeclock/EngineState;->tickReceiver:Landroid/content/BroadcastReceiver;
 
-    .line 163
+    .line 180
     new-instance v0, Ljava/lang/ref/WeakReference;
 
     invoke-direct {v0, p1}, Ljava/lang/ref/WeakReference;-><init>(Ljava/lang/Object;)V
 
     iput-object v0, p0, Lcom/k4/homeclock/EngineState;->engine:Ljava/lang/ref/WeakReference;
 
-    .line 164
+    .line 181
     invoke-virtual {p1}, Lf3/a;->getAppContext()Landroid/content/Context;
 
     move-result-object p1
@@ -186,44 +196,44 @@
 
     iput-object p1, p0, Lcom/k4/homeclock/EngineState;->context:Landroid/content/Context;
 
-    .line 165
+    .line 182
     return-void
 .end method
 
 .method private check(Lf3/a;)V
     .registers 11
 
-    .line 84
+    .line 101
     invoke-virtual {p1}, Lf3/a;->getWhich()I
 
     move-result v0
 
-    .line 85
+    .line 102
     invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->enabled()Z
 
     move-result v1
 
-    .line 86
+    .line 103
     invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->sharedEnabled()Z
 
     move-result v2
 
-    .line 87
+    .line 104
     and-int/lit8 v3, v0, 0x1
 
     if-nez v3, :cond_14
 
-    .line 91
+    .line 108
     invoke-direct {p0, v0, v1, v2}, Lcom/k4/homeclock/EngineState;->logNothingToDo(IZZ)V
 
-    .line 92
+    .line 109
     return-void
 
-    .line 94
+    .line 111
     :cond_14
     iget-object v3, p1, Lf3/a;->g:Lh3/a;
 
-    .line 97
+    .line 114
     const/4 v4, 0x0
 
     const/4 v5, 0x1
@@ -258,7 +268,7 @@
     :cond_2f
     move v6, v4
 
-    .line 98
+    .line 115
     :goto_30
     invoke-static {p1}, Lcom/k4/homeclock/HomeDepthClock;->clockOf(Lf3/a;)Lcom/k4/homeclock/DepthClock;
 
@@ -273,7 +283,7 @@
     :cond_3a
     move v4, v5
 
-    .line 99
+    .line 116
     :cond_3b
     const/4 v5, 0x0
 
@@ -290,7 +300,7 @@
     :cond_45
     move-object v3, v5
 
-    .line 100
+    .line 117
     :goto_46
     if-eqz v6, :cond_50
 
@@ -302,7 +312,7 @@
 
     move-result-object v5
 
-    .line 101
+    .line 118
     :cond_50
     sget-object v7, Lcom/k4/homeclock/EngineState$4;->$SwitchMap$com$k4$homeclock$ReloadPolicy$Action:[I
 
@@ -322,10 +332,10 @@
 
     packed-switch v5, :pswitch_data_da
 
-    .line 109
+    .line 126
     nop
 
-    .line 110
+    .line 127
     if-eqz v6, :cond_a2
 
     if-eqz v4, :cond_a2
@@ -336,7 +346,7 @@
 
     goto :goto_8e
 
-    .line 106
+    .line 123
     :pswitch_6d
     new-instance p1, Ljava/lang/StringBuilder;
 
@@ -362,17 +372,17 @@
 
     invoke-static {v8, p1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 107
+    .line 124
     return-void
 
-    .line 103
+    .line 120
     :pswitch_88
     invoke-direct {p0, v0, v1, v2}, Lcom/k4/homeclock/EngineState;->logNothingToDo(IZZ)V
 
-    .line 104
+    .line 121
     return-void
 
-    .line 110
+    .line 127
     :cond_8c
     const-string v1, "settings changed since the build"
 
@@ -447,13 +457,13 @@
 
     move-result-object v0
 
-    .line 109
+    .line 126
     invoke-static {v8, v0}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 112
+    .line 129
     invoke-virtual {p1}, Lf3/a;->stopSelf()V
 
-    .line 114
+    .line 131
     return-void
 
     :pswitch_data_da
@@ -463,17 +473,62 @@
     .end packed-switch
 .end method
 
+.method private interactive()Z
+    .registers 4
+
+    .line 93
+    const/4 v0, 0x1
+
+    :try_start_1
+    iget-object v1, p0, Lcom/k4/homeclock/EngineState;->context:Landroid/content/Context;
+
+    const-class v2, Landroid/os/PowerManager;
+
+    invoke-virtual {v1, v2}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Landroid/os/PowerManager;
+
+    .line 94
+    if-eqz v1, :cond_15
+
+    invoke-virtual {v1}, Landroid/os/PowerManager;->isInteractive()Z
+
+    move-result v1
+    :try_end_11
+    .catchall {:try_start_1 .. :try_end_11} :catchall_16
+
+    if-eqz v1, :cond_14
+
+    goto :goto_15
+
+    :cond_14
+    const/4 v0, 0x0
+
+    :cond_15
+    :goto_15
+    return v0
+
+    .line 95
+    :catchall_16
+    move-exception v1
+
+    .line 96
+    return v0
+.end method
+
 .method private logNothingToDo(IZZ)V
     .registers 12
 
-    .line 121
+    .line 138
     if-nez p2, :cond_5
 
     const-string v0, "switch off"
 
     goto :goto_18
 
-    .line 122
+    .line 139
     :cond_5
     and-int/lit8 v0, p1, 0x1
 
@@ -483,7 +538,7 @@
 
     goto :goto_18
 
-    .line 123
+    .line 140
     :cond_c
     and-int/lit8 v0, p1, 0x3
 
@@ -497,11 +552,11 @@
 
     goto :goto_18
 
-    .line 124
+    .line 141
     :cond_16
     const-string v0, "no clock for this wallpaper"
 
-    .line 125
+    .line 142
     :goto_18
     new-instance v1, Ljava/lang/StringBuilder;
 
@@ -533,12 +588,12 @@
 
     move-result-object v1
 
-    .line 126
+    .line 143
     invoke-static {}, Landroid/os/SystemClock;->elapsedRealtime()J
 
     move-result-wide v2
 
-    .line 127
+    .line 144
     iget-object v4, p0, Lcom/k4/homeclock/EngineState;->lastSkip:Ljava/lang/String;
 
     invoke-virtual {v1, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
@@ -557,17 +612,17 @@
 
     if-gez v4, :cond_4f
 
-    .line 128
+    .line 145
     return-void
 
-    .line 130
+    .line 147
     :cond_4f
     iput-object v1, p0, Lcom/k4/homeclock/EngineState;->lastSkip:Ljava/lang/String;
 
-    .line 131
+    .line 148
     iput-wide v2, p0, Lcom/k4/homeclock/EngineState;->lastSkipAt:J
 
-    .line 132
+    .line 149
     new-instance v1, Ljava/lang/StringBuilder;
 
     invoke-direct {v1}, Ljava/lang/StringBuilder;-><init>()V
@@ -626,14 +681,14 @@
 
     invoke-static {p2, p1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 134
+    .line 151
     return-void
 .end method
 
 .method private retryWeather(Ljava/lang/String;)V
     .registers 4
 
-    .line 215
+    .line 232
     :try_start_0
     iget-object v0, p0, Lcom/k4/homeclock/EngineState;->engine:Ljava/lang/ref/WeakReference;
 
@@ -643,7 +698,7 @@
 
     check-cast v0, Lf3/a;
 
-    .line 216
+    .line 233
     if-eqz v0, :cond_14
 
     iget-boolean v1, p0, Lcom/k4/homeclock/EngineState;->visible:Z
@@ -663,31 +718,31 @@
     :goto_14
     const/4 v0, 0x0
 
-    .line 217
+    .line 234
     :goto_15
     if-eqz v0, :cond_1a
 
-    .line 218
+    .line 235
     invoke-virtual {v0, p1}, Lcom/k4/homeclock/DepthClock;->retryWeather(Ljava/lang/String;)V
     :try_end_1a
     .catchall {:try_start_0 .. :try_end_1a} :catchall_1b
 
-    .line 222
+    .line 239
     :cond_1a
     goto :goto_23
 
-    .line 220
+    .line 237
     :catchall_1b
     move-exception p1
 
-    .line 221
+    .line 238
     const-string v0, "K4HomeClock"
 
     const-string v1, "weather retry"
 
     invoke-static {v0, v1, p1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 223
+    .line 240
     :goto_23
     return-void
 .end method
@@ -695,7 +750,7 @@
 .method private unregister(Landroid/content/BroadcastReceiver;)V
     .registers 3
 
-    .line 255
+    .line 272
     :try_start_0
     iget-object v0, p0, Lcom/k4/homeclock/EngineState;->context:Landroid/content/Context;
 
@@ -703,14 +758,14 @@
     :try_end_5
     .catch Ljava/lang/IllegalArgumentException; {:try_start_0 .. :try_end_5} :catch_6
 
-    .line 257
+    .line 274
     goto :goto_7
 
-    .line 256
+    .line 273
     :catch_6
     move-exception p1
 
-    .line 258
+    .line 275
     :goto_7
     return-void
 .end method
@@ -720,19 +775,19 @@
 .method redrawIfStale(Ljava/lang/String;)V
     .registers 3
 
-    .line 226
+    .line 243
     const/4 v0, 0x0
 
     invoke-virtual {p0, p1, v0}, Lcom/k4/homeclock/EngineState;->redrawIfStale(Ljava/lang/String;Z)V
 
-    .line 227
+    .line 244
     return-void
 .end method
 
 .method redrawIfStale(Ljava/lang/String;Z)V
     .registers 8
 
-    .line 231
+    .line 248
     const-string v0, "K4HomeClock"
 
     if-eqz p2, :cond_1a
@@ -745,21 +800,21 @@
 
     if-nez v1, :cond_1a
 
-    .line 233
+    .line 250
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->main:Landroid/os/Handler;
 
     iget-object v2, p0, Lcom/k4/homeclock/EngineState;->reload:Ljava/lang/Runnable;
 
     invoke-virtual {v1, v2}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 234
+    .line 251
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->main:Landroid/os/Handler;
 
     iget-object v2, p0, Lcom/k4/homeclock/EngineState;->reload:Ljava/lang/Runnable;
 
     invoke-virtual {v1, v2}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 237
+    .line 254
     :cond_1a
     :try_start_1a
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->engine:Ljava/lang/ref/WeakReference;
@@ -770,7 +825,7 @@
 
     check-cast v1, Lf3/a;
 
-    .line 238
+    .line 255
     if-nez v1, :cond_26
 
     const/4 v2, 0x0
@@ -782,7 +837,7 @@
 
     move-result-object v2
 
-    .line 239
+    .line 256
     :goto_2a
     if-eqz v2, :cond_7a
 
@@ -794,13 +849,13 @@
 
     goto :goto_7a
 
-    .line 242
+    .line 259
     :cond_33
     invoke-virtual {v2}, Lcom/k4/homeclock/DepthClock;->expected()Ljava/lang/String;
 
     move-result-object p2
 
-    .line 243
+    .line 260
     iget-object v3, v2, Lcom/k4/homeclock/DepthClock;->lastDrawn:Ljava/lang/String;
 
     invoke-virtual {p2, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
@@ -809,10 +864,10 @@
 
     if-eqz v3, :cond_40
 
-    .line 244
+    .line 261
     return-void
 
-    .line 246
+    .line 263
     :cond_40
     iget-object v2, v2, Lcom/k4/homeclock/DepthClock;->lastDrawn:Ljava/lang/String;
 
@@ -862,7 +917,7 @@
 
     invoke-static {v0, p1}, Landroid/util/Log;->d(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 247
+    .line 264
     invoke-virtual {v1}, Lf3/a;->getSurfaceHolder()Landroid/view/SurfaceHolder;
 
     move-result-object p1
@@ -871,24 +926,24 @@
     :try_end_79
     .catchall {:try_start_1a .. :try_end_79} :catchall_7b
 
-    .line 250
+    .line 267
     goto :goto_81
 
-    .line 240
+    .line 257
     :cond_7a
     :goto_7a
     return-void
 
-    .line 248
+    .line 265
     :catchall_7b
     move-exception p1
 
-    .line 249
+    .line 266
     const-string p2, "redraw"
 
     invoke-static {v0, p2, p1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 251
+    .line 268
     :goto_81
     return-void
 .end method
@@ -896,10 +951,10 @@
 .method setVisible(Z)V
     .registers 8
 
-    .line 185
+    .line 202
     iput-boolean p1, p0, Lcom/k4/homeclock/EngineState;->visible:Z
 
-    .line 186
+    .line 203
     const/4 v0, 0x1
 
     if-eqz p1, :cond_1f
@@ -908,21 +963,21 @@
 
     if-eqz v1, :cond_1f
 
-    .line 189
+    .line 206
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->main:Landroid/os/Handler;
 
     iget-object v2, p0, Lcom/k4/homeclock/EngineState;->reload:Ljava/lang/Runnable;
 
     invoke-virtual {v1, v2}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 190
+    .line 207
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->main:Landroid/os/Handler;
 
     iget-object v2, p0, Lcom/k4/homeclock/EngineState;->reload:Ljava/lang/Runnable;
 
     invoke-virtual {v1, v2}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 191
+    .line 208
     iget v1, p0, Lcom/k4/homeclock/EngineState;->deferrals:I
 
     invoke-static {v1, v0}, Ljava/lang/Math;->min(II)I
@@ -931,7 +986,7 @@
 
     iput v1, p0, Lcom/k4/homeclock/EngineState;->deferrals:I
 
-    .line 193
+    .line 210
     :cond_1f
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->engine:Ljava/lang/ref/WeakReference;
 
@@ -941,7 +996,7 @@
 
     check-cast v1, Lf3/a;
 
-    .line 194
+    .line 211
     const/4 v2, 0x0
 
     if-eqz p1, :cond_34
@@ -961,7 +1016,7 @@
     :cond_34
     move p1, v2
 
-    .line 195
+    .line 212
     :goto_35
     if-eqz p1, :cond_5c
 
@@ -969,29 +1024,29 @@
 
     if-nez v1, :cond_5c
 
-    .line 196
+    .line 213
     new-instance v1, Landroid/content/IntentFilter;
 
     const-string v3, "android.intent.action.TIME_TICK"
 
     invoke-direct {v1, v3}, Landroid/content/IntentFilter;-><init>(Ljava/lang/String;)V
 
-    .line 197
+    .line 214
     const-string v3, "android.intent.action.TIME_SET"
 
     invoke-virtual {v1, v3}, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V
 
-    .line 198
+    .line 215
     const-string v3, "android.intent.action.TIMEZONE_CHANGED"
 
     invoke-virtual {v1, v3}, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V
 
-    .line 199
+    .line 216
     const-string v3, "android.intent.action.LOCALE_CHANGED"
 
     invoke-virtual {v1, v3}, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V
 
-    .line 200
+    .line 217
     iget-object v3, p0, Lcom/k4/homeclock/EngineState;->context:Landroid/content/Context;
 
     iget-object v4, p0, Lcom/k4/homeclock/EngineState;->tickReceiver:Landroid/content/BroadcastReceiver;
@@ -1000,12 +1055,12 @@
 
     invoke-virtual {v3, v4, v1, v5}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;I)Landroid/content/Intent;
 
-    .line 201
+    .line 218
     iput-boolean v0, p0, Lcom/k4/homeclock/EngineState;->tickerOn:Z
 
     goto :goto_6a
 
-    .line 202
+    .line 219
     :cond_5c
     if-nez p1, :cond_6a
 
@@ -1013,34 +1068,34 @@
 
     if-eqz v0, :cond_6a
 
-    .line 203
+    .line 220
     iget-object v0, p0, Lcom/k4/homeclock/EngineState;->tickReceiver:Landroid/content/BroadcastReceiver;
 
     invoke-direct {p0, v0}, Lcom/k4/homeclock/EngineState;->unregister(Landroid/content/BroadcastReceiver;)V
 
-    .line 204
+    .line 221
     iput-boolean v2, p0, Lcom/k4/homeclock/EngineState;->tickerOn:Z
 
     goto :goto_6b
 
-    .line 202
+    .line 219
     :cond_6a
     :goto_6a
     nop
 
-    .line 206
+    .line 223
     :goto_6b
     if-eqz p1, :cond_75
 
-    .line 207
+    .line 224
     const-string p1, "visible"
 
     invoke-virtual {p0, p1, v2}, Lcom/k4/homeclock/EngineState;->redrawIfStale(Ljava/lang/String;Z)V
 
-    .line 208
+    .line 225
     invoke-direct {p0, p1}, Lcom/k4/homeclock/EngineState;->retryWeather(Ljava/lang/String;)V
 
-    .line 210
+    .line 227
     :cond_75
     return-void
 .end method
@@ -1048,14 +1103,14 @@
 .method start()V
     .registers 7
 
-    .line 168
+    .line 185
     new-instance v2, Landroid/content/IntentFilter;
 
     const-string v0, "com.k4.homeclock.action.RELOAD"
 
     invoke-direct {v2, v0}, Landroid/content/IntentFilter;-><init>(Ljava/lang/String;)V
 
-    .line 169
+    .line 186
     iget-object v0, p0, Lcom/k4/homeclock/EngineState;->context:Landroid/content/Context;
 
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->reloadReceiver:Landroid/content/BroadcastReceiver;
@@ -1068,50 +1123,50 @@
 
     invoke-virtual/range {v0 .. v5}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;
 
-    .line 170
+    .line 187
     const/4 v0, 0x1
 
     iput-boolean v0, p0, Lcom/k4/homeclock/EngineState;->reloadOn:Z
 
-    .line 171
+    .line 188
     return-void
 .end method
 
 .method stop()V
     .registers 3
 
-    .line 174
+    .line 191
     iget-object v0, p0, Lcom/k4/homeclock/EngineState;->main:Landroid/os/Handler;
 
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->reload:Ljava/lang/Runnable;
 
     invoke-virtual {v0, v1}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 175
+    .line 192
     const/4 v0, 0x0
 
     iput-boolean v0, p0, Lcom/k4/homeclock/EngineState;->reloadPending:Z
 
-    .line 176
+    .line 193
     iput-boolean v0, p0, Lcom/k4/homeclock/EngineState;->editorPending:Z
 
-    .line 177
+    .line 194
     invoke-virtual {p0, v0}, Lcom/k4/homeclock/EngineState;->setVisible(Z)V
 
-    .line 178
+    .line 195
     iget-boolean v1, p0, Lcom/k4/homeclock/EngineState;->reloadOn:Z
 
     if-eqz v1, :cond_1a
 
-    .line 179
+    .line 196
     iget-object v1, p0, Lcom/k4/homeclock/EngineState;->reloadReceiver:Landroid/content/BroadcastReceiver;
 
     invoke-direct {p0, v1}, Lcom/k4/homeclock/EngineState;->unregister(Landroid/content/BroadcastReceiver;)V
 
-    .line 180
+    .line 197
     iput-boolean v0, p0, Lcom/k4/homeclock/EngineState;->reloadOn:Z
 
-    .line 182
+    .line 199
     :cond_1a
     return-void
 .end method
