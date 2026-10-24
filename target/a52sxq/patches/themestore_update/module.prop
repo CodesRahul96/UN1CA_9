@@ -1,0 +1,4 @@
+id=a52sxq_themestore_update
+name=Galaxy A52s 5G: Galaxy Themes 6.0.14.4 (store-mandated update)
+author=kusti420
+description=Smoke test 9.3.77: Settings > Themes opened ActivityAbout "A new version is available [Update] [Close app]" instead of the store. Not a port bug: the S26 Ultra images ship ThemeStore 6.0.13.2 (601302103), and Samsung's store setup reply now carries storeSetupInfo.myAppVersionCode=601404100 with storeSetupInfo.isMyAppFoceUpgrade=true (seen in the phone's config_caching.xml), so the app gates itself until it is updated. stubUpdateCheck.as answers "Update Available 6.0.14.4" for SM-S948B and SM-S938B alike (not tied to the model, CSC or the A52s). A stock S26 Ultra gets the update from Galaxy Store; the port ships the Galaxy Store build as the system priv-app, same Samsung signer and the same requested permissions as the S26 Ultra copy.
