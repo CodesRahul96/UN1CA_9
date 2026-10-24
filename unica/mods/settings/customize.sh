@@ -256,7 +256,7 @@ done < <(find "$MODPATH/SecSettings.apk" -type f)
 # The hand-written controllers (src/, compiled by src/build.sh against stubs of this SecSettings build) call methods of
 # a minified app: if a source firmware renames one, Settings would crash when the page opens. Check every reference now.
 python3 - "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk" "$MODPATH/SecSettings.apk" \
-    $(find "$MODPATH/SecSettings.apk" -path "*io/mesalabs/unica/settings/ui/GpuDriverPreferenceController*.smali") << 'PYEOF' \
+    $(find "$MODPATH/SecSettings.apk" -path "*io/mesalabs/unica/settings/ui/GpuDriver*.smali") << 'PYEOF' \
     || ABORT "SecSettings: a UN1CA controller references a method this SecSettings build does not have"
 import glob, os, re, sys
 apk, mod, files = sys.argv[1], sys.argv[2], sys.argv[3:]

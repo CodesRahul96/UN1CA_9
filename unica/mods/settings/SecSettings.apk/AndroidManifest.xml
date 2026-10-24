@@ -1,4 +1,5 @@
 /application>/i
+        <activity android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density" android:excludeFromRecents="true" android:exported="false" android:name="io.mesalabs.unica.settings.ui.GpuDriverActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
         <activity android:configChanges="keyboardHidden|orientation|screenSize" android:exported="true" android:label="@string/unica_settings_title" android:name="com.android.settings.Settings$UnicaSettingsActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
