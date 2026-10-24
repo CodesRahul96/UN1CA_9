@@ -707,8 +707,10 @@ public final class K4StRetry {
                 if (sSubCalls.containsKey(id)) continue;
                 TelephonyManager tm = sTel.createForSubscriptionId(id);
                 SubCall c = new SubCall(id, tm);
-                sSubCalls.put(id, c); // unknown until its first state arrives (registration delivers it at once)
+                // registered first: a registration that throws leaves the sub out, so the retry registers it again.
+                // Unknown until its first state arrives (posted to this thread by the registration, so after the put)
                 tm.registerTelephonyCallback(STATE_EXECUTOR, c);
+                sSubCalls.put(id, c);
             }
             sTelFailed = false;
         } catch (Throwable t) {
