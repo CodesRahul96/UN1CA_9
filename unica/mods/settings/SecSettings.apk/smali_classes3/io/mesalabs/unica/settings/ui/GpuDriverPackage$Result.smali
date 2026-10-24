@@ -26,10 +26,10 @@
 .method constructor <init>()V
     .registers 2
 
-    .line 45
+    .line 58
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
-    .line 47
+    .line 60
     const-string v0, ""
 
     iput-object v0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverPackage$Result;->detail:Ljava/lang/String;
