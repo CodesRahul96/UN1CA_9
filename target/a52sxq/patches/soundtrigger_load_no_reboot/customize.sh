@@ -14,7 +14,13 @@ for c in ("HalException", "RecoverableException", "ISoundTriggerHal$GlobalCallba
 s = open(hits[0]).read()
 # every check before the first write: the helper set must be complete
 helpers = sorted(glob.glob(patch + "/K4StRetry*.smali"))
-assert len(helpers) == 24, "K4StRetry smali files: %d (expected 24, rerun src/build.sh)" % len(helpers)
+assert len(helpers) == 26, "K4StRetry smali files: %d (expected 26, rerun src/build.sh)" % len(helpers)
+main = open(patch + "/K4StRetry.smali").read()
+inner = "".join(open(h).read() for h in helpers if os.path.basename(h) != "K4StRetry.smali")
+# busy refusals are retried on a timer too (the kernel LSM refusal does not depend on playback / screen)
+for anchor in ("->ARM_BACKOFF:Ljava/lang/Runnable;", "->BACKOFF_FIRE:Ljava/lang/Runnable;", "->BACKOFF_MS:[J"):
+    assert anchor in main, "K4StRetry.smali: %s missing (stale smali, rerun src/build.sh)" % anchor
+assert inner.count('const-string v0, "timed retry"') == 1, "K4StRetry timed retry runnable missing (rerun src/build.sh)"
 P = "Lcom/android/server/soundtrigger_middleware/"
 K = "Lcom/k4/soundtrigger/K4StRetry;"
 CATCH = "    :catch_0\n    move-exception p1\n\n"
@@ -85,5 +91,5 @@ for h in helpers:
     shutil.copyfile(h, os.path.join(dst, os.path.basename(h)))
 print("  - %d K4StRetry smali files -> %s" % (len(helpers), os.path.relpath(dst, root)))
 PYEOF
-LOG "- Sound trigger: a model the HAL refuses no longer reboots the audio HAL; a busy refusal is retried when audio stops / screen off"
+LOG "- Sound trigger: a model the HAL refuses no longer reboots the audio HAL; a busy refusal is retried on a timer, when audio stops / screen off"
 unset SERVICES

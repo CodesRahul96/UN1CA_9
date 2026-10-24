@@ -30,23 +30,23 @@
 .method constructor <init>(Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;Ljava/lang/Exception;J)V
     .registers 6
 
-    .line 172
+    .line 185
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
-    .line 170
+    .line 183
     const-string v0, "during a call"
 
     iput-object v0, p0, Lcom/k4/soundtrigger/K4StRetry$Hung;->when:Ljava/lang/String;
 
-    .line 173
+    .line 186
     iput-object p1, p0, Lcom/k4/soundtrigger/K4StRetry$Hung;->hal:Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;
 
-    .line 174
+    .line 187
     iput-object p2, p0, Lcom/k4/soundtrigger/K4StRetry$Hung;->where:Ljava/lang/Exception;
 
-    .line 175
+    .line 188
     iput-wide p3, p0, Lcom/k4/soundtrigger/K4StRetry$Hung;->since:J
 
-    .line 176
+    .line 189
     return-void
 .end method

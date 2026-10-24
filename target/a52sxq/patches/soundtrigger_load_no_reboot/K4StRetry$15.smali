@@ -1,11 +1,11 @@
 .class Lcom/k4/soundtrigger/K4StRetry$15;
-.super Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;
+.super Landroid/media/AudioManager$AudioRecordingCallback;
 .source "K4StRetry.java"
 
 
 # annotations
 .annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->registerTelephony(Landroid/content/Context;)Z
+    value = Lcom/k4/soundtrigger/K4StRetry;->registerState()V
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -18,20 +18,28 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 686
-    invoke-direct {p0}, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;-><init>()V
+    .line 643
+    invoke-direct {p0}, Landroid/media/AudioManager$AudioRecordingCallback;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public onSubscriptionsChanged()V
-    .registers 1
+.method public onRecordingConfigChanged(Ljava/util/List;)V
+    .registers 2
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Ljava/util/List<",
+            "Landroid/media/AudioRecordingConfiguration;",
+            ">;)V"
+        }
+    .end annotation
 
-    .line 689
-    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smsyncSubscriptions()V
+    .line 646
+    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonRecording(Ljava/util/List;)V
 
-    .line 690
+    .line 647
     return-void
 .end method
