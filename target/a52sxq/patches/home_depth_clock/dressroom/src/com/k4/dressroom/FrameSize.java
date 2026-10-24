@@ -268,6 +268,7 @@ public final class FrameSize {
                 sLive = 1f;
                 if (Math.abs(live - 1f) > 0.002f) {
                     applyHole(v);
+                    HomeClock.releaseHeights("frame resized");
                     refit(v);
                     Log.i(TAG, String.format(java.util.Locale.US, "frame size: %.3f of Samsung's", sScale));
                 }

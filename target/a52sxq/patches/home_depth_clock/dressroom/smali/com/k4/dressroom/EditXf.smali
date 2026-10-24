@@ -7850,6 +7850,10 @@
 
     if-eqz v3, :cond_1e
 
+    const-string v3, "picture moved"
+
+    invoke-static {v3}, Lcom/k4/dressroom/HomeClock;->releaseHeights(Ljava/lang/String;)V
+
     invoke-static {}, Lcom/k4/dressroom/EditXf;->refit()V
 
     :cond_1e

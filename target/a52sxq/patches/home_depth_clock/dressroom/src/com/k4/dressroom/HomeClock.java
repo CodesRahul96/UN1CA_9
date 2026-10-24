@@ -113,6 +113,7 @@ public final class HomeClock {
             sSavedStretch = null;
             sStretchHeld = false;
             sStretchWanted = null;
+            sHeights.release();
             sDepth = true;
             synchronized (sPut) {
                 sPut.clear();
@@ -856,6 +857,17 @@ public final class HomeClock {
                     } catch (Throwable t) {
                         Log.w(TAG, "saved clock stretch unreadable, Samsung decides it: " + t);
                     }
+                    try {
+                        sHeights.hold((java.util.List<?>) call(sBundle, "getFontHeights"), (Integer) call(sBundle, "getGravity"),
+                                (Float) call(sBundle, "getScale"), (Float) call(sBundle, "getHorizontalMarginRatio"),
+                                (Float) call(sBundle, "getBottomMarginRatio"));
+                        if (sHeights.held()) {
+                            Log.i(TAG, "saved clock stretch heights held: " + sHeights.heights());
+                        }
+                    } catch (Throwable t) {
+                        sHeights.release();
+                        Log.w(TAG, "saved clock stretch heights unreadable, Samsung fits them: " + t);
+                    }
                 } else if (c == null) {
                     sBundleRead = false; // too early, try again on the next lookup
                 }
@@ -936,6 +948,7 @@ public final class HomeClock {
      * exactly as if it had not been held (the stretch suggestion for the new clock then runs as stock).
      */
     public static void stretchReset(Object resetUseCase) {
+        releaseHeights("stretch data reset");
         if (!sStretchHeld) {
             return;
         }
@@ -952,6 +965,49 @@ public final class HomeClock {
             }
         } catch (Throwable t) {
             Log.w(TAG, "stretchReset", t);
+        }
+    }
+
+    /** The restored home clock's stretch heights, held until the clock is moved, resized or changed (StretchHold). */
+    private static final StretchHold sHeights = new StretchHold();
+
+    /**
+     * ApplyStretchResultUseCase (vo.t, the stretch pipeline's result on the main thread), with Samsung's fitted
+     * heights for the ClockData: while the restored home clock is where and as large as it was saved, its saved
+     * heights instead (Samsung then skips the update as "same with previous", or puts the saved heights back). A re-edit
+     * fits to the wallpaper's saved bg region (Samsung's crop, not the zoomed-out / tilted picture), so without this the
+     * editor shrank the saved clock about 2 s after opening, and Done stored that even after a colour-only change.
+     */
+    public static java.util.List<?> stretchHeights(Object clockData, java.util.List<?> fit) {
+        try {
+            if (!sHeights.held() || clockData == null) {
+                return fit;
+            }
+            if (!sRestored || !live()) {
+                sHeights.release();
+                return fit;
+            }
+            java.util.List<?> out = sHeights.apply(fit, (Integer) call(clockData, "getGravity"),
+                    (Float) call(clockData, "getScale"), (Float) call(clockData, "getHorizontalMarginRatio"),
+                    (Float) call(clockData, "getBottomMarginRatio"));
+            if (sHeights.released != null) {
+                Log.i(TAG, "clock " + sHeights.released + ": stretch heights fitted again " + fit);
+            } else if (!out.equals(fit)) {
+                Log.i(TAG, "clock stretch heights kept as saved " + out + " (fit: " + fit + ")");
+            }
+            return out;
+        } catch (Throwable t) {
+            sHeights.release();
+            Log.e(TAG, "stretchHeights", t);
+            return fit;
+        }
+    }
+
+    /** The user changed the clock or moved the picture: Samsung fits the stretch heights again from now on. */
+    static void releaseHeights(String why) {
+        if (sHeights.held()) {
+            sHeights.release();
+            Log.i(TAG, why + ": saved clock stretch heights released");
         }
     }
 
