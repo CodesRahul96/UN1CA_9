@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 999
+    .line 1001
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -32,13 +32,13 @@
 .method public run()V
     .registers 4
 
-    .line 1002
+    .line 1004
     const-wide/16 v0, 0x1388
 
     const-string v2, "audio stopped"
 
     invoke-static {v0, v1, v2}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
 
-    .line 1003
+    .line 1005
     return-void
 .end method

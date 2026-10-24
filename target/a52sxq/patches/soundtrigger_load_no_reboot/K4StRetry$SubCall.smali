@@ -29,21 +29,21 @@
 .method constructor <init>(ILandroid/telephony/TelephonyManager;)V
     .registers 4
 
-    .line 236
+    .line 237
     invoke-direct {p0}, Landroid/telephony/TelephonyCallback;-><init>()V
 
-    .line 234
+    .line 235
     const/4 v0, -0x1
 
     iput v0, p0, Lcom/k4/soundtrigger/K4StRetry$SubCall;->state:I
 
-    .line 237
+    .line 238
     iput p1, p0, Lcom/k4/soundtrigger/K4StRetry$SubCall;->subId:I
 
-    .line 238
+    .line 239
     iput-object p2, p0, Lcom/k4/soundtrigger/K4StRetry$SubCall;->tm:Landroid/telephony/TelephonyManager;
 
-    .line 239
+    .line 240
     return-void
 .end method
 
@@ -52,12 +52,12 @@
 .method public onCallStateChanged(I)V
     .registers 2
 
-    .line 243
+    .line 244
     iput p1, p0, Lcom/k4/soundtrigger/K4StRetry$SubCall;->state:I
 
-    .line 244
+    .line 245
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smupdateTelephony()V
 
-    .line 245
+    .line 246
     return-void
 .end method

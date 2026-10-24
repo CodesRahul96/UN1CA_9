@@ -135,9 +135,10 @@ public final class K4StRetry {
      */
     private static final long OWED_CHECK_MS = 60000;
     /**
-     * Owed reboots run anyway once the only "call" has been a voice playback / recording signal this long while
-     * AudioService's own mode is NORMAL and every SIM is idle: a voice-chat app idling in a channel or a player left
-     * started, not a call (a CS call always has a call mode once answered). Hung HAL calls keep their 48 s cap.
+     * Owed reboots run anyway once the only "call" has been a voice / ringtone playback this long, with no active
+     * voice recording, AudioService's own mode NORMAL and every SIM idle: a player left started, not a call (a CS call
+     * has a call mode once answered, a VoIP call always records its uplink; silenced recordings are already ignored).
+     * Never while a voice recording is active, however long. Hung HAL calls keep their 48 s cap.
      */
     private static final long AUDIO_ONLY_MAX_MS = 30 * 60 * 1000;
     private static final long NORMAL_GRACE_MS = 3000;
@@ -911,8 +912,9 @@ public final class K4StRetry {
                 live = MODE_UNKNOWN;
             }
         }
+        // never with an active (unsilenced) voice recording: a real VoIP call always has its uplink recording
         boolean audioOnly = live == AudioManager.MODE_NORMAL && !sTelBusy && !sSignalsUnknown
-                && (sVoicePlayback || sVoiceRecording);
+                && sVoicePlayback && !sVoiceRecording;
         long now = SystemClock.uptimeMillis();
         if (!audioOnly) {
             sAudioOnlySince = 0;
@@ -931,7 +933,7 @@ public final class K4StRetry {
             }
             if (!listenerSaysCall() && sHandler.hasCallbacks(RESYNC)) return; // the listener agrees, a resync is due
         } else {
-            Slog.w(TAG, "only a voice playback / recording signal for " + (AUDIO_ONLY_MAX_MS / 60000) + " min with"
+            Slog.w(TAG, "only a voice playback, no voice recording, for " + (AUDIO_ONLY_MAX_MS / 60000) + " min with"
                     + " AudioService NORMAL and every SIM idle: not a call, running the owed reboots");
             sAudioOnlySince = 0;
         }
