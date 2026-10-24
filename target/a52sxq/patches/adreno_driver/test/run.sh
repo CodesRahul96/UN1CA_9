@@ -522,5 +522,23 @@ printf 'persist.sys.k4.gpu_driver=530\npersist.sys.k4.gpu_trial=testing\nsys.boo
 K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=5 timeout 4 "$SH" "$SCRIPT" settle 150 > /dev/null 2>&1
 eq "ok without waiting" "$(prop persist.sys.k4.gpu_trial)" ok
 
+CASE="polish 2: boot.log is group-writable so settle (user system) can append its result"
+device; boot
+eq "boot.log mode" "$(stat -c %a "$R/data/k4gpu/boot.log")" 660
+
+CASE="polish 2: settle writes its result to boot.log and sys.k4.gpu_settle"
+device; boot
+printf 'persist.sys.k4.gpu_driver=u_x\npersist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\nsys.system_server.start_count=1\n' > "$T/props"
+K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=0 "$SH" "$SCRIPT" settle 20 > /dev/null 2>&1
+has "result in boot.log" "settle: 20s stable, trial ok" "$R/data/k4gpu/boot.log"
+eq "status prop" "$(prop sys.k4.gpu_settle)" "ok: 20s stable"
+printf 'persist.sys.k4.gpu_driver=u_x\npersist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\nsys.system_server.start_count=1\n' > "$T/props"
+( K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=0.3 "$SH" "$SCRIPT" settle 500 > /dev/null 2>&1 ) &
+SPID=$!
+sleep 0.5; setp sys.system_server.start_count 2
+wait $SPID
+has "crash result in boot.log" "system_server restarted (1 -> 2)" "$R/data/k4gpu/boot.log"
+eq "crash status prop" "$(prop sys.k4.gpu_settle)" "failed: system_server restarted (1 -> 2), trial stays testing"
+
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]
