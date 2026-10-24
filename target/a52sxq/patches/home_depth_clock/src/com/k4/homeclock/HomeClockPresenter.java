@@ -40,6 +40,9 @@ final class HomeClockPresenter extends h3.a {
         i3.k group = (i3.k) data.b;
         if (in == null) {
             Log.w(HomeDepthClock.TAG, "build: no presenter data");
+            HomeDepthClock.setClock(this, null); // nothing of an earlier build stays drawn (drawAbove)
+            clock = null;
+            frontNode = null;
             inner.d();
             return;
         }

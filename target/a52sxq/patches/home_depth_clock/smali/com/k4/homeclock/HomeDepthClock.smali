@@ -85,14 +85,14 @@
 
     sput-object v0, Lcom/k4/homeclock/HomeDepthClock;->CLOCKS:Ljava/util/Map;
 
-    .line 148
+    .line 156
     new-instance v0, Ljava/util/WeakHashMap;
 
     invoke-direct {v0}, Ljava/util/WeakHashMap;-><init>()V
 
     sput-object v0, Lcom/k4/homeclock/HomeDepthClock;->BUILT:Ljava/util/Map;
 
-    .line 223
+    .line 231
     new-instance v0, Ljava/util/WeakHashMap;
 
     invoke-direct {v0}, Ljava/util/WeakHashMap;-><init>()V
@@ -112,7 +112,7 @@
 .end method
 
 .method public static afterBuild(Lh3/a;)V
-    .registers 15
+    .registers 16
 
     .line 95
     const-string v1, "K4HomeClock"
@@ -124,94 +124,107 @@
 
     const-class v2, Lh3/b;
 
-    if-ne v0, v2, :cond_c8
+    if-eq v0, v2, :cond_b
 
-    iget v0, p0, Lh3/a;->c:I
+    .line 96
+    return-void
 
-    const/4 v2, 0x3
+    .line 101
+    :cond_b
+    const/4 v0, 0x0
 
-    and-int/2addr v0, v2
+    invoke-static {p0, v0}, Lcom/k4/homeclock/HomeDepthClock;->setClock(Lh3/a;Lcom/k4/homeclock/DepthClock;)V
 
-    if-ne v0, v2, :cond_c8
+    .line 102
+    invoke-static {p0, v0}, Lcom/k4/homeclock/HomeDepthClock;->built(Lh3/a;Ljava/lang/String;)V
+
+    .line 103
+    iget v2, p0, Lh3/a;->c:I
+
+    const/4 v3, 0x3
+
+    and-int/2addr v2, v3
+
+    if-ne v2, v3, :cond_ce
 
     invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->enabled()Z
 
-    move-result v0
+    move-result v2
 
-    if-eqz v0, :cond_c8
+    if-eqz v2, :cond_ce
 
     invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->sharedEnabled()Z
 
-    move-result v0
+    move-result v2
 
-    if-nez v0, :cond_1e
+    if-nez v2, :cond_26
 
-    goto/16 :goto_c8
+    goto/16 :goto_ce
 
-    .line 98
-    :cond_1e
-    iget-object v0, p0, Lh3/a;->e:Lg0/a;
+    .line 106
+    :cond_26
+    iget-object v2, p0, Lh3/a;->e:Lg0/a;
 
-    .line 99
-    if-nez v0, :cond_23
-
-    .line 100
-    return-void
-
-    .line 102
-    :cond_23
-    iget-object v2, p0, Lh3/a;->f:Li3/k;
-
-    iget-object v2, v2, Li3/k;->c:Ljava/util/ArrayList;
-
-    .line 103
-    iget-object v3, v0, Lg0/a;->d:Ljava/lang/Object;
-
-    if-nez v3, :cond_2d
-
-    const/4 v3, -0x1
-
-    goto :goto_33
-
-    :cond_2d
-    iget-object v3, v0, Lg0/a;->d:Ljava/lang/Object;
-
-    invoke-virtual {v2, v3}, Ljava/util/ArrayList;->indexOf(Ljava/lang/Object;)I
-
-    move-result v3
-
-    .line 104
-    :goto_33
-    if-gez v3, :cond_39
-
-    .line 105
-    invoke-virtual {v2}, Ljava/util/ArrayList;->size()I
-
-    move-result v3
+    .line 107
+    if-nez v2, :cond_2b
 
     .line 108
-    :cond_39
-    iget-object v4, p0, Lh3/a;->a:Landroid/content/Context;
+    return-void
 
-    invoke-static {v4}, Lcom/k4/homeclock/KeyguardWatch;->ensure(Landroid/content/Context;)Z
+    .line 110
+    :cond_2b
+    iget-object v3, p0, Lh3/a;->f:Li3/k;
+
+    iget-object v3, v3, Li3/k;->c:Ljava/util/ArrayList;
+
+    .line 111
+    iget-object v4, v2, Lg0/a;->d:Ljava/lang/Object;
+
+    if-nez v4, :cond_35
+
+    const/4 v4, -0x1
+
+    goto :goto_3b
+
+    :cond_35
+    iget-object v4, v2, Lg0/a;->d:Ljava/lang/Object;
+
+    invoke-virtual {v3, v4}, Ljava/util/ArrayList;->indexOf(Ljava/lang/Object;)I
 
     move-result v4
-    :try_end_3f
-    .catchall {:try_start_2 .. :try_end_3f} :catchall_c9
 
-    const-string v5, "shared home+lock wallpaper (which="
+    .line 112
+    :goto_3b
+    if-gez v4, :cond_41
 
-    if-nez v4, :cond_60
+    .line 113
+    invoke-virtual {v3}, Ljava/util/ArrayList;->size()I
 
-    .line 109
-    :try_start_43
+    move-result v4
+
+    .line 116
+    :cond_41
+    iget-object v5, p0, Lh3/a;->a:Landroid/content/Context;
+
+    invoke-static {v5}, Lcom/k4/homeclock/KeyguardWatch;->ensure(Landroid/content/Context;)Z
+
+    move-result v5
+    :try_end_47
+    .catchall {:try_start_2 .. :try_end_47} :catchall_cf
+
+    const-string v6, "shared home+lock wallpaper (which="
+
+    if-nez v5, :cond_68
+
+    .line 117
+    :try_start_4b
     iget p0, p0, Lh3/a;->c:I
 
     new-instance v0, Ljava/lang/StringBuilder;
 
     invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
 
-    invoke-virtual {v0, v5}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v0, v6}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
     move-result-object v0
 
@@ -231,86 +244,82 @@
 
     invoke-static {v1, p0}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 110
+    .line 118
     return-void
 
-    .line 112
-    :cond_60
-    iget-object v4, v0, Lg0/a;->d:Ljava/lang/Object;
+    .line 120
+    :cond_68
+    iget-object v5, v2, Lg0/a;->d:Ljava/lang/Object;
 
-    instance-of v4, v4, Li3/c;
+    instance-of v5, v5, Li3/c;
 
-    const/4 v6, 0x0
+    if-eqz v5, :cond_73
 
-    if-eqz v4, :cond_6c
+    iget-object v5, v2, Lg0/a;->d:Ljava/lang/Object;
 
-    iget-object v4, v0, Lg0/a;->d:Ljava/lang/Object;
+    check-cast v5, Li3/c;
 
-    check-cast v4, Li3/c;
+    goto :goto_74
 
-    goto :goto_6d
+    :cond_73
+    move-object v5, v0
 
-    :cond_6c
-    move-object v4, v6
-
-    .line 113
-    :goto_6d
-    iget-object v7, v0, Lg0/a;->c:Ljava/lang/Object;
+    .line 121
+    :goto_74
+    iget-object v7, v2, Lg0/a;->c:Ljava/lang/Object;
 
     instance-of v7, v7, Li3/c;
 
-    if-eqz v7, :cond_78
+    if-eqz v7, :cond_7e
 
-    iget-object v0, v0, Lg0/a;->c:Ljava/lang/Object;
+    iget-object v0, v2, Lg0/a;->c:Ljava/lang/Object;
 
-    move-object v6, v0
+    check-cast v0, Li3/c;
 
-    check-cast v6, Li3/c;
+    :cond_7e
+    move-object v12, v0
 
-    :cond_78
-    move-object v11, v6
-
-    .line 114
+    .line 122
     iget-object v0, p0, Lh3/a;->a:Landroid/content/Context;
 
     invoke-static {v0}, Lcom/k4/homeclock/HomeDepthClock;->fingerprint(Landroid/content/Context;)Ljava/lang/String;
 
     move-result-object v0
 
-    .line 115
-    iget-object v6, p0, Lh3/a;->a:Landroid/content/Context;
+    .line 123
+    iget-object v7, p0, Lh3/a;->a:Landroid/content/Context;
 
-    iget v7, p0, Lh3/a;->g:I
+    iget v8, p0, Lh3/a;->g:I
 
-    iget v8, p0, Lh3/a;->h:I
+    iget v9, p0, Lh3/a;->h:I
 
-    invoke-static {v4}, Lcom/k4/homeclock/HomeClockPresenter;->subjectTop(Li3/c;)F
+    invoke-static {v5}, Lcom/k4/homeclock/HomeClockPresenter;->subjectTop(Li3/c;)F
 
-    move-result v9
+    move-result v10
 
-    const/4 v10, 0x0
+    const/4 v11, 0x0
 
-    const/4 v13, 0x1
+    const/4 v14, 0x1
 
-    move-object v12, p0
+    move-object v13, p0
 
-    invoke-static/range {v6 .. v13}, Lcom/k4/homeclock/HomeDepthClock;->makeClock(Landroid/content/Context;IIFLandroid/graphics/Bitmap;Li3/c;Lh3/a;Z)Lcom/k4/homeclock/DepthClock;
+    invoke-static/range {v7 .. v14}, Lcom/k4/homeclock/HomeDepthClock;->makeClock(Landroid/content/Context;IIFLandroid/graphics/Bitmap;Li3/c;Lh3/a;Z)Lcom/k4/homeclock/DepthClock;
 
     move-result-object p0
 
-    .line 116
-    invoke-virtual {v2, v3, p0}, Ljava/util/ArrayList;->add(ILjava/lang/Object;)V
+    .line 124
+    invoke-virtual {v3, v4, p0}, Ljava/util/ArrayList;->add(ILjava/lang/Object;)V
 
-    .line 117
-    invoke-static {v12, p0}, Lcom/k4/homeclock/HomeDepthClock;->setClock(Lh3/a;Lcom/k4/homeclock/DepthClock;)V
+    .line 125
+    invoke-static {v13, p0}, Lcom/k4/homeclock/HomeDepthClock;->setClock(Lh3/a;Lcom/k4/homeclock/DepthClock;)V
 
-    .line 118
-    invoke-static {v12, v0}, Lcom/k4/homeclock/HomeDepthClock;->built(Lh3/a;Ljava/lang/String;)V
+    .line 126
+    invoke-static {v13, v0}, Lcom/k4/homeclock/HomeDepthClock;->built(Lh3/a;Ljava/lang/String;)V
 
-    .line 119
-    iget p0, v12, Lh3/a;->c:I
+    .line 127
+    iget p0, v13, Lh3/a;->c:I
 
-    invoke-virtual {v2}, Ljava/util/ArrayList;->size()I
+    invoke-virtual {v3}, Ljava/util/ArrayList;->size()I
 
     move-result v0
 
@@ -318,7 +327,7 @@
 
     invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
 
-    invoke-virtual {v2, v5}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invoke-virtual {v2, v6}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
     move-result-object v2
 
@@ -332,7 +341,7 @@
 
     move-result-object p0
 
-    invoke-virtual {p0, v3}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+    invoke-virtual {p0, v4}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
     move-result-object p0
 
@@ -351,45 +360,45 @@
     move-result-object p0
 
     invoke-static {v1, p0}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
-    :try_end_c7
-    .catchall {:try_start_43 .. :try_end_c7} :catchall_c9
+    :try_end_cd
+    .catchall {:try_start_4b .. :try_end_cd} :catchall_cf
 
-    .line 122
-    goto :goto_d0
+    .line 130
+    goto :goto_d6
 
-    .line 96
-    :cond_c8
-    :goto_c8
+    .line 104
+    :cond_ce
+    :goto_ce
     return-void
 
-    .line 120
-    :catchall_c9
+    .line 128
+    :catchall_cf
     move-exception v0
 
     move-object p0, v0
 
-    .line 121
+    .line 129
     const-string v0, "afterBuild"
 
     invoke-static {v1, v0, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 123
-    :goto_d0
+    .line 131
+    :goto_d6
     return-void
 .end method
 
 .method static built(Lh3/a;Ljava/lang/String;)V
     .registers 4
 
-    .line 171
+    .line 179
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->BUILT:Ljava/util/Map;
 
     monitor-enter v0
 
-    .line 172
+    .line 180
     if-nez p1, :cond_b
 
-    .line 173
+    .line 181
     :try_start_5
     sget-object p1, Lcom/k4/homeclock/HomeDepthClock;->BUILT:Ljava/util/Map;
 
@@ -397,20 +406,20 @@
 
     goto :goto_10
 
-    .line 175
+    .line 183
     :cond_b
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->BUILT:Ljava/util/Map;
 
     invoke-interface {v1, p0, p1}, Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 177
+    .line 185
     :goto_10
     monitor-exit v0
 
-    .line 178
+    .line 186
     return-void
 
-    .line 177
+    .line 185
     :catchall_12
     move-exception p0
 
@@ -424,12 +433,12 @@
 .method static builtFrom(Lh3/a;)Ljava/lang/String;
     .registers 3
 
-    .line 181
+    .line 189
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->BUILT:Ljava/util/Map;
 
     monitor-enter v0
 
-    .line 182
+    .line 190
     :try_start_3
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->BUILT:Ljava/util/Map;
 
@@ -443,7 +452,7 @@
 
     return-object p0
 
-    .line 183
+    .line 191
     :catchall_d
     move-exception p0
 
@@ -457,12 +466,12 @@
 .method static clockOf(Lf3/a;)Lcom/k4/homeclock/DepthClock;
     .registers 3
 
-    .line 201
+    .line 209
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->CLOCKS:Ljava/util/Map;
 
     monitor-enter v0
 
-    .line 202
+    .line 210
     :try_start_3
     iget-object v1, p0, Lf3/a;->g:Lh3/a;
 
@@ -488,7 +497,7 @@
 
     return-object p0
 
-    .line 203
+    .line 211
     :catchall_15
     move-exception p0
 
@@ -502,10 +511,10 @@
 .method static dimOf(Lf3/a;)F
     .registers 2
 
-    .line 249
+    .line 257
     iget-object p0, p0, Lf3/a;->j:Li3/e;
 
-    .line 250
+    .line 258
     if-eqz p0, :cond_17
 
     iget-boolean v0, p0, Li3/e;->c:Z
@@ -582,12 +591,12 @@
 .method static engineOf(Lh3/a;)Lf3/a;
     .registers 5
 
-    .line 207
+    .line 215
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
     monitor-enter v0
 
-    .line 208
+    .line 216
     :try_start_3
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
@@ -612,32 +621,32 @@
 
     check-cast v2, Lf3/a;
 
-    .line 209
+    .line 217
     if-eqz v2, :cond_21
 
     iget-object v3, v2, Lf3/a;->g:Lh3/a;
 
     if-ne v3, p0, :cond_21
 
-    .line 210
+    .line 218
     monitor-exit v0
 
     return-object v2
 
-    .line 212
+    .line 220
     :cond_21
     goto :goto_d
 
-    .line 213
+    .line 221
     :cond_22
     monitor-exit v0
 
-    .line 214
+    .line 222
     const/4 p0, 0x0
 
     return-object p0
 
-    .line 213
+    .line 221
     :catchall_25
     move-exception p0
 
@@ -651,37 +660,37 @@
 .method static fingerprint(Landroid/content/Context;)Ljava/lang/String;
     .registers 9
 
-    .line 157
+    .line 165
     :try_start_0
     invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
 
     move-result-object p0
 
-    .line 158
+    .line 166
     const-string v0, "k4_home_clock_item"
 
-    .line 159
+    .line 167
     invoke-static {p0, v0}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v1
 
     const-string v0, "k4_home_clock_item_rect"
 
-    .line 160
+    .line 168
     invoke-static {p0, v0}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v2
 
     const-string v0, "k4_home_clock_bundle"
 
-    .line 161
+    .line 169
     invoke-static {p0, v0}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v3
 
     const-string p0, "persist.sys.k4.home_depth_clock"
 
-    .line 162
+    .line 170
     invoke-static {p0}, Lcom/k4/homeclock/HomeDepthClock;->prop(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v4
@@ -708,7 +717,7 @@
 
     move-result-object p0
 
-    .line 158
+    .line 166
     invoke-static {p0}, Lcom/k4/homeclock/ReloadPolicy;->fingerprint([Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p0
@@ -717,20 +726,20 @@
 
     return-object p0
 
-    .line 163
+    .line 171
     :catchall_37
     move-exception v0
 
     move-object p0, v0
 
-    .line 164
+    .line 172
     const-string v0, "K4HomeClock"
 
     const-string v1, "clock settings fingerprint"
 
     invoke-static {v0, v1, p0}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 165
+    .line 173
     const/4 p0, 0x0
 
     return-object p0
@@ -758,7 +767,7 @@
 .method static makeClock(Landroid/content/Context;IIFLandroid/graphics/Bitmap;Li3/c;Lh3/a;Z)Lcom/k4/homeclock/DepthClock;
     .registers 18
 
-    .line 132
+    .line 140
     new-instance v1, Lcom/k4/homeclock/ClockNode;
 
     move-object v2, p0
@@ -779,25 +788,25 @@
 
     invoke-direct/range {v1 .. v9}, Lcom/k4/homeclock/ClockNode;-><init>(Landroid/content/Context;IIFLandroid/graphics/Bitmap;Li3/c;Lh3/a;Z)V
 
-    .line 133
+    .line 141
     invoke-static {p0}, Lcom/k4/homeclock/HomeClockItem;->read(Landroid/content/Context;)Lcom/k4/homeclock/HomeClockItem;
 
     move-result-object v3
 
-    .line 134
+    .line 142
     const-string p3, "K4HomeClock"
 
     if-nez v3, :cond_1d
 
-    .line 135
+    .line 143
     const-string p0, "no saved home clock item: plain clock"
 
     invoke-static {p3, p0}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 136
+    .line 144
     return-object v1
 
-    .line 139
+    .line 147
     :cond_1d
     move-object v0, p0
 
@@ -824,7 +833,7 @@
 
     return-object p0
 
-    .line 140
+    .line 148
     :catchall_2c
     move-exception v0
 
@@ -832,7 +841,7 @@
 
     move-object p0, v0
 
-    .line 141
+    .line 149
     instance-of p1, p0, Ljava/lang/reflect/InvocationTargetException;
 
     if-eqz p1, :cond_3d
@@ -847,7 +856,7 @@
 
     move-result-object p0
 
-    .line 142
+    .line 150
     :cond_3d
     invoke-static {v3}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
 
@@ -879,14 +888,14 @@
 
     invoke-static {p3, p1, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 143
+    .line 151
     return-object v1
 .end method
 
 .method public static onCreate(Lf3/a;)V
     .registers 4
 
-    .line 274
+    .line 282
     :try_start_0
     invoke-virtual {p0}, Lf3/a;->getWhich()I
 
@@ -898,10 +907,10 @@
 
     if-nez v0, :cond_b
 
-    .line 275
+    .line 283
     return-void
 
-    .line 277
+    .line 285
     :cond_b
     iget-object v0, p0, Lf3/a;->g:Lh3/a;
 
@@ -911,20 +920,20 @@
 
     if-eqz v0, :cond_62
 
-    .line 283
+    .line 291
     :try_start_11
     invoke-virtual {p0}, Lf3/a;->d()Z
     :try_end_14
     .catchall {:try_start_11 .. :try_end_14} :catchall_15
 
-    .line 286
+    .line 294
     goto :goto_1d
 
-    .line 284
+    .line 292
     :catchall_15
     move-exception v0
 
-    .line 285
+    .line 293
     :try_start_16
     const-string v1, "K4HomeClock"
 
@@ -934,7 +943,7 @@
     :try_end_1d
     .catchall {:try_start_16 .. :try_end_1d} :catchall_77
 
-    .line 288
+    .line 296
     :goto_1d
     :try_start_1d
     iget-object v0, p0, Lf3/a;->h:Li3/k;
@@ -963,7 +972,7 @@
 
     if-eqz v0, :cond_52
 
-    .line 289
+    .line 297
     iget-object v0, p0, Lf3/a;->h:Li3/k;
 
     iget-object v0, v0, Li3/k;->c:Ljava/util/ArrayList;
@@ -974,14 +983,14 @@
 
     invoke-virtual {v0, v1}, Ljava/util/ArrayList;->add(Ljava/lang/Object;)Z
 
-    .line 290
+    .line 298
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->POST_DIM:Ljava/util/Map;
 
     monitor-enter v0
     :try_end_46
     .catchall {:try_start_1d .. :try_end_46} :catchall_5a
 
-    .line 291
+    .line 299
     :try_start_46
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->POST_DIM:Ljava/util/Map;
 
@@ -989,7 +998,7 @@
 
     invoke-interface {v1, p0, v2}, Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 292
+    .line 300
     monitor-exit v0
 
     goto :goto_59
@@ -1004,7 +1013,7 @@
     :try_start_51
     throw v1
 
-    .line 294
+    .line 302
     :cond_52
     const-string v0, "K4HomeClock"
 
@@ -1014,15 +1023,15 @@
     :try_end_59
     .catchall {:try_start_51 .. :try_end_59} :catchall_5a
 
-    .line 298
+    .line 306
     :goto_59
     goto :goto_62
 
-    .line 296
+    .line 304
     :catchall_5a
     move-exception v0
 
-    .line 297
+    .line 305
     :try_start_5b
     const-string v1, "K4HomeClock"
 
@@ -1030,41 +1039,41 @@
 
     invoke-static {v1, v2, v0}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 300
+    .line 308
     :cond_62
     :goto_62
     new-instance v0, Lcom/k4/homeclock/EngineState;
 
     invoke-direct {v0, p0}, Lcom/k4/homeclock/EngineState;-><init>(Lf3/a;)V
 
-    .line 301
+    .line 309
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
     monitor-enter v1
     :try_end_6a
     .catchall {:try_start_5b .. :try_end_6a} :catchall_77
 
-    .line 302
+    .line 310
     :try_start_6a
     sget-object v2, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
     invoke-interface {v2, p0, v0}, Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 303
+    .line 311
     monitor-exit v1
     :try_end_70
     .catchall {:try_start_6a .. :try_end_70} :catchall_74
 
-    .line 304
+    .line 312
     :try_start_70
     invoke-virtual {v0}, Lcom/k4/homeclock/EngineState;->start()V
     :try_end_73
     .catchall {:try_start_70 .. :try_end_73} :catchall_77
 
-    .line 307
+    .line 315
     goto :goto_7f
 
-    .line 303
+    .line 311
     :catchall_74
     move-exception p0
 
@@ -1078,18 +1087,18 @@
     :try_end_77
     .catchall {:try_start_76 .. :try_end_77} :catchall_77
 
-    .line 305
+    .line 313
     :catchall_77
     move-exception p0
 
-    .line 306
+    .line 314
     const-string v0, "K4HomeClock"
 
     const-string v1, "onCreate"
 
     invoke-static {v0, v1, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 308
+    .line 316
     :goto_7f
     return-void
 .end method
@@ -1097,7 +1106,7 @@
 .method public static onDestroy(Lf3/a;)V
     .registers 4
 
-    .line 327
+    .line 335
     :try_start_0
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
@@ -1105,7 +1114,7 @@
     :try_end_3
     .catchall {:try_start_0 .. :try_end_3} :catchall_2d
 
-    .line 328
+    .line 336
     :try_start_3
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
@@ -1115,12 +1124,12 @@
 
     check-cast v1, Lcom/k4/homeclock/EngineState;
 
-    .line 329
+    .line 337
     monitor-exit v0
     :try_end_c
     .catchall {:try_start_3 .. :try_end_c} :catchall_2a
 
-    .line 330
+    .line 338
     :try_start_c
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->POST_DIM:Ljava/util/Map;
 
@@ -1128,47 +1137,47 @@
     :try_end_f
     .catchall {:try_start_c .. :try_end_f} :catchall_2d
 
-    .line 331
+    .line 339
     :try_start_f
     sget-object v2, Lcom/k4/homeclock/HomeDepthClock;->POST_DIM:Ljava/util/Map;
 
     invoke-interface {v2, p0}, Ljava/util/Map;->remove(Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 332
+    .line 340
     monitor-exit v0
     :try_end_15
     .catchall {:try_start_f .. :try_end_15} :catchall_27
 
-    .line 333
+    .line 341
     if-eqz v1, :cond_1a
 
-    .line 334
+    .line 342
     :try_start_17
     invoke-virtual {v1}, Lcom/k4/homeclock/EngineState;->stop()V
 
-    .line 339
+    .line 347
     :cond_1a
     iget-object p0, p0, Lf3/a;->g:Lh3/a;
 
-    .line 340
+    .line 348
     if-eqz p0, :cond_26
 
     instance-of v0, p0, Lcom/k4/homeclock/HomeClockPresenter;
 
     if-nez v0, :cond_26
 
-    .line 341
+    .line 349
     const/4 v0, 0x0
 
     invoke-static {p0, v0}, Lcom/k4/homeclock/HomeDepthClock;->setClock(Lh3/a;Lcom/k4/homeclock/DepthClock;)V
     :try_end_26
     .catchall {:try_start_17 .. :try_end_26} :catchall_2d
 
-    .line 345
+    .line 353
     :cond_26
     goto :goto_35
 
-    .line 332
+    .line 340
     :catchall_27
     move-exception p0
 
@@ -1182,7 +1191,7 @@
     :try_end_2a
     .catchall {:try_start_29 .. :try_end_2a} :catchall_2d
 
-    .line 329
+    .line 337
     :catchall_2a
     move-exception p0
 
@@ -1196,18 +1205,18 @@
     :try_end_2d
     .catchall {:try_start_2c .. :try_end_2d} :catchall_2d
 
-    .line 343
+    .line 351
     :catchall_2d
     move-exception p0
 
-    .line 344
+    .line 352
     const-string v0, "K4HomeClock"
 
     const-string v1, "onDestroy"
 
     invoke-static {v0, v1, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 346
+    .line 354
     :goto_35
     return-void
 .end method
@@ -1215,7 +1224,7 @@
 .method public static onVisibility(Lf3/a;Z)V
     .registers 4
 
-    .line 313
+    .line 321
     :try_start_0
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
@@ -1223,7 +1232,7 @@
     :try_end_3
     .catchall {:try_start_0 .. :try_end_3} :catchall_15
 
-    .line 314
+    .line 322
     :try_start_3
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
@@ -1233,25 +1242,25 @@
 
     check-cast p0, Lcom/k4/homeclock/EngineState;
 
-    .line 315
+    .line 323
     monitor-exit v0
     :try_end_c
     .catchall {:try_start_3 .. :try_end_c} :catchall_12
 
-    .line 316
+    .line 324
     if-eqz p0, :cond_11
 
-    .line 317
+    .line 325
     :try_start_e
     invoke-virtual {p0, p1}, Lcom/k4/homeclock/EngineState;->setVisible(Z)V
     :try_end_11
     .catchall {:try_start_e .. :try_end_11} :catchall_15
 
-    .line 321
+    .line 329
     :cond_11
     goto :goto_1d
 
-    .line 315
+    .line 323
     :catchall_12
     move-exception p0
 
@@ -1265,18 +1274,18 @@
     :try_end_15
     .catchall {:try_start_14 .. :try_end_15} :catchall_15
 
-    .line 319
+    .line 327
     :catchall_15
     move-exception p0
 
-    .line 320
+    .line 328
     const-string p1, "K4HomeClock"
 
     const-string v0, "onVisibility"
 
     invoke-static {p1, v0, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 322
+    .line 330
     :goto_1d
     return-void
 .end method
@@ -1284,12 +1293,12 @@
 .method static postDimInstalled(Lh3/a;)Z
     .registers 4
 
-    .line 255
+    .line 263
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->POST_DIM:Ljava/util/Map;
 
     monitor-enter v0
 
-    .line 256
+    .line 264
     :try_start_3
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->POST_DIM:Ljava/util/Map;
 
@@ -1314,34 +1323,34 @@
 
     check-cast v2, Lf3/a;
 
-    .line 257
+    .line 265
     if-eqz v2, :cond_22
 
     iget-object v2, v2, Lf3/a;->g:Lh3/a;
 
     if-ne v2, p0, :cond_22
 
-    .line 258
+    .line 266
     monitor-exit v0
 
     const/4 p0, 0x1
 
     return p0
 
-    .line 260
+    .line 268
     :cond_22
     goto :goto_d
 
-    .line 261
+    .line 269
     :cond_23
     monitor-exit v0
 
-    .line 262
+    .line 270
     const/4 p0, 0x0
 
     return p0
 
-    .line 261
+    .line 269
     :catchall_26
     move-exception p0
 
@@ -1465,7 +1474,7 @@
 .method static redrawStale(Ljava/lang/String;)V
     .registers 5
 
-    .line 267
+    .line 275
     invoke-static {}, Lcom/k4/homeclock/HomeDepthClock;->states()[Lcom/k4/homeclock/EngineState;
 
     move-result-object v0
@@ -1479,15 +1488,15 @@
 
     aget-object v3, v0, v2
 
-    .line 268
+    .line 276
     invoke-virtual {v3, p0}, Lcom/k4/homeclock/EngineState;->redrawIfStale(Ljava/lang/String;)V
 
-    .line 267
+    .line 275
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_6
 
-    .line 270
+    .line 278
     :cond_10
     return-void
 .end method
@@ -1495,12 +1504,12 @@
 .method static setClock(Lh3/a;Lcom/k4/homeclock/DepthClock;)V
     .registers 4
 
-    .line 188
+    .line 196
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->CLOCKS:Ljava/util/Map;
 
     monitor-enter v0
 
-    .line 189
+    .line 197
     if-nez p1, :cond_c
 
     :try_start_5
@@ -1522,42 +1531,42 @@
     :goto_12
     check-cast p0, Lcom/k4/homeclock/DepthClock;
 
-    .line 190
+    .line 198
     monitor-exit v0
     :try_end_15
     .catchall {:try_start_5 .. :try_end_15} :catchall_26
 
-    .line 191
+    .line 199
     if-eqz p0, :cond_25
 
     if-eq p0, p1, :cond_25
 
-    .line 193
+    .line 201
     :try_start_19
     invoke-virtual {p0}, Lcom/k4/homeclock/DepthClock;->release()V
     :try_end_1c
     .catchall {:try_start_19 .. :try_end_1c} :catchall_1d
 
-    .line 196
+    .line 204
     goto :goto_25
 
-    .line 194
+    .line 202
     :catchall_1d
     move-exception p0
 
-    .line 195
+    .line 203
     const-string p1, "K4HomeClock"
 
     const-string v0, "release"
 
     invoke-static {p1, v0, p0}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 198
+    .line 206
     :cond_25
     :goto_25
     return-void
 
-    .line 190
+    .line 198
     :catchall_26
     move-exception p0
 
@@ -1610,12 +1619,12 @@
 .method static states()[Lcom/k4/homeclock/EngineState;
     .registers 3
 
-    .line 218
+    .line 226
     sget-object v0, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
     monitor-enter v0
 
-    .line 219
+    .line 227
     :try_start_3
     sget-object v1, Lcom/k4/homeclock/HomeDepthClock;->ENGINES:Ljava/util/Map;
 
@@ -1637,7 +1646,7 @@
 
     return-object v1
 
-    .line 220
+    .line 228
     :catchall_14
     move-exception v1
 

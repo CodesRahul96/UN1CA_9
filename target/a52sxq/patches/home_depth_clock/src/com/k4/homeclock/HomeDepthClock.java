@@ -92,7 +92,15 @@ public final class HomeDepthClock {
     /** h3.a.e hook, after the presenter built its layer list. Only the shared home+lock instance's h3.b is touched. */
     public static void afterBuild(h3.a p) {
         try {
-            if (p.getClass() != h3.b.class || (p.c & 3) != 3 || !enabled() || !sharedEnabled()) {
+            if (p.getClass() != h3.b.class) {
+                return;
+            }
+            // h3.a.e has just cleared and rebuilt the layer list: a clock from an earlier build of p is no longer in
+            // it. Forget it (released) and what it was built from before any early return below, so no orphan clock
+            // keeps redrawing the engine on minute ticks / keyguard changes and a RELOAD sees the truth.
+            setClock(p, null);
+            built(p, null);
+            if ((p.c & 3) != 3 || !enabled() || !sharedEnabled()) {
                 return;
             }
             g0.a data = p.e;

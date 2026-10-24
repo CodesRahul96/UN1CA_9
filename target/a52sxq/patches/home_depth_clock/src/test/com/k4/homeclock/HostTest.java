@@ -31,6 +31,7 @@ public final class HostTest {
         settingsToggles();
         nothingToDoLogRateLimited();
         sharedEngine();
+        sharedRebuildWithoutClock();
         gate();
         System.out.println(passed + " passed, " + failed + " failed");
         if (failed > 0) {
@@ -370,6 +371,24 @@ public final class HostTest {
         Looper.advance(400);
         check("shared with a presenter that takes no clock: not rebuilt", flat.stops == 0);
         HomeDepthClock.onDestroy(flat);
+    }
+
+    /** A later build of the same h3.b that ends without a clock leaves no orphan clock or fingerprint behind. */
+    private static void sharedRebuildWithoutClock() throws Exception {
+        reset();
+        Context c = new Context();
+        f3.a e = sharedEngine(c);
+        h3.a p = e.g;
+        SemSystemProperties.P.put(HomeDepthClock.PROP + "_shared", "0"); // flipped, no RELOAD yet
+        HomeDepthClock.afterBuild(p);                                      // h3.a.e again (surface change)
+        check("shared rebuild without a clock: old clock entry cleared", HomeDepthClock.clockOf(e) == null);
+        check("shared rebuild without a clock: old fingerprint cleared", HomeDepthClock.builtFrom(p) == null);
+        p.e = null;                                                        // and the "no presenter data" return
+        SemSystemProperties.P.remove(HomeDepthClock.PROP + "_shared");
+        HomeDepthClock.setClock(p, new TestClock(c, p, true));
+        HomeDepthClock.afterBuild(p);
+        check("shared rebuild, no presenter data: old clock entry cleared", HomeDepthClock.clockOf(e) == null);
+        HomeDepthClock.onDestroy(e);
     }
 
     // ---- DepthClock.showing
