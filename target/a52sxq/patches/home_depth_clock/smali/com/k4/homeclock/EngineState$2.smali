@@ -30,7 +30,7 @@
         }
     .end annotation
 
-    .line 100
+    .line 107
     iput-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
@@ -43,7 +43,7 @@
 .method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
     .registers 6
 
-    .line 103
+    .line 110
     iget-object p1, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {p1}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetmain(Lcom/k4/homeclock/EngineState;)Landroid/os/Handler;
@@ -58,7 +58,7 @@
 
     invoke-virtual {p1, v0}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 104
+    .line 111
     const-string p1, "com.k4.homeclock.extra.WALLPAPER_PENDING"
 
     const/4 v0, 0x0
@@ -67,17 +67,17 @@
 
     move-result p1
 
-    .line 105
+    .line 112
     iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     const/4 v0, 0x1
 
     invoke-static {p2, v0}, Lcom/k4/homeclock/EngineState;->-$$Nest$fputreloadPending(Lcom/k4/homeclock/EngineState;Z)V
 
-    .line 106
+    .line 113
     if-eqz p1, :cond_50
 
-    .line 107
+    .line 114
     iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
     invoke-static {p2}, Lcom/k4/homeclock/EngineState;->-$$Nest$fgetengine(Lcom/k4/homeclock/EngineState;)Ljava/lang/ref/WeakReference;
@@ -90,7 +90,7 @@
 
     check-cast p2, Lf3/a;
 
-    .line 108
+    .line 115
     if-nez p2, :cond_2e
 
     const/4 p2, -0x1
@@ -131,7 +131,7 @@
 
     invoke-static {v0, p2}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 111
+    .line 118
     :cond_50
     iget-object p2, p0, Lcom/k4/homeclock/EngineState$2;->this$0:Lcom/k4/homeclock/EngineState;
 
@@ -151,6 +151,6 @@
 
     invoke-virtual {p2, v0, v1, v2}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 112
+    .line 119
     return-void
 .end method

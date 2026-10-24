@@ -32,6 +32,7 @@ public final class HostTest {
         nothingToDoLogRateLimited();
         sharedEngine();
         sharedRebuildWithoutClock();
+        sharedDemotedToLockOnly();
         gate();
         System.out.println(passed + " passed, " + failed + " failed");
         if (failed > 0) {
@@ -388,6 +389,26 @@ public final class HostTest {
         HomeDepthClock.setClock(p, new TestClock(c, p, true));
         HomeDepthClock.afterBuild(p);
         check("shared rebuild, no presenter data: old clock entry cleared", HomeDepthClock.clockOf(e) == null);
+        HomeDepthClock.onDestroy(e);
+    }
+
+    /** 7 -> 6 (new home wallpaper, the shared one stays on the lock screen): a pending check never rebuilds it. */
+    private static void sharedDemotedToLockOnly() throws Exception {
+        reset();
+        Context c = new Context();
+        f3.a e = sharedEngine(c);
+        HomeDepthClock.onVisibility(e, false); // the editor is in front
+        saveClock("{\"clockType\":4}", "1,2,3,4,1.0,0,");
+        reload(true);
+        e.which = 6;
+        KeyguardWatch.locked = true;
+        HomeDepthClock.onVisibility(e, true);  // shown as the lock screen
+        Looper.advance(10_000);
+        check("7->6: lock-only engine not rebuilt by the editor's check", e.stops == 0);
+        check("7->6: says why", logged("nothing to rebuild (not a home screen wallpaper)"));
+        reload(false);
+        Looper.advance(400);
+        check("7->6: nor by a Settings RELOAD", e.stops == 0);
         HomeDepthClock.onDestroy(e);
     }
 

@@ -55,6 +55,13 @@ final class EngineState {
         int which = e.getWhich();
         boolean enabled = HomeDepthClock.enabled();
         boolean shared = HomeDepthClock.sharedEnabled();
+        if ((which & 1) == 0) {
+            // no longer a home screen engine (a shared wallpaper left on the lock screen after a new home one: 7 -> 6,
+            // LayeredEngine keeps the engine): its gated clock is never drawn again, and a rebuild here would only
+            // decode the lock screen wallpaper again as the lock screen or the AOD shows it
+            logNothingToDo(which, enabled, shared);
+            return;
+        }
         h3.a p = e.g;
         // the shared clock only ever goes into Samsung's BgCachableLayeredPresenter (h3.b, HomeDepthClock.afterBuild);
         // a shared engine with another presenter would come back without a clock however often it is rebuilt
