@@ -238,7 +238,7 @@ undo_mounts() {
 mount_set() {
     d="$STORE/$1"
     MOUNTED=""
-    label_set "$d" || log "$1: relabel failed"
+    # labels were set at import (k4gpu may relabel to the driver types, not from them)
     bind "$d/egl" "$VND/lib64/egl" || return 1
     for f in "$d"/lib64/*.so "$d"/lib64/hw/vulkan.adreno.so; do
         [ -f "$f" ] || continue
