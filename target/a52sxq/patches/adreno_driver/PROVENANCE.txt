@@ -18,3 +18,26 @@ processor, so it is the most trusted file here. It matches no file we can check 
 (header version 0x016dc094), linux-firmware qcom/a660_sqe.fw d222f3fe... (0x016dc112), this one 0x016dc109 - a release
 between the two, consistent with a genuine Qualcomm build, but not provable. Nothing from these sets is used unless the
 owner of the phone picks V@0849 or V@0863 in Settings > K4_UN1CA > UI (default: stock V@0530 untouched).
+
+v530_55  stock Samsung, SM-A528B A528BXXSBGYI3 (vendor A528BXXSBGYI3, security patch 2025-09-01, built 2025-09-11)
+      libGLESv2_adreno.so: "OpenGL ES 3.2 V@0530.55.1 (GIT@9ad1b67875, Ib48d2dada6, 1746950435) (Date:05/11/25)"
+      (FWK4 stock in /vendor: V@0530.0 (GIT@cac6e6f805, I5187d04b75, 1637574833) (Date:11/22/21))
+      source: Samsung FUS (official), fetched 2026-10-24 with the repo's samloader (scripts/download_fw.sh flow),
+      model SM-A528B, CSC BTU, FUS latest A528BXXSBGYI3/A528BOXMBGYI3/A528BXXSBGYI3 (same build on DBT/XEF)
+      SM-A528B_4_20250912122141_gwavcu1pw8_fac.zip, 8582765282 bytes,
+      sha256 bc485201a7088ed5983bd1974aa3b0969df1de506d99c2dba7f7122d4490ec64
+      AP_A528BXXSBGYI3_A528BXXSBGYI3_MQB101124172_REV00_user_low_ship_MULTI_CERT_meta_OS14.tar.md5 (Samsung md5 trailer
+      3e7aa3eff04779acbcba73b4ce43051d verified) -> super.img -> vendor (ext4, debugfs rdump); nothing else was used
+      Only userspace files were taken: 18 ELF 64-bit aarch64 shared objects from /vendor/lib64 (the v849/v863 file list
+      that GYI3 has, plus libOpenCL.so and libVkLayer_q3dtools.so, which GYI3 rebuilt with this driver) and
+      /vendor/firmware/a660_sqe.fw. a660_sqe.fw (and a660_gmu.bin, not taken) is byte-identical in GYI3 and FWK4
+      (f911a4ba..., header 0x016dc094): it is the microcode the FWK4 vendor already loads, a raw blob (not ELF, no
+      hash/signature segment, no certificate); it is in the set only because the set format requires it. No signed or
+      TZ-authenticated image (a660_zap.*, gmu, mdt/bNN) and nothing from boot/vendor_boot/dtbo/vbmeta/modem/BL is in it.
+      Byte-identical to the FWK4 stock files (same build in both firmwares): libGLESv1_CM_adreno.so, libq3dtools_adreno.so,
+      libkcl.so, libkernelmanager.so, libgpu_tonemapper.so, a660_sqe.fw.
+      Checked against the FWK4 vendor + VNDK v30 + the ROM system: every library has the same NEEDED list as its FWK4
+      counterpart, all resolve, no unresolved symbol, no exported symbol removed (libCB +2, libgpudataproducer +1,
+      libVkLayer_q3dtools +1 added); FWK4 consumers (libC2D2, libc2d30_bltlib, camera OpenCL users, gralloc's
+      libadreno_utils dlsyms, composer) still resolve. libgsl issues the same 51 kgsl ioctl codes as the FWK4 libgsl.
+      Vulkan: same 89 extensions as V@0530.0 (Vulkan 1.1, not 1.3).
