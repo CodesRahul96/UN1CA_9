@@ -49,12 +49,15 @@ final class GpuDriverModel {
         final int kind;
         final String label;
         final boolean external;
+        /** the module id for a module's driver (from the drivers list), else "" */
+        final String module;
 
-        Entry(String id, int kind, String label, boolean external) {
+        Entry(String id, int kind, String label, boolean external, String module) {
             this.id = id;
             this.kind = kind;
             this.label = label;
             this.external = external;
+            this.module = module == null ? "" : module;
         }
     }
 
@@ -95,15 +98,11 @@ final class GpuDriverModel {
     List<Entry> entries() {
         if (mEntries != null) return mEntries;
         List<Entry> list = new ArrayList<>();
-        for (String id : builtins()) list.add(new Entry(id, BUILTIN, null, false));
-        if ("1".equals(prop(PROP_SCAN))) {
-            for (String line : readLines(new File(mBase, "drivers"))) {
-                String[] f = line.split("\t", 4);
-                if (f.length < 4 || !isSlot(f[0]) || find(list, f[0]) != null) continue;
-                boolean external = "external".equals(f[2]);
-                if (!external && (marker(f[0], ".remove").exists() || marker(f[0], ".hide").exists())) continue;
-                list.add(new Entry(f[0], "module".equals(f[1]) ? MODULE : ADDED, f[3], external));
-            }
+        for (String id : builtins()) list.add(new Entry(id, BUILTIN, null, false, null));
+        for (Entry e : listed()) {
+            if (find(list, e.id) != null) continue;
+            if (!e.external && (marker(e.id, ".remove").exists() || marker(e.id, ".hide").exists())) continue;
+            list.add(e);
         }
         String[] staged = mIncoming.list();
         if (staged != null) {
@@ -113,7 +112,7 @@ final class GpuDriverModel {
                 if (!s.startsWith("u_") || !new File(d, "ready").isFile() || find(list, s) != null) continue;
                 String version = info(new File(d, "info"), "version");
                 String name = info(new File(d, "info"), "name");
-                list.add(new Entry(s, STAGED, addedLabel(version, name), false));
+                list.add(new Entry(s, STAGED, addedLabel(version, name), false, null));
             }
         }
         mEntries = list;
@@ -122,6 +121,33 @@ final class GpuDriverModel {
 
     Entry entry(String id) {
         return find(entries(), id);
+    }
+
+    /** The drivers k4-gpu-driver listed this boot (only once sys.k4.gpu_scan=1), including ones Settings has since
+     *  asked to hide or remove: slot, kind, flags, label[, module id]. */
+    private List<Entry> listed() {
+        List<Entry> out = new ArrayList<>();
+        if (!"1".equals(prop(PROP_SCAN))) return out;
+        for (String line : readLines(new File(mBase, "drivers"))) {
+            String[] f = line.split("\t", 5);
+            if (f.length < 4 || !isSlot(f[0]) || find(out, f[0]) != null) continue;
+            out.add(new Entry(f[0], "module".equals(f[1]) ? MODULE : ADDED, f[3], "external".equals(f[2]),
+                    f.length > 4 ? f[4].trim() : ""));
+        }
+        return out;
+    }
+
+    /** Like entry(), but also finds a listed driver that is being hidden or removed (it stays in use until the
+     *  restart, so its label is still the right one to show). */
+    Entry anyEntry(String id) {
+        Entry e = entry(id);
+        return e != null ? e : find(listed(), id);
+    }
+
+    /** The module id behind a module's slot: from the drivers list, else derived from the slot name. */
+    String moduleOf(String slot) {
+        Entry e = anyEntry(slot);
+        return e != null && !e.module.isEmpty() ? e.module : moduleId(slot);
     }
 
     boolean isKnown(String id) {
@@ -228,12 +254,17 @@ final class GpuDriverModel {
     }
 
     static boolean isSlot(String s) {
-        return (s.startsWith("m_") || s.startsWith("u_")) && s.length() > 2 && s.matches("[A-Za-z0-9._-]+");
+        return (s.startsWith("m_") || s.startsWith("u_")) && s.length() > 2 && s.matches("[A-Za-z0-9._+-]+");
     }
 
-    /** "m_some_driver" -> "some_driver" (the module id, as far as the slot name kept it). */
+    /**
+     * "m_some_driver_0249090c" -> "some_driver": k4-gpu-driver names a module's slot m_&lt;id, at most 30 chars&gt;_&lt;8 hex
+     * of the full id&gt;; this is only the fallback when the drivers list does not name the module (moduleOf).
+     */
     static String moduleId(String slot) {
-        return slot.startsWith("m_") ? slot.substring(2) : slot;
+        if (!slot.startsWith("m_")) return slot;
+        String s = slot.substring(2);
+        return s.matches(".+_[0-9a-f]{8}") ? s.substring(0, s.length() - 9) : s;
     }
 
     private File marker(String slot, String suffix) {

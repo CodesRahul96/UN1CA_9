@@ -38,7 +38,7 @@
 # changing the selection; `setprop persist.sys.k4.gpu_reset 1` (settable from adb shell) resets to the stock driver
 # on the next boot.
 #
-# Output: /data/k4gpu/drivers (one line per user driver: slot, kind, flags, label; read by Settings),
+# Output: /data/k4gpu/drivers (one line per user driver: slot, kind, flags, label, module id; read by Settings),
 # sys.k4.gpu_scan=1 when this ran to the end, sys.k4.gpu_user_active, sys.k4.gpu_external, sys.k4.gpu_root,
 # sys.k4.gpu_vendor, sys.k4.gpu_missing, sys.k4.gpu_rejected; sys.k4.gpu_settle (the settle result, readable with
 # getprop); log in /data/k4gpu/boot.log (root:system 0660, settle appends to it) and the kernel log.
@@ -643,12 +643,12 @@ boot() {
     {
         for s in $SLOTS; do
             if [ "$s" = "$ext" ]; then
-                printf '%s\tmodule\texternal\t%s (module %s)\n' "$s" "$visver" "$(clean_name "$extid")"
+                printf '%s\tmodule\texternal\t%s (module %s)\t%s\n' "$s" "$visver" "$(clean_name "$extid")" "$(clean_name "$extid")"
             else
                 i="$STORE/$s/info"
                 case "$s" in
-                    m_*) printf '%s\tmodule\t-\t%s (module %s)\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
-                    u_*) printf '%s\tadded\t-\t%s (added: %s)\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
+                    m_*) printf '%s\tmodule\t-\t%s (module %s)\t%s\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" "$(info_get "$i" name)" ;;
+                    u_*) printf '%s\tadded\t-\t%s (added: %s)\t\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
                 esac
             fi
         done

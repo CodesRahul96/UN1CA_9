@@ -96,7 +96,7 @@
 .end method
 
 .method private confirmRemove(Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;)V
-    .registers 9
+    .registers 10
 
     .line 218
     iget-object v0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverActivity;->mModel:Lio/mesalabs/unica/settings/ui/GpuDriverModel;
@@ -153,14 +153,16 @@
 
     const/4 v4, 0x0
 
-    if-eqz v3, :cond_53
+    if-eqz v3, :cond_55
 
     .line 221
     iget-object v3, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->label:Ljava/lang/String;
 
+    iget-object v5, p0, Lio/mesalabs/unica/settings/ui/GpuDriverActivity;->mModel:Lio/mesalabs/unica/settings/ui/GpuDriverModel;
+
     iget-object p1, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->id:Ljava/lang/String;
 
-    invoke-static {p1}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleId(Ljava/lang/String;)Ljava/lang/String;
+    invoke-virtual {v5, p1}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleOf(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p1
 
@@ -189,24 +191,26 @@
 
     invoke-virtual {p1, v0, v4}, Landroid/app/AlertDialog$Builder;->setPositiveButton(Ljava/lang/CharSequence;Landroid/content/DialogInterface$OnClickListener;)Landroid/app/AlertDialog$Builder;
 
-    goto :goto_bd
+    goto :goto_c1
 
     .line 223
-    :cond_53
+    :cond_55
     iget v3, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
 
     const/4 v5, 0x1
 
     const-string v6, "k4_gpu_driver_cancel"
 
-    if-ne v3, v5, :cond_8b
+    if-ne v3, v5, :cond_8f
 
     .line 224
     iget-object v3, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->label:Ljava/lang/String;
 
-    iget-object v5, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->id:Ljava/lang/String;
+    iget-object v5, p0, Lio/mesalabs/unica/settings/ui/GpuDriverActivity;->mModel:Lio/mesalabs/unica/settings/ui/GpuDriverModel;
 
-    invoke-static {v5}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleId(Ljava/lang/String;)Ljava/lang/String;
+    iget-object v7, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->id:Ljava/lang/String;
+
+    invoke-virtual {v5, v7}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleOf(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v5
 
@@ -250,25 +254,25 @@
 
     invoke-virtual {p1, v0, v4}, Landroid/app/AlertDialog$Builder;->setNegativeButton(Ljava/lang/CharSequence;Landroid/content/DialogInterface$OnClickListener;)Landroid/app/AlertDialog$Builder;
 
-    goto :goto_bd
+    goto :goto_c1
 
     .line 228
-    :cond_8b
+    :cond_8f
     iget v0, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
 
     const/4 v3, 0x3
 
-    if-ne v0, v3, :cond_93
+    if-ne v0, v3, :cond_97
 
     const-string v0, "k4_gpu_driver_remove_staged_msg"
 
-    goto :goto_95
+    goto :goto_99
 
     .line 229
-    :cond_93
+    :cond_97
     const-string v0, "k4_gpu_driver_remove_added_msg"
 
-    :goto_95
+    :goto_99
     iget-object v3, p1, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->label:Ljava/lang/String;
 
     filled-new-array {v3}, [Ljava/lang/Object;
@@ -311,7 +315,7 @@
     invoke-virtual {p1, v0, v4}, Landroid/app/AlertDialog$Builder;->setNegativeButton(Ljava/lang/CharSequence;Landroid/content/DialogInterface$OnClickListener;)Landroid/app/AlertDialog$Builder;
 
     .line 233
-    :goto_bd
+    :goto_c1
     invoke-virtual {v2}, Landroid/app/AlertDialog$Builder;->create()Landroid/app/AlertDialog;
 
     move-result-object p1
@@ -767,7 +771,9 @@
     move-object v1, v0
 
     :goto_2e
-    invoke-static {v0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleId(Ljava/lang/String;)Ljava/lang/String;
+    iget-object v3, p0, Lio/mesalabs/unica/settings/ui/GpuDriverActivity;->mModel:Lio/mesalabs/unica/settings/ui/GpuDriverModel;
+
+    invoke-virtual {v3, v0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleOf(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
 

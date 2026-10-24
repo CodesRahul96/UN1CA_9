@@ -218,10 +218,10 @@ public class GpuDriverActivity extends Activity {
         String root = mModel.root().isEmpty() ? str("k4_gpu_driver_root_unknown") : mModel.root();
         AlertDialog.Builder b = builder().setTitle(str("k4_gpu_driver_remove_title"));
         if (e.external) {
-            b.setMessage(str("k4_gpu_driver_remove_external_msg", e.label, root, GpuDriverModel.moduleId(e.id)))
+            b.setMessage(str("k4_gpu_driver_remove_external_msg", e.label, root, mModel.moduleOf(e.id)))
                     .setPositiveButton(str("k4_gpu_driver_failed_button"), null);
         } else if (e.kind == GpuDriverModel.MODULE) {
-            b.setMessage(str("k4_gpu_driver_remove_module_msg", e.label, root, GpuDriverModel.moduleId(e.id)))
+            b.setMessage(str("k4_gpu_driver_remove_module_msg", e.label, root, mModel.moduleOf(e.id)))
                     .setPositiveButton(str("k4_gpu_driver_remove_hide"), (d, w) -> doRemove(e))
                     .setNegativeButton(str("k4_gpu_driver_cancel"), null);
         } else {
@@ -243,7 +243,7 @@ public class GpuDriverActivity extends Activity {
         String ext = mModel.external();
         GpuDriverModel.Entry e = mModel.entry(ext);
         String root = mModel.root().isEmpty() ? str("k4_gpu_driver_root_unknown") : mModel.root();
-        return str("k4_gpu_driver_locked", e != null ? e.label : ext, root, GpuDriverModel.moduleId(ext));
+        return str("k4_gpu_driver_locked", e != null ? e.label : ext, root, mModel.moduleOf(ext));
     }
 
     private String label(String id) {

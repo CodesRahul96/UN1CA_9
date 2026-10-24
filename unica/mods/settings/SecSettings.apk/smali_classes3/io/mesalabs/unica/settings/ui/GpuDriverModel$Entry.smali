@@ -23,25 +23,35 @@
 
 .field final label:Ljava/lang/String;
 
+.field final module:Ljava/lang/String;
+
 
 # direct methods
-.method constructor <init>(Ljava/lang/String;ILjava/lang/String;Z)V
-    .registers 5
-
-    .line 53
-    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
-
-    .line 54
-    iput-object p1, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->id:Ljava/lang/String;
+.method constructor <init>(Ljava/lang/String;ILjava/lang/String;ZLjava/lang/String;)V
+    .registers 6
 
     .line 55
-    iput p2, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     .line 56
-    iput-object p3, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->label:Ljava/lang/String;
+    iput-object p1, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->id:Ljava/lang/String;
 
     .line 57
+    iput p2, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
+
+    .line 58
+    iput-object p3, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->label:Ljava/lang/String;
+
+    .line 59
     iput-boolean p4, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->external:Z
+
+    if-nez p5, :cond_f
+
+    .line 60
+    const-string p5, ""
+
+    :cond_f
+    iput-object p5, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->module:Ljava/lang/String;
 
     return-void
 .end method

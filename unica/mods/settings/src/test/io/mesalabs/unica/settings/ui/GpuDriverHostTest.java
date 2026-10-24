@@ -221,6 +221,9 @@ public final class GpuDriverHostTest {
         eq("not a slot", GpuDriverModel.isSlot("849"), false);
         eq("not a slot 2", GpuDriverModel.isSlot("m_../x"), false);
         eq("module id", GpuDriverModel.moduleId("m_adreno_x"), "adreno_x");
+        eq("module id without the slot hash", GpuDriverModel.moduleId("m_k4test_adreno849_0249090c"), "k4test_adreno849");
+        eq("an id that merely ends in _ is kept", GpuDriverModel.moduleId("m_drv_v2"), "drv_v2");
+        eq("'+' is a slot character", GpuDriverModel.isSlot("m_drv+gl_0249090c"), true);
     }
 
     static void write(File f, String s) throws IOException {
@@ -318,6 +321,26 @@ public final class GpuDriverHostTest {
         eq("hide", m.remove("m_adreno_x"), true);
         eq("request", new File(base, "incoming/m_adreno_x.hide").exists(), true);
         eq("hidden now", m.isKnown("m_adreno_x"), false);
+
+        section = "model: the module id and label of a driver being hidden (polish 1)";
+        write(new File(base, "drivers"), "m_k4test_adreno849_0249090c\tmodule\t-\tV@0849.0 (module k4test_adreno849)\tk4test_adreno849\n");
+        new File(base, "incoming/m_adreno_x.hide").delete();
+        p.set(GpuDriverModel.PROP_ACTIVE, "m_k4test_adreno849_0249090c");
+        m.reload();
+        eq("module id from the list", m.moduleOf("m_k4test_adreno849_0249090c"), "k4test_adreno849");
+        eq("entry carries it", m.entry("m_k4test_adreno849_0249090c").module, "k4test_adreno849");
+        GpuDriverModel.touch(new File(base, "incoming/m_k4test_adreno849_0249090c.hide"));
+        m.reload();
+        eq("hidden from the list", m.isKnown("m_k4test_adreno849_0249090c"), false);
+        eq("but its label is still known while it is active", m.anyEntry("m_k4test_adreno849_0249090c").label,
+                "V@0849.0 (module k4test_adreno849)");
+        eq("and its module id", m.moduleOf("m_k4test_adreno849_0249090c"), "k4test_adreno849");
+        eq("a slot not in the list falls back to the slot name minus the hash", m.moduleOf("m_other_drv_1234abcd"), "other_drv");
+        new File(base, "incoming/m_k4test_adreno849_0249090c.hide").delete();
+        write(new File(base, "drivers"), "m_adreno_x\tmodule\t-\tV@0744.0 (module adreno_x)\n");
+        p.set(GpuDriverModel.PROP_ACTIVE, "");
+        m.reload();
+        eq("old 4-field lists still parse", m.entry("m_adreno_x").label, "V@0744.0 (module adreno_x)");
         eq("built-ins cannot be removed", m.remove("849"), false);
 
         section = "model: module mounted by the root manager";

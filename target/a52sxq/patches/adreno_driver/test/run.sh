@@ -549,5 +549,15 @@ rm -rf "$R/data/adb/modules/adreno_p"; boot
 eq "module gone: back to prev" "$(prop persist.sys.k4.gpu_driver)" 849
 eq "then prev cleared" "$(prop persist.sys.k4.gpu_prev)" ""
 
+CASE="polish 1: the drivers list names the module id (not the slot) as its 5th field"
+device; ksu_module modules k4test_adreno849 V@0744.0; boot
+sl="$(mslot k4test_adreno849)"
+eq "module line" "$(grep "^$sl	" "$(L)")" "$sl	module	-	V@0744.0 (module k4test_adreno849)	k4test_adreno849"
+device; ksu_module modules adreno_ext V@0744.0
+cp "$R/data/adb/modules/adreno_ext/vendor/lib64/egl/libGLESv2_adreno.so" "$R/vendor/lib64/egl/libGLESv2_adreno.so"; boot
+eq "external line" "$(cut -f 5 "$(L)")" adreno_ext
+device; staged u_0849_0_m V@0849.0 mine; boot
+eq "added line: empty module field" "$(awk -F '\t' '{ print NF ":" $5 }' "$(L)")" "5:"
+
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]

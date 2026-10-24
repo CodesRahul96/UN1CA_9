@@ -206,12 +206,12 @@ public class GpuDriverPreferenceController extends BasePreferenceController
      * driver flashed into /vendor instead; user drivers: the label k4-gpu-driver wrote; unknown slots: "module <id>".
      */
     static String label(Context context, GpuDriverModel model, String id) {
-        GpuDriverModel.Entry e = model.entry(id);
+        GpuDriverModel.Entry e = model.anyEntry(id);
         if (e != null && e.label != null) return e.label;
         if (id.equals(model.defaultDriver()) && !model.vendorVersion().isEmpty()) {
             return string(context, "k4_gpu_driver_label_vendor", model.vendorVersion());
         }
-        if (id.startsWith("m_")) return string(context, "k4_gpu_driver_label_module", GpuDriverModel.moduleId(id));
+        if (id.startsWith("m_")) return string(context, "k4_gpu_driver_label_module", model.moduleOf(id));
         if (id.startsWith("u_")) return string(context, "k4_gpu_driver_label_added");
         try {
             Resources res = context.getResources();
@@ -231,7 +231,7 @@ public class GpuDriverPreferenceController extends BasePreferenceController
 
     private String lockedMessage() {
         String ext = mModel.external();
-        return string("k4_gpu_driver_locked", label(ext), root(), GpuDriverModel.moduleId(ext));
+        return string("k4_gpu_driver_locked", label(ext), root(), mModel.moduleOf(ext));
     }
 
     private String string(String name, Object... args) {
