@@ -42,9 +42,10 @@
 # changing the selection; `setprop persist.sys.k4.gpu_reset 1` (settable from adb shell) resets to the stock driver
 # on the next boot.
 #
-# Output: /data/k4gpu/drivers (one line per user driver: slot, kind, flags, label; read by Settings),
+# Output: /data/k4gpu/drivers (one line per user driver: slot, kind, flags, label, module id; read by Settings),
 # sys.k4.gpu_scan=1 when this ran to the end, sys.k4.gpu_user_active, sys.k4.gpu_external, sys.k4.gpu_root,
-# sys.k4.gpu_vendor, sys.k4.gpu_missing, sys.k4.gpu_rejected; log in /data/k4gpu/boot.log and the kernel log.
+# sys.k4.gpu_vendor, sys.k4.gpu_missing, sys.k4.gpu_rejected; sys.k4.gpu_settle (the settle result, readable with
+# getprop); log in /data/k4gpu/boot.log (root:system 0660, settle appends to it) and the kernel log.
 # Idempotent: a second run on the same boot does nothing (sys.k4.gpu_scan), a run on the next boot only redoes
 # what changed (imports are keyed by the size and mtime of the module's files).
 #
@@ -370,6 +371,9 @@ boot() {
     fi
     mkdir -p "$STORE" "$IN" 2> /dev/null
     : > "$LOGF"
+    # group system may append: settle runs as user system (k4_gpu_settle service). SELinux still limits writers of
+    # k4_gpu_data_file to init and k4gpu (system_app may only read it), so this opens nothing to other system apps.
+    chmod 660 "$LOGF" 2> /dev/null
     log "start (stock $STOCK)"
 
     sel="$(gp ${P}driver)"
@@ -391,6 +395,13 @@ boot() {
         trial=ok
         failed=""
         sp ${P}reset ""
+    fi
+
+    # the stock driver is never on trial (nothing to fall back from): a "pending"/"testing" left on it (older Settings
+    # selected it with a trial) becomes ok, so no 150 s settle runs and no gpu_failed=530 can be recorded
+    if [ "$sel" = "$DEF" ] && { [ "$trial" = pending ] || [ "$trial" = testing ]; }; then
+        log "the stock driver needs no trial"
+        trial=ok
     fi
 
     # a boot with a newly selected driver never settled: same as the rc's early-boot failsafe
@@ -636,17 +647,20 @@ boot() {
     {
         for s in $SLOTS; do
             if [ "$s" = "$ext" ]; then
-                printf '%s\tmodule\texternal\t%s (module %s)\n' "$s" "$visver" "$(clean_name "$extid")"
+                printf '%s\tmodule\texternal\t%s (module %s)\t%s\n' "$s" "$visver" "$(clean_name "$extid")" "$(clean_name "$extid")"
             else
                 i="$STORE/$s/info"
                 case "$s" in
-                    m_*) printf '%s\tmodule\t-\t%s (module %s)\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
-                    u_*) printf '%s\tadded\t-\t%s (added: %s)\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
+                    m_*) printf '%s\tmodule\t-\t%s (module %s)\t%s\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" "$(info_get "$i" name)" ;;
+                    u_*) printf '%s\tadded\t-\t%s (added: %s)\t\n' "$s" "$(info_get "$i" version)" "$(info_get "$i" name)" ;;
                 esac
             fi
         done
     } > "$LIST.new" && chmod 644 "$LIST.new" && mv "$LIST.new" "$LIST"
 
+    # "previous choice" is only kept while it differs from the current one (it is where a vanished module falls
+    # back to); equal to the selection it carries nothing, so it is cleared
+    [ "$prev" = "$sel" ] && prev=""
     spc ${P}driver "$sel"
     spc ${P}trial "$trial"
     spc ${P}failed "$failed"
@@ -681,22 +695,33 @@ space_ok() {
 # crashes inside the window, the trial stays "testing" and the next boot reverts to the stock driver (failsafe).
 settle() {
     [ "$(gp ${P}trial)" = testing ] || return 0
+    # the stock driver is never on trial (boot normally turns that into ok first; this covers a boot where it did not)
+    if [ "$(gp ${P}driver)" = "$DEF" ]; then
+        spc ${P}trial ok
+        sp ${S}settle "ok: stock driver, no trial"
+        log "settle: the stock driver needs no trial, trial ok"
+        return 0
+    fi
     window="${1:-150}"
+    sp ${S}settle "running: ${window}s window for $(gp ${P}driver)"
+    log "settle: ${window}s window for $(gp ${P}driver)"
     step="${K4GPU_SLEEP:-10}"
     base_count="$(gp sys.system_server.start_count)"
     waited=0
     while [ "$waited" -lt "$window" ]; do
         sleep "$step"
         waited=$((waited + 10))
-        [ "$(gp sys.boot_completed)" = 1 ] || return 0
+        [ "$(gp sys.boot_completed)" = 1 ] || { sp ${S}settle "stopped: boot_completed cleared, trial stays testing"; return 0; }
         c="$(gp sys.system_server.start_count)"
         [ -z "$base_count" ] || [ -z "$c" ] || [ "$c" = "$base_count" ] || {
+            sp ${S}settle "failed: system_server restarted ($base_count -> $c), trial stays testing"
             log "settle: system_server restarted ($base_count -> $c), trial stays testing"
             return 0
         }
     done
-    [ "$(gp ${P}trial)" = testing ] || return 0
+    [ "$(gp ${P}trial)" = testing ] || { sp ${S}settle "skipped: trial changed during the window"; return 0; }
     spc ${P}trial ok
+    sp ${S}settle "ok: ${window}s stable"
     log "settle: ${window}s stable, trial ok"
 }
 

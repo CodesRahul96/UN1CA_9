@@ -96,7 +96,7 @@
     .line 209
     const-string v0, "array"
 
-    invoke-virtual {p1, p2}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->entry(Ljava/lang/String;)Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;
+    invoke-virtual {p1, p2}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->anyEntry(Ljava/lang/String;)Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;
 
     move-result-object v1
 
@@ -152,15 +152,15 @@
 
     .line 214
     :cond_32
-    const-string p1, "m_"
+    const-string v1, "m_"
 
-    invoke-virtual {p2, p1}, Ljava/lang/String;->startsWith(Ljava/lang/String;)Z
+    invoke-virtual {p2, v1}, Ljava/lang/String;->startsWith(Ljava/lang/String;)Z
 
-    move-result p1
+    move-result v1
 
-    if-eqz p1, :cond_49
+    if-eqz v1, :cond_49
 
-    invoke-static {p2}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleId(Ljava/lang/String;)Ljava/lang/String;
+    invoke-virtual {p1, p2}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleOf(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p1
 
@@ -299,7 +299,7 @@
 .end method
 
 .method private lockedMessage()Ljava/lang/String;
-    .registers 4
+    .registers 5
 
     .line 233
     iget-object v0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverPreferenceController;->mModel:Lio/mesalabs/unica/settings/ui/GpuDriverModel;
@@ -317,7 +317,9 @@
 
     move-result-object v2
 
-    invoke-static {v0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleId(Ljava/lang/String;)Ljava/lang/String;
+    iget-object v3, p0, Lio/mesalabs/unica/settings/ui/GpuDriverPreferenceController;->mModel:Lio/mesalabs/unica/settings/ui/GpuDriverModel;
+
+    invoke-virtual {v3, v0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->moduleOf(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
 

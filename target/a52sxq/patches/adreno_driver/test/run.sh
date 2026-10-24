@@ -505,5 +505,59 @@ device; for i in 1 2 3 4 5 6; do ksu_module modules "big$i" V@0744.0; done; boot
 imp="$(grep -c imported "$R/data/k4gpu/boot.log")"
 [ "$imp" -le 4 ] && ok || bad "imported $imp new modules in one boot (cap is 4)"
 
+CASE="polish 3: the stock driver is never on trial (pending left by an older Settings)"
+device; setp persist.sys.k4.gpu_driver 530; setp persist.sys.k4.gpu_trial pending; boot
+eq "trial ok" "$(prop persist.sys.k4.gpu_trial)" ok
+rc_early_boot
+eq "rc does not turn it into testing" "$(prop persist.sys.k4.gpu_trial)" ok
+
+CASE="polish 3: testing left on the stock driver records no failure"
+device; setp persist.sys.k4.gpu_driver 530; setp persist.sys.k4.gpu_trial testing; boot
+eq "trial ok" "$(prop persist.sys.k4.gpu_trial)" ok
+eq "no gpu_failed=530" "$(prop persist.sys.k4.gpu_failed)" ""
+
+CASE="polish 3: settle on the stock driver promotes at once (no 150 s window)"
+device
+printf 'persist.sys.k4.gpu_driver=530\npersist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\n' > "$T/props"
+K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=5 timeout 4 "$SH" "$SCRIPT" settle 150 > /dev/null 2>&1
+eq "ok without waiting" "$(prop persist.sys.k4.gpu_trial)" ok
+
+CASE="polish 2: boot.log is group-writable so settle (user system) can append its result"
+device; boot
+eq "boot.log mode" "$(stat -c %a "$R/data/k4gpu/boot.log")" 660
+
+CASE="polish 2: settle writes its result to boot.log and sys.k4.gpu_settle"
+device; boot
+printf 'persist.sys.k4.gpu_driver=u_x\npersist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\nsys.system_server.start_count=1\n' > "$T/props"
+K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=0 "$SH" "$SCRIPT" settle 20 > /dev/null 2>&1
+has "result in boot.log" "settle: 20s stable, trial ok" "$R/data/k4gpu/boot.log"
+eq "status prop" "$(prop sys.k4.gpu_settle)" "ok: 20s stable"
+printf 'persist.sys.k4.gpu_driver=u_x\npersist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\nsys.system_server.start_count=1\n' > "$T/props"
+( K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=0.3 "$SH" "$SCRIPT" settle 500 > /dev/null 2>&1 ) &
+SPID=$!
+sleep 0.5; setp sys.system_server.start_count 2
+wait $SPID
+has "crash result in boot.log" "system_server restarted (1 -> 2)" "$R/data/k4gpu/boot.log"
+eq "crash status prop" "$(prop sys.k4.gpu_settle)" "failed: system_server restarted (1 -> 2), trial stays testing"
+
+CASE="polish 4: persist.sys.k4.gpu_prev is cleared when it equals the current choice"
+device; setp persist.sys.k4.gpu_prev 530; boot
+eq "prev cleared (530 == 530)" "$(prop persist.sys.k4.gpu_prev)" ""
+device; ksu_module modules adreno_p V@0744.0; setp persist.sys.k4.gpu_driver 849; boot
+eq "prev kept while it differs (module auto-selected, prev 849)" "$(prop persist.sys.k4.gpu_prev)" 849
+rm -rf "$R/data/adb/modules/adreno_p"; boot
+eq "module gone: back to prev" "$(prop persist.sys.k4.gpu_driver)" 849
+eq "then prev cleared" "$(prop persist.sys.k4.gpu_prev)" ""
+
+CASE="polish 1: the drivers list names the module id (not the slot) as its 5th field"
+device; ksu_module modules k4test_adreno849 V@0744.0; boot
+sl="$(mslot k4test_adreno849)"
+eq "module line" "$(grep "^$sl	" "$(L)")" "$sl	module	-	V@0744.0 (module k4test_adreno849)	k4test_adreno849"
+device; ksu_module modules adreno_ext V@0744.0
+cp "$R/data/adb/modules/adreno_ext/vendor/lib64/egl/libGLESv2_adreno.so" "$R/vendor/lib64/egl/libGLESv2_adreno.so"; boot
+eq "external line" "$(cut -f 5 "$(L)")" adreno_ext
+device; staged u_0849_0_m V@0849.0 mine; boot
+eq "added line: empty module field" "$(awk -F '\t' '{ print NF ":" $5 }' "$(L)")" "5:"
+
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]
