@@ -175,13 +175,16 @@ final class GpuDriverModel {
         return false;
     }
 
-    /** Selects a driver for the next boot (with a trial boot unless it is already active); false if refused. */
+    /**
+     * Selects a driver for the next boot, with a trial boot unless it is already active or it is the stock (default)
+     * driver - the stock driver is what the failsafe falls back to, so it is never on trial. False if refused.
+     */
     boolean select(String id) {
         if (!isKnown(id)) return false;
         String ext = external();
         if (!ext.isEmpty() && !ext.equals(id)) return false;
         mProps.set(PROP_SELECTED, id);
-        mProps.set(PROP_TRIAL, id.equals(active()) ? "ok" : "pending");
+        mProps.set(PROP_TRIAL, id.equals(active()) || id.equals(defaultDriver()) ? "ok" : "pending");
         mProps.set(PROP_FAILED, "");
         return true;
     }

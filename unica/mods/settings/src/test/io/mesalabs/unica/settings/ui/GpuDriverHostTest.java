@@ -259,6 +259,11 @@ public final class GpuDriverHostTest {
         eq("select active", m.select("530"), true);
         eq("trial ok for the active one", p.get(GpuDriverModel.PROP_TRIAL), "ok");
         eq("unknown refused", m.select("999"), false);
+        p.set(GpuDriverModel.PROP_ACTIVE, "849");
+        eq("select stock while 849 is active", m.select("530"), true);
+        eq("the stock driver is never on trial", p.get(GpuDriverModel.PROP_TRIAL), "ok");
+        eq("a built-in other than stock is", m.select("863") && "pending".equals(p.get(GpuDriverModel.PROP_TRIAL)), true);
+        p.set(GpuDriverModel.PROP_ACTIVE, "");
 
         section = "model: user drivers listed only after the boot scan";
         write(new File(base, "drivers"), "m_adreno_x\tmodule\t-\tV@0744.0 (module adreno_x)\n"
@@ -306,7 +311,8 @@ public final class GpuDriverHostTest {
         eq("request", new File(base, "incoming/u_0849_0_k3.remove").exists(), true);
         eq("hidden now", m.isKnown("u_0849_0_k3"), false);
         eq("prev is itself: default", p.get(GpuDriverModel.PROP_SELECTED), "530");
-        eq("restart needed", p.get(GpuDriverModel.PROP_TRIAL), "pending");
+        eq("the stock driver gets no trial", p.get(GpuDriverModel.PROP_TRIAL), "ok");
+        eq("restart still needed (selected != active)", m.selected().equals(m.active()), false);
 
         section = "model: hide a module's driver";
         eq("hide", m.remove("m_adreno_x"), true);

@@ -505,5 +505,22 @@ device; for i in 1 2 3 4 5 6; do ksu_module modules "big$i" V@0744.0; done; boot
 imp="$(grep -c imported "$R/data/k4gpu/boot.log")"
 [ "$imp" -le 4 ] && ok || bad "imported $imp new modules in one boot (cap is 4)"
 
+CASE="polish 3: the stock driver is never on trial (pending left by an older Settings)"
+device; setp persist.sys.k4.gpu_driver 530; setp persist.sys.k4.gpu_trial pending; boot
+eq "trial ok" "$(prop persist.sys.k4.gpu_trial)" ok
+rc_early_boot
+eq "rc does not turn it into testing" "$(prop persist.sys.k4.gpu_trial)" ok
+
+CASE="polish 3: testing left on the stock driver records no failure"
+device; setp persist.sys.k4.gpu_driver 530; setp persist.sys.k4.gpu_trial testing; boot
+eq "trial ok" "$(prop persist.sys.k4.gpu_trial)" ok
+eq "no gpu_failed=530" "$(prop persist.sys.k4.gpu_failed)" ""
+
+CASE="polish 3: settle on the stock driver promotes at once (no 150 s window)"
+device
+printf 'persist.sys.k4.gpu_driver=530\npersist.sys.k4.gpu_trial=testing\nsys.boot_completed=1\n' > "$T/props"
+K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null K4GPU_SLEEP=5 timeout 4 "$SH" "$SCRIPT" settle 150 > /dev/null 2>&1
+eq "ok without waiting" "$(prop persist.sys.k4.gpu_trial)" ok
+
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]

@@ -389,6 +389,13 @@ boot() {
         sp ${P}reset ""
     fi
 
+    # the stock driver is never on trial (nothing to fall back from): a "pending"/"testing" left on it (older Settings
+    # selected it with a trial) becomes ok, so no 150 s settle runs and no gpu_failed=530 can be recorded
+    if [ "$sel" = "$DEF" ] && { [ "$trial" = pending ] || [ "$trial" = testing ]; }; then
+        log "the stock driver needs no trial"
+        trial=ok
+    fi
+
     # a boot with a newly selected driver never settled: same as the rc's early-boot failsafe
     if [ "$trial" = testing ]; then
         log "previous boot with $sel never settled: back to V@0$DEF"
@@ -677,6 +684,12 @@ space_ok() {
 # crashes inside the window, the trial stays "testing" and the next boot reverts to the stock driver (failsafe).
 settle() {
     [ "$(gp ${P}trial)" = testing ] || return 0
+    # the stock driver is never on trial (boot normally turns that into ok first; this covers a boot where it did not)
+    if [ "$(gp ${P}driver)" = "$DEF" ]; then
+        spc ${P}trial ok
+        log "settle: the stock driver needs no trial, trial ok"
+        return 0
+    fi
     window="${1:-150}"
     step="${K4GPU_SLEEP:-10}"
     base_count="$(gp sys.system_server.start_count)"

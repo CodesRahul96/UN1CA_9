@@ -92,7 +92,7 @@
 .method static addedLabel(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
     .registers 3
 
-    .line 224
+    .line 227
     new-instance v0, Ljava/lang/StringBuilder;
 
     invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
@@ -119,7 +119,7 @@
 .method static deleteTree(Ljava/io/File;)Z
     .registers 6
 
-    .line 279
+    .line 282
     invoke-virtual {p0}, Ljava/io/File;->isDirectory()Z
 
     move-result v0
@@ -140,7 +140,7 @@
 
     if-eqz v0, :cond_1b
 
-    .line 280
+    .line 283
     array-length v2, v0
 
     move v3, v1
@@ -156,7 +156,7 @@
 
     goto :goto_11
 
-    .line 281
+    .line 284
     :cond_1b
     invoke-virtual {p0}, Ljava/io/File;->delete()Z
 
@@ -200,7 +200,7 @@
 
     if-eqz p1, :cond_23
 
-    .line 246
+    .line 249
     invoke-virtual {p1}, Ljava/lang/String;->isEmpty()Z
 
     move-result v1
@@ -209,7 +209,7 @@
 
     goto :goto_23
 
-    .line 247
+    .line 250
     :cond_a
     invoke-interface {p0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
@@ -246,7 +246,7 @@
 .method static info(Ljava/io/File;Ljava/lang/String;)Ljava/lang/String;
     .registers 5
 
-    .line 252
+    .line 255
     invoke-static {p0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->readLines(Ljava/io/File;)Ljava/util/List;
 
     move-result-object p0
@@ -268,7 +268,7 @@
 
     check-cast v0, Ljava/lang/String;
 
-    .line 253
+    .line 256
     new-instance v1, Ljava/lang/StringBuilder;
 
     invoke-direct {v1}, Ljava/lang/StringBuilder;-><init>()V
@@ -301,7 +301,7 @@
 
     return-object p0
 
-    .line 255
+    .line 258
     :cond_36
     const-string p0, ""
 
@@ -311,7 +311,7 @@
 .method static isSlot(Ljava/lang/String;)Z
     .registers 3
 
-    .line 228
+    .line 231
     const-string v0, "m_"
 
     invoke-virtual {p0, v0}, Ljava/lang/String;->startsWith(Ljava/lang/String;)Z
@@ -358,7 +358,7 @@
 .method private marker(Ljava/lang/String;Ljava/lang/String;)Ljava/io/File;
     .registers 5
 
-    .line 237
+    .line 240
     new-instance v0, Ljava/io/File;
 
     iget-object p0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->mIncoming:Ljava/io/File;
@@ -383,7 +383,7 @@
 .method static moduleId(Ljava/lang/String;)Ljava/lang/String;
     .registers 2
 
-    .line 233
+    .line 236
     const-string v0, "m_"
 
     invoke-virtual {p0, v0}, Ljava/lang/String;->startsWith(Ljava/lang/String;)Z
@@ -405,7 +405,7 @@
 .method private prop(Ljava/lang/String;)Ljava/lang/String;
     .registers 2
 
-    .line 241
+    .line 244
     iget-object p0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->mProps:Lio/mesalabs/unica/settings/ui/GpuDriverModel$Props;
 
     invoke-interface {p0, p1}, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Props;->get(Ljava/lang/String;)Ljava/lang/String;
@@ -414,7 +414,7 @@
 
     if-nez p0, :cond_b
 
-    .line 242
+    .line 245
     const-string p0, ""
 
     return-object p0
@@ -440,12 +440,12 @@
         }
     .end annotation
 
-    .line 259
+    .line 262
     new-instance v0, Ljava/util/ArrayList;
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
-    .line 260
+    .line 263
     invoke-virtual {p0}, Ljava/io/File;->isFile()Z
 
     move-result v1
@@ -454,7 +454,7 @@
 
     goto :goto_3d
 
-    .line 261
+    .line 264
     :cond_c
     :try_start_c
     new-instance v1, Ljava/io/BufferedReader;
@@ -473,7 +473,7 @@
     :try_end_1d
     .catch Ljava/io/IOException; {:try_start_c .. :try_end_1d} :catch_3d
 
-    .line 263
+    .line 266
     :goto_1d
     :try_start_1d
     invoke-virtual {v1}, Ljava/io/BufferedReader;->readLine()Ljava/lang/String;
@@ -496,7 +496,7 @@
 
     goto :goto_1d
 
-    .line 264
+    .line 267
     :cond_2f
     :try_start_2f
     invoke-virtual {v1}, Ljava/io/BufferedReader;->close()V
@@ -508,7 +508,7 @@
     :catchall_33
     move-exception p0
 
-    .line 261
+    .line 264
     :try_start_34
     invoke-virtual {v1}, Ljava/io/BufferedReader;->close()V
     :try_end_37
@@ -535,7 +535,7 @@
 .method static touch(Ljava/io/File;)Z
     .registers 2
 
-    .line 271
+    .line 274
     :try_start_0
     new-instance v0, Ljava/io/FileOutputStream;
 
@@ -681,12 +681,12 @@
 .method duplicateOf(Ljava/lang/String;Ljava/lang/String;)Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;
     .registers 5
 
-    .line 215
+    .line 218
     invoke-static {p1, p2}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->addedLabel(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p1
 
-    .line 216
+    .line 219
     invoke-virtual {p0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->entries()Ljava/util/List;
 
     move-result-object p0
@@ -708,7 +708,7 @@
 
     check-cast p2, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;
 
-    .line 217
+    .line 220
     iget v0, p2, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
 
     const/4 v1, 0x2
@@ -1241,7 +1241,7 @@
 .method remove(Ljava/lang/String;)Z
     .registers 7
 
-    .line 195
+    .line 198
     invoke-virtual {p0, p1}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->entry(Ljava/lang/String;)Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;
 
     move-result-object v0
@@ -1250,7 +1250,7 @@
 
     if-eqz v0, :cond_60
 
-    .line 196
+    .line 199
     iget v2, v0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
 
     if-eqz v2, :cond_60
@@ -1261,7 +1261,7 @@
 
     goto :goto_60
 
-    .line 198
+    .line 201
     :cond_10
     iget v2, v0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
 
@@ -1271,7 +1271,7 @@
 
     if-ne v2, v3, :cond_22
 
-    .line 199
+    .line 202
     new-instance v0, Ljava/io/File;
 
     iget-object v2, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->mIncoming:Ljava/io/File;
@@ -1284,7 +1284,7 @@
 
     goto :goto_33
 
-    .line 201
+    .line 204
     :cond_22
     iget v0, v0, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Entry;->kind:I
 
@@ -1311,7 +1311,7 @@
 
     return v1
 
-    .line 204
+    .line 207
     :cond_36
     const-string v0, "persist.sys.k4.gpu_driver"
 
@@ -1325,19 +1325,19 @@
 
     const/4 v1, 0x0
 
-    .line 205
+    .line 208
     iput-object v1, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->mEntries:Ljava/util/List;
 
     if-eqz v0, :cond_5f
 
-    .line 207
+    .line 210
     const-string v0, "persist.sys.k4.gpu_prev"
 
     invoke-direct {p0, v0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->prop(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
 
-    .line 208
+    .line 211
     invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
     move-result p1
@@ -1408,7 +1408,7 @@
 .method select(Ljava/lang/String;)Z
     .registers 5
 
-    .line 180
+    .line 183
     invoke-virtual {p0, p1}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->isKnown(Ljava/lang/String;)Z
 
     move-result v0
@@ -1419,13 +1419,13 @@
 
     return v1
 
-    .line 181
+    .line 184
     :cond_8
     invoke-virtual {p0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->external()Ljava/lang/String;
 
     move-result-object v0
 
-    .line 182
+    .line 185
     invoke-virtual {v0}, Ljava/lang/String;->isEmpty()Z
 
     move-result v2
@@ -1440,7 +1440,7 @@
 
     return v1
 
-    .line 183
+    .line 186
     :cond_19
     iget-object v0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->mProps:Lio/mesalabs/unica/settings/ui/GpuDriverModel$Props;
 
@@ -1448,7 +1448,7 @@
 
     invoke-interface {v0, v1, p1}, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Props;->set(Ljava/lang/String;Ljava/lang/String;)V
 
-    .line 184
+    .line 187
     iget-object v0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->mProps:Lio/mesalabs/unica/settings/ui/GpuDriverModel$Props;
 
     invoke-virtual {p0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->active()Ljava/lang/String;
@@ -1457,23 +1457,37 @@
 
     invoke-virtual {p1, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
+    move-result v1
+
+    if-nez v1, :cond_3a
+
+    invoke-virtual {p0}, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->defaultDriver()Ljava/lang/String;
+
+    move-result-object v1
+
+    invoke-virtual {p1, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
     move-result p1
 
-    if-eqz p1, :cond_2f
+    if-eqz p1, :cond_37
 
-    const-string p1, "ok"
+    goto :goto_3a
 
-    goto :goto_31
-
-    :cond_2f
+    :cond_37
     const-string p1, "pending"
 
-    :goto_31
+    goto :goto_3c
+
+    :cond_3a
+    :goto_3a
+    const-string p1, "ok"
+
+    :goto_3c
     const-string v1, "persist.sys.k4.gpu_trial"
 
     invoke-interface {v0, v1, p1}, Lio/mesalabs/unica/settings/ui/GpuDriverModel$Props;->set(Ljava/lang/String;Ljava/lang/String;)V
 
-    .line 185
+    .line 188
     iget-object p0, p0, Lio/mesalabs/unica/settings/ui/GpuDriverModel;->mProps:Lio/mesalabs/unica/settings/ui/GpuDriverModel$Props;
 
     const-string p1, "persist.sys.k4.gpu_failed"
