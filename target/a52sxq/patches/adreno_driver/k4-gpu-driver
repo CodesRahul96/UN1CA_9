@@ -258,7 +258,9 @@ install_set() {
         cp "$2/firmware/a660_sqe.fw" "$t/firmware/" || return 1
     fi
     chown -R 0:0 "$t" 2> /dev/null
-    find "$t" -type d -exec chmod 755 {} + && find "$t" -type f -exec chmod 644 {} + || return 1
+    # toybox find -exec opens the working directory, which is / (rootfs) when init starts this script and k4gpu may
+    # not read it ("copy failed" on device for every added/module driver): run both from inside the slot.
+    (cd "$t" && find . -type d -exec chmod 755 {} + && find . -type f -exec chmod 644 {} +) || return 1
     label_set "$t" || return 1
     v="$(ver_of "$t/egl/libGLESv2_adreno.so")"
     {
