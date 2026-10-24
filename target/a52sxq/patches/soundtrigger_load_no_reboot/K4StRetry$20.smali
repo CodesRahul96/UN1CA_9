@@ -30,7 +30,7 @@
         }
     .end annotation
 
-    .line 1001
+    .line 1002
     iput-wide p1, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$until:J
 
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
@@ -43,11 +43,11 @@
 .method public run()V
     .registers 3
 
-    .line 1004
+    .line 1005
     iget-wide v0, p0, Lcom/k4/soundtrigger/K4StRetry$20;->val$until:J
 
     invoke-static {v0, v1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smacquire(J)V
 
-    .line 1005
+    .line 1006
     return-void
 .end method

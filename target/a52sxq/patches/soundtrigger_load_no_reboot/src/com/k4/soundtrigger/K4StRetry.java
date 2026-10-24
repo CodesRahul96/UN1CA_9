@@ -495,8 +495,9 @@ public final class K4StRetry {
         }
         for (Hung h : deferred) {
             Slog.e(TAG, "sound trigger HAL call still running after " + WATCHDOG_MS + " ms during a call ("
-                    + callState(mode) + "): NOT rebooting the audio HAL (shared with call audio); rebooting it after the call"
-                    + " if the call into the HAL is still hung", h.where);
+                    + callState(mode) + "): NOT rebooting the audio HAL (shared with call audio); rebooting it " + (CALL_END_DELAY_MS / 1000)
+                    + " s after the call if the call into the HAL is still hung, or at once if it is still hung "
+                    + ((HUNG_IN_CALL_MAX_MS + WATCHDOG_MS) / 1000) + " s after it started (dead HAL)", h.where);
         }
         if (!deferred.isEmpty()) {
             if (!sHandler.hasCallbacks(CHECK_HUNG_MAX)) sHandler.postDelayed(CHECK_HUNG_MAX, HUNG_IN_CALL_MAX_MS);

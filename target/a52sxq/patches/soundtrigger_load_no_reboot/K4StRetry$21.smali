@@ -32,7 +32,7 @@
         }
     .end annotation
 
-    .line 1041
+    .line 1042
     iput-object p1, p0, Lcom/k4/soundtrigger/K4StRetry$21;->val$cbs:Ljava/util/List;
 
     iput-object p2, p0, Lcom/k4/soundtrigger/K4StRetry$21;->val$reason:Ljava/lang/String;
@@ -47,7 +47,7 @@
 .method public run()V
     .registers 5
 
-    .line 1044
+    .line 1045
     iget-object v0, p0, Lcom/k4/soundtrigger/K4StRetry$21;->val$cbs:Ljava/util/List;
 
     invoke-interface {v0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
@@ -67,7 +67,7 @@
 
     check-cast v1, Lcom/android/server/soundtrigger_middleware/ISoundTriggerHal$GlobalCallback;
 
-    .line 1045
+    .line 1046
     iget-object v2, p0, Lcom/k4/soundtrigger/K4StRetry$21;->val$reason:Ljava/lang/String;
 
     new-instance v3, Ljava/lang/StringBuilder;
@@ -92,29 +92,29 @@
 
     invoke-static {v3, v2}, Landroid/util/Slog;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 1047
+    .line 1048
     :try_start_2c
     invoke-interface {v1}, Lcom/android/server/soundtrigger_middleware/ISoundTriggerHal$GlobalCallback;->onResourcesAvailable()V
     :try_end_2f
     .catchall {:try_start_2c .. :try_end_2f} :catchall_30
 
-    .line 1050
+    .line 1051
     goto :goto_36
 
-    .line 1048
+    .line 1049
     :catchall_30
     move-exception v1
 
-    .line 1049
+    .line 1050
     const-string v2, "onResourcesAvailable failed"
 
     invoke-static {v3, v2, v1}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 1051
+    .line 1052
     :goto_36
     goto :goto_6
 
-    .line 1052
+    .line 1053
     :cond_37
     return-void
 .end method
