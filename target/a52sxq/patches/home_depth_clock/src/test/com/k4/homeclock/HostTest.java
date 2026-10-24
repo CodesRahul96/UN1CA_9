@@ -413,6 +413,9 @@ public final class HostTest {
         TestClock plain = new TestClock(c, hp, false);
         KeyguardWatch.locked = true;
         check("home-only: shown while the engine is home-only (keyguard not consulted)", plain.showing());
+        home.preview = true;
+        check("home-only: hidden in a preview engine", !plain.showing());
+        home.preview = false;
         home.which = 3;
         check("home-only: hidden once the engine also shows the lock screen", !plain.showing());
         home.which = 2;

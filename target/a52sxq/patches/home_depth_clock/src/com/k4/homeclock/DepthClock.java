@@ -43,8 +43,9 @@ abstract class DepthClock extends i3.j {
      * Whether a draw now shows the clock.
      * Home-only presenter (HomeClockPresenter, not gated): its wallpaper is never the lock screen's, and LayeredEngine
      * rebuilds the engine at once when it becomes one (onWhichChanged 1 -> 3: stopSelf); until that has happened, and for
-     * any engine that no longer shows the home screen alone, nothing is drawn. An engine not found keeps the clock (the
-     * presenter is only ever made for a home-only engine).
+     * any engine that no longer shows the home screen alone, nothing is drawn; nor in a preview engine (picker / editor
+     * previews never show the clock). An engine not found keeps the clock (the presenter is only ever made for a
+     * home-only engine).
      * Gated (shared home+lock instance): only while the keyguard is known to be gone (KeyguardWatch, locked until
      * known), the engine is found, is no preview (wallpaper picker / editor / Wallpaper and style previews have no
      * keyguard to go by and may show the lock screen), still has the home flag and its display state is ON (not NONE,
@@ -55,7 +56,7 @@ abstract class DepthClock extends i3.j {
             h3.a p = owner.get();
             f3.a e = p == null ? null : HomeDepthClock.engineOf(p);
             if (!gated) {
-                return e == null || (e.getWhich() & 3) == 1;
+                return e == null || ((e.getWhich() & 3) == 1 && !e.isPreview());
             }
             if (KeyguardWatch.locked || e == null || e.isPreview() || (e.getWhich() & 1) == 0) {
                 return false;

@@ -53,7 +53,7 @@
 .method static luminance(Landroid/graphics/Bitmap;IIII)F
     .registers 15
 
-    .line 91
+    .line 92
     const/high16 v0, -0x40800000    # -1.0f
 
     if-eqz p0, :cond_81
@@ -74,7 +74,7 @@
 
     goto/16 :goto_81
 
-    .line 94
+    .line 95
     :cond_14
     const/4 v1, 0x0
 
@@ -82,12 +82,12 @@
 
     move-result p1
 
-    .line 95
+    .line 96
     invoke-static {v1, p2}, Ljava/lang/Math;->max(II)I
 
     move-result p2
 
-    .line 96
+    .line 97
     invoke-virtual {p0}, Landroid/graphics/Bitmap;->getWidth()I
 
     move-result v2
@@ -98,7 +98,7 @@
 
     move-result p3
 
-    .line 97
+    .line 98
     invoke-virtual {p0}, Landroid/graphics/Bitmap;->getHeight()I
 
     move-result v2
@@ -109,21 +109,21 @@
 
     move-result p4
 
-    .line 98
+    .line 99
     if-le p3, p1, :cond_80
 
     if-gt p4, p2, :cond_36
 
     goto :goto_80
 
-    .line 101
+    .line 102
     :cond_36
     nop
 
-    .line 102
+    .line 103
     nop
 
-    .line 103
+    .line 104
     const/4 v0, 0x0
 
     move v2, v1
@@ -135,7 +135,7 @@
 
     if-ge v2, v4, :cond_7d
 
-    .line 104
+    .line 105
     sub-int v4, p4, p2
 
     mul-int/2addr v4, v2
@@ -144,7 +144,7 @@
 
     add-int/2addr v4, p2
 
-    .line 105
+    .line 106
     move v5, v1
 
     :goto_46
@@ -152,7 +152,7 @@
 
     if-ge v5, v6, :cond_7a
 
-    .line 106
+    .line 107
     sub-int v6, p3, p1
 
     mul-int/2addr v6, v5
@@ -165,7 +165,7 @@
 
     move-result v6
 
-    .line 107
+    .line 108
     invoke-static {v6}, Landroid/graphics/Color;->red(I)I
 
     move-result v7
@@ -206,21 +206,21 @@
 
     add-float/2addr v0, v7
 
-    .line 108
+    .line 109
     add-int/lit8 v3, v3, 0x1
 
-    .line 105
+    .line 106
     add-int/lit8 v5, v5, 0x1
 
     goto :goto_46
 
-    .line 103
+    .line 104
     :cond_7a
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_3b
 
-    .line 111
+    .line 112
     :cond_7d
     int-to-float p0, v3
 
@@ -228,12 +228,12 @@
 
     return v0
 
-    .line 99
+    .line 100
     :cond_80
     :goto_80
     return v0
 
-    .line 92
+    .line 93
     :cond_81
     :goto_81
     return v0
@@ -242,7 +242,7 @@
 .method static meanColor(Landroid/graphics/Bitmap;IIII)I
     .registers 22
 
-    .line 116
+    .line 117
     move-object/from16 v0, p0
 
     const/4 v1, 0x0
@@ -267,7 +267,7 @@
 
     goto/16 :goto_9a
 
-    .line 119
+    .line 120
     :cond_17
     move/from16 v2, p1
 
@@ -275,14 +275,14 @@
 
     move-result v2
 
-    .line 120
+    .line 121
     move/from16 v3, p2
 
     invoke-static {v1, v3}, Ljava/lang/Math;->max(II)I
 
     move-result v3
 
-    .line 121
+    .line 122
     invoke-virtual {v0}, Landroid/graphics/Bitmap;->getWidth()I
 
     move-result v4
@@ -295,7 +295,7 @@
 
     move-result v4
 
-    .line 122
+    .line 123
     invoke-virtual {v0}, Landroid/graphics/Bitmap;->getHeight()I
 
     move-result v5
@@ -308,7 +308,7 @@
 
     move-result v5
 
-    .line 123
+    .line 124
     if-le v4, v2, :cond_95
 
     if-gt v5, v3, :cond_42
@@ -317,14 +317,14 @@
 
     goto :goto_97
 
-    .line 126
+    .line 127
     :cond_42
     nop
 
-    .line 127
+    .line 128
     nop
 
-    .line 128
+    .line 129
     const-wide/16 v6, 0x0
 
     move v12, v1
@@ -340,7 +340,7 @@
 
     if-ge v12, v14, :cond_89
 
-    .line 129
+    .line 130
     sub-int v14, v5, v3
 
     mul-int/2addr v14, v12
@@ -349,7 +349,7 @@
 
     add-int/2addr v14, v3
 
-    .line 130
+    .line 131
     move v15, v1
 
     :goto_55
@@ -359,7 +359,7 @@
 
     if-ge v15, v1, :cond_82
 
-    .line 131
+    .line 132
     sub-int v1, v4, v2
 
     mul-int/2addr v1, v15
@@ -372,7 +372,7 @@
 
     move-result v1
 
-    .line 132
+    .line 133
     invoke-static {v1}, Landroid/graphics/Color;->red(I)I
 
     move-result v0
@@ -383,7 +383,7 @@
 
     add-long/2addr v6, v0
 
-    .line 133
+    .line 134
     invoke-static/range {p1 .. p1}, Landroid/graphics/Color;->green(I)I
 
     move-result v0
@@ -392,7 +392,7 @@
 
     add-long/2addr v8, v0
 
-    .line 134
+    .line 135
     invoke-static/range {p1 .. p1}, Landroid/graphics/Color;->blue(I)I
 
     move-result v0
@@ -401,10 +401,10 @@
 
     add-long/2addr v10, v0
 
-    .line 135
+    .line 136
     add-int/lit8 v13, v13, 0x1
 
-    .line 130
+    .line 131
     add-int/lit8 v15, v15, 0x1
 
     move-object/from16 v0, p0
@@ -413,7 +413,7 @@
 
     goto :goto_55
 
-    .line 128
+    .line 129
     :cond_82
     add-int/lit8 v12, v12, 0x1
 
@@ -423,7 +423,7 @@
 
     goto :goto_4a
 
-    .line 138
+    .line 139
     :cond_89
     int-to-long v0, v13
 
@@ -445,19 +445,19 @@
 
     return v0
 
-    .line 123
+    .line 124
     :cond_95
     move/from16 v16, v1
 
-    .line 124
+    .line 125
     :goto_97
     return v16
 
-    .line 116
+    .line 117
     :cond_98
     move/from16 v16, v1
 
-    .line 117
+    .line 118
     :goto_9a
     return v16
 .end method
@@ -467,7 +467,7 @@
 .method expected()Ljava/lang/String;
     .registers 2
 
-    .line 72
+    .line 73
     invoke-virtual {p0}, Lcom/k4/homeclock/DepthClock;->showing()Z
 
     move-result v0
@@ -490,21 +490,21 @@
 .method release()V
     .registers 1
 
-    .line 81
+    .line 82
     return-void
 .end method
 
 .method retryWeather(Ljava/lang/String;)V
     .registers 2
 
-    .line 77
+    .line 78
     return-void
 .end method
 
 .method showing()Z
     .registers 5
 
-    .line 55
+    .line 56
     const/4 v0, 0x1
 
     :try_start_1
@@ -516,7 +516,7 @@
 
     check-cast v1, Lh3/a;
 
-    .line 56
+    .line 57
     if-nez v1, :cond_d
 
     const/4 v1, 0x0
@@ -528,47 +528,53 @@
 
     move-result-object v1
 
-    .line 57
+    .line 58
     :goto_11
     iget-boolean v2, p0, Lcom/k4/homeclock/DepthClock;->gated:Z
 
     const/4 v3, 0x0
 
-    if-nez v2, :cond_23
+    if-nez v2, :cond_29
 
-    .line 58
-    if-eqz v1, :cond_22
+    .line 59
+    if-eqz v1, :cond_28
 
     invoke-virtual {v1}, Lf3/a;->getWhich()I
 
+    move-result v2
+
+    and-int/lit8 v2, v2, 0x3
+
+    if-ne v2, v0, :cond_27
+
+    invoke-virtual {v1}, Lf3/a;->isPreview()Z
+
     move-result v1
 
-    and-int/lit8 v1, v1, 0x3
+    if-nez v1, :cond_27
 
-    if-ne v1, v0, :cond_21
+    goto :goto_28
 
-    goto :goto_22
-
-    :cond_21
+    :cond_27
     move v0, v3
 
-    :cond_22
-    :goto_22
+    :cond_28
+    :goto_28
     return v0
 
-    .line 60
-    :cond_23
+    .line 61
+    :cond_29
     sget-boolean v2, Lcom/k4/homeclock/KeyguardWatch;->locked:Z
 
-    if-nez v2, :cond_50
+    if-nez v2, :cond_56
 
-    if-eqz v1, :cond_50
+    if-eqz v1, :cond_56
 
     invoke-virtual {v1}, Lf3/a;->isPreview()Z
 
     move-result v2
 
-    if-nez v2, :cond_50
+    if-nez v2, :cond_56
 
     invoke-virtual {v1}, Lf3/a;->getWhich()I
 
@@ -576,20 +582,20 @@
 
     and-int/2addr v2, v0
 
-    if-nez v2, :cond_37
+    if-nez v2, :cond_3d
 
-    goto :goto_50
+    goto :goto_56
 
-    .line 63
-    :cond_37
+    .line 64
+    :cond_3d
     invoke-virtual {v1}, Lf3/a;->getDisplayState()LB2/a;
 
     move-result-object v1
 
-    .line 64
+    .line 65
     instance-of v2, v1, Ljava/lang/Enum;
 
-    if-eqz v2, :cond_4e
+    if-eqz v2, :cond_54
 
     const-string v2, "ON"
 
@@ -602,29 +608,29 @@
     invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
     move-result v1
-    :try_end_4b
-    .catchall {:try_start_1 .. :try_end_4b} :catchall_51
+    :try_end_51
+    .catchall {:try_start_1 .. :try_end_51} :catchall_57
 
-    if-eqz v1, :cond_4e
+    if-eqz v1, :cond_54
 
-    goto :goto_4f
+    goto :goto_55
 
-    :cond_4e
+    :cond_54
     move v0, v3
 
-    :goto_4f
+    :goto_55
     return v0
 
-    .line 61
-    :cond_50
-    :goto_50
+    .line 62
+    :cond_56
+    :goto_56
     return v3
 
-    .line 65
-    :catchall_51
+    .line 66
+    :catchall_57
     move-exception v1
 
-    .line 66
+    .line 67
     iget-boolean v1, p0, Lcom/k4/homeclock/DepthClock;->gated:Z
 
     xor-int/2addr v0, v1
@@ -675,7 +681,7 @@
 .method zoom()F
     .registers 4
 
-    .line 85
+    .line 86
     iget-object v0, p0, Lcom/k4/homeclock/DepthClock;->scaleRef:Li3/c;
 
     const/high16 v1, 0x3f800000    # 1.0f
@@ -691,7 +697,7 @@
     :cond_b
     move v0, v1
 
-    .line 86
+    .line 87
     :goto_c
     const/4 v2, 0x0
 
