@@ -97,7 +97,7 @@ open(dst, "w").write("""\
 
     const-wide/32 v3, 0x36ee80
 
-    invoke-virtual {v1, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
+    invoke-virtual {v1, v2, v3, v4}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
     :try_end_0
     .catchall {:try_start_0 .. :try_end_0} :catchall_0
 
