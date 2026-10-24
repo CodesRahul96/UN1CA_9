@@ -71,6 +71,7 @@ function flush() {
     m = ""
     if (match(buf, " mSessionErrorMessage=.* mPreapprovalDetails=")) m = substr(buf, RSTART + 22, RLENGTH - 22 - 21)
     gsub(/\t/, " ", m)
+    gsub(/^ +| +$/, "", m)   # a line wrap right after "mSessionErrorMessage=" leaves a lone space for an empty message
     printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", kind, id, v(buf, "mParentSessionId"), v(buf, "params.isStaged"),
         v(buf, "committedMillis"), v(buf, "mSessionApplied"), v(buf, "mSessionFailed"), v(buf, "mSessionReady"),
         v(buf, "mDestroyed"), v(buf, "mSessionErrorCode"), v(buf, "appPackageName"), m
