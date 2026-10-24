@@ -527,10 +527,49 @@ if [ "$TARGET_PLATFORM_SDK_VERSION" -lt "35" ]; then
         if [ -d "$WORK_DIR/vendor/etc/singletake/bestmoment" ]; then
             DELETE_FROM_WORK_DIR "vendor" "etc/singletake/bestmoment"
         fi
-        ADD_TO_WORK_DIR "$SOURCE_FIRMWARE" "vendor" \
-            "etc/singletake/ClarityScorer" 0 2000 755 "u:object_r:vendor_configs_file:s0"
+        SOURCE_FIRMWARE_PATH="$(cut -d "/" -f 1 -s <<< "$SOURCE_FIRMWARE")_$(cut -d "/" -f 2 -s <<< "$SOURCE_FIRMWARE")"
+        if [ -f "$FW_DIR/$SOURCE_FIRMWARE_PATH/vendor/etc/singletake/ClarityScorer/ClarityScorer.tflite" ]; then
+            ADD_TO_WORK_DIR "$SOURCE_FIRMWARE" "vendor" \
+                "etc/singletake/ClarityScorer" 0 2000 755 "u:object_r:vendor_configs_file:s0"
+        else
+            # One UI 9 (S26U) ships the clarity model only as a QNN .dlc
+            # (08-15_SingleTake_ClarityScorer_v1.0.0.dlc), read by its own service through
+            # vendor libs a legacy vendor does not have. The One UI 6.1 Single Take service
+            # these targets run (stp1 flavor, prebuilts/samsung/a73xqxx) hard-codes
+            # /vendor/etc/singletake/ClarityScorer/ClarityScorer.tflite, loaded by the vendor
+            # snap HAL; without it blurEngineInit fails, frees its engine but keeps the stale
+            # pointer, and blurEngineDeinit then crashes the service (SIGSEGV on unbind).
+            # Ship the tflite model: the p3sxxx copy is byte-identical to the one stock
+            # A736B (GZE2) firmware shipped next to this service.
+            CLARITY_MODEL="$SRC_DIR/prebuilts/samsung/p3sxxx/vendor/etc/singletake/ClarityScorer/ClarityScorer.tflite"
+            CLARITY_MODEL_SHA256="38d451bbec758d47a0836a3e4f9c0b161939709b658177a1d0ec00197a8ff4db"
+            if [[ "$(sha256sum "$CLARITY_MODEL" 2> /dev/null | cut -d " " -f 1)" != "$CLARITY_MODEL_SHA256" ]]; then
+                ABORT "Single Take ClarityScorer.tflite prebuilt missing or changed (expected sha256 $CLARITY_MODEL_SHA256)"
+            fi
+            ADD_TO_WORK_DIR "p3sxxx" "vendor" \
+                "etc/singletake/ClarityScorer/ClarityScorer.tflite" 0 0 644 "u:object_r:vendor_configs_file:s0"
+            unset CLARITY_MODEL CLARITY_MODEL_SHA256
+        fi
+        unset SOURCE_FIRMWARE_PATH
     fi
 fi
+
+# Every model path the Single Take service's native engines hard-code for ClarityScorer must
+# exist as a TFLite model, or the service crashes on unbind (see above).
+SINGLETAKE_APK="$WORK_DIR/system/system/priv-app/SingleTakeService/SingleTakeService.apk"
+CLARITY_PATH="/vendor/etc/singletake/ClarityScorer/ClarityScorer.tflite"
+if [ -f "$SINGLETAKE_APK" ] && \
+        unzip -p "$SINGLETAKE_APK" "lib/arm64-v8a/*.so" 2> /dev/null | grep -a -q -F "$CLARITY_PATH"; then
+    if [ ! -s "$WORK_DIR$CLARITY_PATH" ] || \
+            [[ "$(dd if="$WORK_DIR$CLARITY_PATH" bs=1 skip=4 count=4 2> /dev/null)" != "TFL3" ]]; then
+        ABORT "SingleTakeService loads $CLARITY_PATH but the build does not ship it as a TFLite model"
+    fi
+    if ! grep -q -F "${CLARITY_PATH:1} " "$WORK_DIR/configs/fs_config-vendor" || \
+            ! grep -q -F "/$(_HANDLE_SPECIAL_CHARS "${CLARITY_PATH:1}") u:object_r:vendor_configs_file:s0" "$WORK_DIR/configs/file_context-vendor"; then
+        ABORT "$CLARITY_PATH has no fs_config/vendor_configs_file entry"
+    fi
+fi
+unset SINGLETAKE_APK CLARITY_PATH
 
 if ! $PATCHED; then
     LOG "\033[0;33m! Nothing to do\033[0m"
