@@ -107,3 +107,17 @@ fi
 SYSTEM_DEBLOAT+="
 system/etc/sysconfig/preinstalled-packages-com.samsung.android.offline.languagemodel.xml
 "
+
+# Link to Windows: keep the S26 Ultra's Microsoft app (YourPhone_P1_5, com.microsoft.appmanager, ~84 MB). unica drops
+# it on One UI 9 without importing a stub, and the S26 Ultra LinkToWindowsService (com.samsung.android.mdx) then
+# answers every entry point (Connected devices > Link to Windows, the quick panel tile) with "To use Link to Windows,
+# enable the Link to Windows app in Settings": SystemRepository.isPackageEnabled() is false for a package that is not
+# installed. Its privapp-permissions and preload allowlist entries are still in the base. Super has ~2 GB spare.
+LTW_DEBLOAT_ENTRY="system/priv-app/YourPhone_P1_5"
+grep -q -x -F "$LTW_DEBLOAT_ENTRY" <<< "$SYSTEM_DEBLOAT" || ABORT "debloat: $LTW_DEBLOAT_ENTRY is no longer in the unica list, re-check Link to Windows"
+[ -f "$WORK_DIR/system/$LTW_DEBLOAT_ENTRY/YourPhone_P1_5.apk" ] || ABORT "debloat: no $LTW_DEBLOAT_ENTRY in this base"
+[ -f "$WORK_DIR/system/system/etc/permissions/privapp-permissions-com.microsoft.appmanager.xml" ] \
+    || ABORT "debloat: privapp-permissions-com.microsoft.appmanager.xml missing, Link to Windows would not get its permissions"
+SYSTEM_DEBLOAT="$(grep -v -x -F "$LTW_DEBLOAT_ENTRY" <<< "$SYSTEM_DEBLOAT")"
+LOG "- Keeping the Link to Windows app (com.microsoft.appmanager)"
+unset LTW_DEBLOAT_ENTRY
