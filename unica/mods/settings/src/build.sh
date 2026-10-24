@@ -20,6 +20,10 @@ mkdir -p "$T/ship"
 (cd "$T/classes" && rm -rf io/mesalabs/unica/settings && jar cf "$T/stubs.jar" .)
 "$D8" --release --min-api 33 --lib "$ANDROID_JAR" --classpath "$T/stubs.jar" --output "$T" $(find "$T/ship" -name "*.class")
 java -cp "$APKTOOL" com.android.tools.smali.baksmali.Main d --api 33 -o "$T/smali" "$T/classes.dex"
+# drop what an earlier build emitted for these sources (a renamed lambda or a removed inner class must not linger)
+find io -name "*.java" | while read -r j; do
+    rm -f "$OUT/${j%.java}.smali" "$OUT/${j%.java}"\$*.smali
+done
 (cd "$T/smali" && find . -name "*.smali") | while read -r f; do
     mkdir -p "$OUT/$(dirname "$f")"; cp "$T/smali/$f" "$OUT/$f"; echo "  $OUT/${f#./}"
 done
