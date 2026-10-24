@@ -84,6 +84,36 @@ function flush() {
 { line = $0; sub(/^ */, "", line); buf = buf " " line }
 END { flush() }' "$T/sessions.txt" > "$T/sessions.tsv"
 
+# Sessions without a package name: dumpsys prints params.appPackageName, i.e. only what the installer passed (Play
+# does; pm/adb installs leave it null, e.g. the CTS shim APEX of a rehearsal or a rollback's child). The resolved name
+# is in `pm get-stagedsessions` (until the session is applied and the device rebooted) and, for a session staged with
+# rollback, in that rollback's package list (the APEX modules of it). Column 11 gets the first found, else "(unknown)".
+if awk -F '\t' '$11 == "" || $11 == "null" { f = 1 } END { exit !f }' "$T/sessions.tsv"; then
+    if [ -n "$K4MD_DUMPSYS_FILE" ]; then   # testing: the saved outputs next to it (empty if not saved)
+        cat "${K4MD_DUMPSYS_FILE%.*}.staged.txt" > "$T/names_staged.txt" 2> /dev/null
+        cat "${K4MD_DUMPSYS_FILE%.*}.rollback.txt" > "$T/names_rollback.txt" 2> /dev/null
+        cat "${K4MD_DUMPSYS_FILE%.*}.apex.txt" > "$T/names_apex.txt" 2> /dev/null
+    else
+        pm get-stagedsessions > "$T/names_staged.txt" 2>&1
+        dumpsys rollback > "$T/names_rollback.txt" 2>&1
+        pm list packages --apex-only > "$T/names_apex.txt" 2>&1
+    fi
+    # pm wraps its lines anywhere (also inside words): drop all white space, one "key=value" per line
+    tr -d ' \t\r\n' < "$T/names_staged.txt" | tr ';' '\n' | awk '
+        /^sessionId=-?[0-9]+$/ { id = substr($0, 11); next }
+        /^appPackageName=/ && id != "" { v = substr($0, 16); if (v != "" && v != "null") print id "\t" v; id = "" }' > "$T/names.tsv"
+    awk 'FILENAME == ARGV[1] { if (sub(/^package:/, "")) apex[$0] = 1; next }
+        /-originalSessionId:/ { id = $2; inp = 0; next }
+        /-packages:/ { inp = (id != ""); next }
+        inp && NF >= 4 && $3 == "->" { if ($1 in apex) a[id] = a[id] " " $1; else o[id] = o[id] " " $1; next }
+        { inp = 0 }
+        END { for (i in a) print i "\t" substr(a[i], 2); for (i in o) if (!(i in a)) print i "\t" substr(o[i], 2) }' \
+        "$T/names_apex.txt" "$T/names_rollback.txt" >> "$T/names.tsv"
+    awk -F '\t' 'BEGIN { OFS = "\t" } FILENAME == ARGV[1] { if (!($1 in n)) n[$1] = $2; next }
+        $11 == "" || $11 == "null" { $11 = ($2 in n) ? n[$2] : "(unknown)" } { print }' \
+        "$T/names.tsv" "$T/sessions.tsv" > "$T/sessions.tsv.new" && mv "$T/sessions.tsv.new" "$T/sessions.tsv"
+fi
+
 # Decide on the newest batch of staged parents: one reboot activates every staged session and one failed APEX fails all
 # of them, so the most specific error message of the batch is the reason. A batch = the sessions committed within 3
 # minutes before its newest one. That never merged two reboots in the field data (10-10: failed reboots retried 4-8
@@ -109,7 +139,7 @@ END {
     if (!n) { print "STATE\tnone"; exit }
     st = "applied"; best = ""; br = -1; when = 0; nf = 0; na = 0; np = 0; lastok = 0
     for (i = 1; i <= n; i++) {
-        if (ap[i] == "true" && t[i] > lastok) { lastok = t[i]; okp = kids[id[i]] }
+        if (ap[i] == "true" && t[i] > lastok) { lastok = t[i]; okp = kids[id[i]]; if (okp == "") okp = " " pk[i] }
         if (t[i] < latest - 180000) continue
         p = kids[id[i]]; if (p == "") p = " " pk[i]
         pkgs = pkgs p; ids = ids " " id[i]
