@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 516
+    .line 523
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -32,9 +32,9 @@
 .method public run()V
     .registers 1
 
-    .line 519
+    .line 526
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smcheckHungMax()V
 
-    .line 520
+    .line 527
     return-void
 .end method

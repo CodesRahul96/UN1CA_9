@@ -18,7 +18,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 611
+    .line 618
     invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
 
     return-void
@@ -29,7 +29,7 @@
 .method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
     .registers 3
 
-    .line 614
+    .line 621
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsHandler()Landroid/os/Handler;
 
     move-result-object p1
@@ -40,6 +40,6 @@
 
     invoke-virtual {p1, p2}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 615
+    .line 622
     return-void
 .end method

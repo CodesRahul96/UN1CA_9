@@ -134,6 +134,12 @@ public final class K4StRetry {
      * setPhoneState at hang-up leaves the dispatch at IN_CALL while getMode() says NORMAL) cannot keep them forever.
      */
     private static final long OWED_CHECK_MS = 60000;
+    /**
+     * Owed reboots run anyway once the only "call" has been a voice playback / recording signal this long while
+     * AudioService's own mode is NORMAL and every SIM is idle: a voice-chat app idling in a channel or a player left
+     * started, not a call (a CS call always has a call mode once answered). Hung HAL calls keep their 48 s cap.
+     */
+    private static final long AUDIO_ONLY_MAX_MS = 30 * 60 * 1000;
     private static final long NORMAL_GRACE_MS = 3000;
     private static final long WATCHDOG_MS = 3000; // SoundTriggerHalWatchdog deadline (0xbb8)
     /**
@@ -268,6 +274,7 @@ public final class K4StRetry {
         }
     };
     private static boolean sOwedSeenFree;
+    private static long sAudioOnlySince;
     private static final Runnable CHECK_HUNG = new Runnable() {
         @Override
         public void run() {
@@ -768,7 +775,7 @@ public final class K4StRetry {
         boolean voice = false;
         if (configs != null) {
             for (AudioRecordingConfiguration c : configs) {
-                if (c == null) continue;
+                if (c == null || c.isClientSilenced()) continue; // a silenced client carries no call uplink
                 int src = c.getClientAudioSource();
                 if (src == MediaRecorder.AudioSource.VOICE_COMMUNICATION || src == MediaRecorder.AudioSource.VOICE_CALL
                         || src == MediaRecorder.AudioSource.VOICE_UPLINK
@@ -900,15 +907,30 @@ public final class K4StRetry {
                 live = MODE_UNKNOWN;
             }
         }
-        if (live != AudioManager.MODE_NORMAL || callBySignals()) {
-            sOwedSeenFree = false;
-            return;
+        boolean audioOnly = live == AudioManager.MODE_NORMAL && !sTelBusy && !sSignalsUnknown
+                && (sVoicePlayback || sVoiceRecording);
+        long now = SystemClock.uptimeMillis();
+        if (!audioOnly) {
+            sAudioOnlySince = 0;
+        } else if (sAudioOnlySince == 0) {
+            sAudioOnlySince = now;
         }
-        if (!sOwedSeenFree) {
-            sOwedSeenFree = true;
-            return;
+        boolean backstop = audioOnly && now - sAudioOnlySince >= AUDIO_ONLY_MAX_MS;
+        if (!backstop) {
+            if (live != AudioManager.MODE_NORMAL || callBySignals()) {
+                sOwedSeenFree = false;
+                return;
+            }
+            if (!sOwedSeenFree) {
+                sOwedSeenFree = true;
+                return;
+            }
+            if (!listenerSaysCall() && sHandler.hasCallbacks(RESYNC)) return; // the listener agrees, a resync is due
+        } else {
+            Slog.w(TAG, "only a voice playback / recording signal for " + (AUDIO_ONLY_MAX_MS / 60000) + " min with"
+                    + " AudioService NORMAL and every SIM idle: not a call, running the owed reboots");
+            sAudioOnlySince = 0;
         }
-        if (!listenerSaysCall() && sHandler.hasCallbacks(RESYNC)) return; // the listener agrees, a resync is due
         sOwedSeenFree = false;
         List<SoundTriggerHalEnforcer> owed;
         List<Hung> hung;

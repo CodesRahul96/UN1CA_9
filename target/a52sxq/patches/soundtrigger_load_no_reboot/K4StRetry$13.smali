@@ -18,7 +18,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 594
+    .line 601
     invoke-direct {p0}, Landroid/media/AudioManager$AudioRecordingCallback;-><init>()V
 
     return-void
@@ -37,9 +37,9 @@
         }
     .end annotation
 
-    .line 597
+    .line 604
     invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonRecording(Ljava/util/List;)V
 
-    .line 598
+    .line 605
     return-void
 .end method

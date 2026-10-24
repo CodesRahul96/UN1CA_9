@@ -18,7 +18,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 674
+    .line 681
     invoke-direct {p0}, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;-><init>()V
 
     return-void
@@ -29,9 +29,9 @@
 .method public onSubscriptionsChanged()V
     .registers 1
 
-    .line 677
+    .line 684
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smsyncSubscriptions()V
 
-    .line 678
+    .line 685
     return-void
 .end method
