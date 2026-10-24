@@ -16,6 +16,10 @@
 #     module is imported (copied) into /data/k4gpu/store/m_<id>_<hash> and bound like a built-in set. If the module is
 #     already mounted (a metamodule, Magisk's magic mount, Mountify: the GLES library seen in /vendor is the module's
 #     file) nothing is mounted on top: the user's mount wins and the entry is reported as active and locked.
+#     The ROM installs meta-overlayfs by default (target/a52sxq/patches/ksu_metamodule): a driver module installed
+#     after it is in its image and mounted by ksud's post-fs-data (metamount.sh, inside the blocking init.rc exec that
+#     runs before this file's post-fs-data action), so it takes the "already mounted" path; a module installed before
+#     the metamodule is not in that image, stays unmounted and is imported as above (checked on the phone 2026-10-24).
 #   - Settings > K4_UN1CA > UI > GPU driver > Add driver: Settings validates the zip and stages the set in
 #     /data/k4gpu/incoming/u_<id>/ (+ "ready"); it is validated again and moved to /data/k4gpu/store/u_<id> here.
 #   - A driver flashed into /vendor itself (TWRP zip): no mount, the default entry is labeled with its version.
