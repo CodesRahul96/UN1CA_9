@@ -165,6 +165,8 @@ public final class K4StRetry {
         final Exception where;
         final long since;
         boolean deferred;
+        /** "during a call" or "while the call state was unknown", for the logs. */
+        String when = "during a call";
 
         Hung(SoundTriggerHalWatchdog hal, Exception where, long since) {
             this.hal = hal;
@@ -495,13 +497,15 @@ public final class K4StRetry {
                 for (Hung h : sHung.values()) {
                     if (!h.deferred) {
                         h.deferred = true;
+                        h.when = (mode != AudioManager.MODE_NORMAL && mode != MODE_UNKNOWN) || signalWillReport()
+                                ? "during a call" : "while the call state was unknown";
                         deferred.add(h);
                     }
                 }
             }
         }
         for (Hung h : deferred) {
-            Slog.e(TAG, "sound trigger HAL call still running after " + WATCHDOG_MS + " ms during a call ("
+            Slog.e(TAG, "sound trigger HAL call still running after " + WATCHDOG_MS + " ms " + h.when + " ("
                     + callState(mode) + "): NOT rebooting the audio HAL (shared with call audio); rebooting it " + (CALL_END_DELAY_MS / 1000)
                     + " s after the call if the call into the HAL is still hung, or at once if it is still hung "
                     + ((HUNG_IN_CALL_MAX_MS + WATCHDOG_MS) / 1000) + " s after it started (dead HAL)", h.where);
@@ -546,8 +550,8 @@ public final class K4StRetry {
         }
         if (next != Long.MAX_VALUE) sHandler.postDelayed(CHECK_HUNG_MAX, next);
         if (dead.isEmpty()) return;
-        Slog.e(TAG, "sound trigger HAL call hung for " + ((HUNG_IN_CALL_MAX_MS + WATCHDOG_MS) / 1000) + " s during a"
-                + " call: treating the HAL as dead, rebooting it now before blocked system_server threads trip the"
+        Slog.e(TAG, "sound trigger HAL call hung for " + ((HUNG_IN_CALL_MAX_MS + WATCHDOG_MS) / 1000) + " s "
+                + dead.get(0).when + ": treating the HAL as dead, rebooting it now before blocked system_server threads trip the"
                 + " system_server watchdog (this restarts the audio HAL)");
         rebootAll(new ArrayList<SoundTriggerHalEnforcer>(), dead);
     }

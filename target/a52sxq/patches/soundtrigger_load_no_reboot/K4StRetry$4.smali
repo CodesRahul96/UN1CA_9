@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 264
+    .line 266
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -32,9 +32,9 @@
 .method public run()V
     .registers 1
 
-    .line 267
+    .line 269
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smresync()V
 
-    .line 268
+    .line 270
     return-void
 .end method

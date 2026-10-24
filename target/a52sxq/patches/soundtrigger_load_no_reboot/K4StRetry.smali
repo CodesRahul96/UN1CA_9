@@ -356,138 +356,138 @@
 .method static constructor <clinit>()V
     .registers 1
 
-    .line 176
+    .line 178
     new-instance v0, Ljava/lang/Object;
 
     invoke-direct {v0}, Ljava/lang/Object;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
-    .line 178
+    .line 180
     new-instance v0, Ljava/util/IdentityHashMap;
 
     invoke-direct {v0}, Ljava/util/IdentityHashMap;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sCallbacks:Ljava/util/IdentityHashMap;
 
-    .line 180
+    .line 182
     new-instance v0, Ljava/util/IdentityHashMap;
 
     invoke-direct {v0}, Ljava/util/IdentityHashMap;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sPending:Ljava/util/IdentityHashMap;
 
-    .line 182
+    .line 184
     new-instance v0, Ljava/util/IdentityHashMap;
 
     invoke-direct {v0}, Ljava/util/IdentityHashMap;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
-    .line 184
+    .line 186
     new-instance v0, Ljava/util/IdentityHashMap;
 
     invoke-direct {v0}, Ljava/util/IdentityHashMap;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
-    .line 190
+    .line 192
     new-instance v0, Ljava/util/WeakHashMap;
 
     invoke-direct {v0}, Ljava/util/WeakHashMap;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sClosed:Ljava/util/WeakHashMap;
 
-    .line 216
+    .line 218
     new-instance v0, Ljava/util/HashMap;
 
     invoke-direct {v0}, Ljava/util/HashMap;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sSubCalls:Ljava/util/HashMap;
 
-    .line 218
+    .line 220
     const/16 v0, -0x64
 
     sput v0, Lcom/k4/soundtrigger/K4StRetry;->sMode:I
 
-    .line 246
+    .line 248
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$1;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$1;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->FIRE:Ljava/lang/Runnable;
 
-    .line 252
+    .line 254
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$2;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$2;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->REGISTER_STATE:Ljava/lang/Runnable;
 
-    .line 258
+    .line 260
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$3;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$3;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->SIGNALS:Ljava/lang/Runnable;
 
-    .line 264
+    .line 266
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$4;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$4;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
 
-    .line 270
+    .line 272
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$5;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$5;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->OWED_CHECK:Ljava/lang/Runnable;
 
-    .line 278
+    .line 280
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$6;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$6;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->CHECK_HUNG:Ljava/lang/Runnable;
 
-    .line 284
+    .line 286
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$7;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$7;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->EXECUTOR:Ljava/util/concurrent/Executor;
 
-    .line 290
+    .line 292
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$8;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$8;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->STATE_EXECUTOR:Ljava/util/concurrent/Executor;
 
-    .line 523
+    .line 527
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$9;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$9;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->CHECK_HUNG_MAX:Ljava/lang/Runnable;
 
-    .line 989
+    .line 993
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$17;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$17;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->AUDIO_STARTED:Ljava/lang/Runnable;
 
-    .line 995
+    .line 999
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$18;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$18;-><init>()V
 
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->AUDIO_STOPPED:Ljava/lang/Runnable;
 
-    .line 1001
+    .line 1005
     new-instance v0, Lcom/k4/soundtrigger/K4StRetry$19;
 
     invoke-direct {v0}, Lcom/k4/soundtrigger/K4StRetry$19;-><init>()V
@@ -500,7 +500,7 @@
 .method private constructor <init>()V
     .registers 1
 
-    .line 297
+    .line 299
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -509,14 +509,14 @@
 .method private static acquire(J)V
     .registers 7
 
-    .line 1036
+    .line 1040
     invoke-static {}, Landroid/os/SystemClock;->uptimeMillis()J
 
     move-result-wide v0
 
     sub-long v0, p0, v0
 
-    .line 1037
+    .line 1041
     sget-wide v2, Lcom/k4/soundtrigger/K4StRetry;->sWakeUntil:J
 
     cmp-long v2, p0, v2
@@ -531,14 +531,14 @@
 
     goto :goto_3e
 
-    .line 1039
+    .line 1043
     :cond_13
     :try_start_13
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sWakeLock:Landroid/os/PowerManager$WakeLock;
 
     if-nez v2, :cond_34
 
-    .line 1040
+    .line 1044
     invoke-static {}, Landroid/app/ActivityThread;->currentActivityThread()Landroid/app/ActivityThread;
 
     move-result-object v2
@@ -549,14 +549,14 @@
 
     const-class v3, Landroid/os/PowerManager;
 
-    .line 1041
+    .line 1045
     invoke-virtual {v2, v3}, Landroid/app/ContextImpl;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
 
     move-result-object v2
 
     check-cast v2, Landroid/os/PowerManager;
 
-    .line 1042
+    .line 1046
     const-string v3, "K4StRetry"
 
     const/4 v4, 0x1
@@ -565,37 +565,37 @@
 
     move-result-object v2
 
-    .line 1043
+    .line 1047
     const/4 v3, 0x0
 
     invoke-virtual {v2, v3}, Landroid/os/PowerManager$WakeLock;->setReferenceCounted(Z)V
 
-    .line 1044
+    .line 1048
     sput-object v2, Lcom/k4/soundtrigger/K4StRetry;->sWakeLock:Landroid/os/PowerManager$WakeLock;
 
-    .line 1046
+    .line 1050
     :cond_34
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sWakeLock:Landroid/os/PowerManager$WakeLock;
 
     invoke-virtual {v2, v0, v1}, Landroid/os/PowerManager$WakeLock;->acquire(J)V
 
-    .line 1047
+    .line 1051
     sput-wide p0, Lcom/k4/soundtrigger/K4StRetry;->sWakeUntil:J
     :try_end_3b
     .catchall {:try_start_13 .. :try_end_3b} :catchall_3c
 
-    .line 1050
+    .line 1054
     goto :goto_3d
 
-    .line 1048
+    .line 1052
     :catchall_3c
     move-exception p0
 
-    .line 1051
+    .line 1055
     :goto_3d
     return-void
 
-    .line 1037
+    .line 1041
     :cond_3e
     :goto_3e
     return-void
@@ -604,7 +604,7 @@
 .method private static callBySignals()Z
     .registers 6
 
-    .line 465
+    .line 467
     sget-boolean v0, Lcom/k4/soundtrigger/K4StRetry;->sTelBusy:Z
 
     const/4 v1, 0x1
@@ -621,7 +621,7 @@
 
     goto :goto_23
 
-    .line 466
+    .line 468
     :cond_e
     sget-boolean v0, Lcom/k4/soundtrigger/K4StRetry;->sSignalsUnknown:Z
 
@@ -649,7 +649,7 @@
     :goto_22
     return v1
 
-    .line 465
+    .line 467
     :cond_23
     :goto_23
     return v1
@@ -658,7 +658,7 @@
 .method private static callState(I)Ljava/lang/String;
     .registers 7
 
-    .line 480
+    .line 482
     sget-boolean v0, Lcom/k4/soundtrigger/K4StRetry;->sTelBusy:Z
 
     const-string v1, ""
@@ -684,7 +684,7 @@
     :cond_11
     move-object v2, v1
 
-    .line 481
+    .line 483
     :goto_12
     sget-boolean v3, Lcom/k4/soundtrigger/K4StRetry;->sVoiceRecording:Z
 
@@ -739,74 +739,74 @@
 
     move-result-object p0
 
-    .line 480
+    .line 482
     return-object p0
 .end method
 
 .method public static callbackError(Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;)V
     .registers 2
 
-    .line 373
+    .line 375
     const-string v0, "HAL callback broke the sound trigger contract"
 
     invoke-static {p0, v0}, Lcom/k4/soundtrigger/K4StRetry;->owe(Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;Ljava/lang/String;)V
 
-    .line 374
+    .line 376
     return-void
 .end method
 
 .method private static checkHung()V
-    .registers 9
+    .registers 10
 
-    .line 486
+    .line 488
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->currentMode()I
 
     move-result v0
 
-    .line 487
+    .line 489
     new-instance v1, Ljava/util/ArrayList;
 
     invoke-direct {v1}, Ljava/util/ArrayList;-><init>()V
 
-    .line 488
+    .line 490
     new-instance v2, Ljava/util/ArrayList;
 
     invoke-direct {v2}, Ljava/util/ArrayList;-><init>()V
 
-    .line 489
-    const/16 v3, -0x64
+    .line 491
+    const/4 v3, 0x1
 
-    const/4 v4, 0x1
+    const/16 v4, -0x64
 
-    if-eq v0, v3, :cond_1c
+    if-eq v0, v4, :cond_1c
 
     invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->noCall(I)Z
 
-    move-result v3
+    move-result v5
 
-    if-eqz v3, :cond_1a
+    if-eqz v5, :cond_1a
 
     goto :goto_1c
 
     :cond_1a
-    const/4 v3, 0x0
+    const/4 v5, 0x0
 
     goto :goto_1d
 
     :cond_1c
     :goto_1c
-    move v3, v4
-
-    .line 490
-    :goto_1d
-    sget-object v5, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
-
-    monitor-enter v5
-
-    .line 491
-    if-eqz v3, :cond_31
+    move v5, v3
 
     .line 492
+    :goto_1d
+    sget-object v6, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
+
+    monitor-enter v6
+
+    .line 493
+    if-eqz v5, :cond_31
+
+    .line 494
     :try_start_22
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
@@ -816,71 +816,95 @@
 
     invoke-interface {v1, v3}, Ljava/util/List;->addAll(Ljava/util/Collection;)Z
 
-    .line 493
+    .line 495
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v3}, Ljava/util/IdentityHashMap;->clear()V
 
-    goto :goto_51
-
-    .line 495
-    :cond_31
-    sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
-
-    invoke-virtual {v3}, Ljava/util/IdentityHashMap;->values()Ljava/util/Collection;
-
-    move-result-object v3
-
-    invoke-interface {v3}, Ljava/util/Collection;->iterator()Ljava/util/Iterator;
-
-    move-result-object v3
-
-    :goto_3b
-    invoke-interface {v3}, Ljava/util/Iterator;->hasNext()Z
-
-    move-result v6
-
-    if-eqz v6, :cond_51
-
-    invoke-interface {v3}, Ljava/util/Iterator;->next()Ljava/lang/Object;
-
-    move-result-object v6
-
-    check-cast v6, Lcom/k4/soundtrigger/K4StRetry$Hung;
-
-    .line 496
-    iget-boolean v7, v6, Lcom/k4/soundtrigger/K4StRetry$Hung;->deferred:Z
-
-    if-nez v7, :cond_50
+    goto :goto_62
 
     .line 497
-    iput-boolean v4, v6, Lcom/k4/soundtrigger/K4StRetry$Hung;->deferred:Z
+    :cond_31
+    sget-object v5, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
+
+    invoke-virtual {v5}, Ljava/util/IdentityHashMap;->values()Ljava/util/Collection;
+
+    move-result-object v5
+
+    invoke-interface {v5}, Ljava/util/Collection;->iterator()Ljava/util/Iterator;
+
+    move-result-object v5
+
+    :goto_3b
+    invoke-interface {v5}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v7
+
+    if-eqz v7, :cond_62
+
+    invoke-interface {v5}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v7
+
+    check-cast v7, Lcom/k4/soundtrigger/K4StRetry$Hung;
 
     .line 498
-    invoke-interface {v2, v6}, Ljava/util/List;->add(Ljava/lang/Object;)Z
+    iget-boolean v8, v7, Lcom/k4/soundtrigger/K4StRetry$Hung;->deferred:Z
+
+    if-nez v8, :cond_61
+
+    .line 499
+    iput-boolean v3, v7, Lcom/k4/soundtrigger/K4StRetry$Hung;->deferred:Z
 
     .line 500
-    :cond_50
-    goto :goto_3b
+    if-eqz v0, :cond_51
+
+    if-ne v0, v4, :cond_57
+
+    :cond_51
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->signalWillReport()Z
+
+    move-result v8
+
+    if-eqz v8, :cond_5a
+
+    .line 501
+    :cond_57
+    const-string v8, "during a call"
+
+    goto :goto_5c
+
+    :cond_5a
+    const-string v8, "while the call state was unknown"
+
+    :goto_5c
+    iput-object v8, v7, Lcom/k4/soundtrigger/K4StRetry$Hung;->when:Ljava/lang/String;
 
     .line 502
-    :cond_51
-    :goto_51
-    monitor-exit v5
-    :try_end_52
-    .catchall {:try_start_22 .. :try_end_52} :catchall_fd
+    invoke-interface {v2, v7}, Ljava/util/List;->add(Ljava/lang/Object;)Z
 
-    .line 503
+    .line 504
+    :cond_61
+    goto :goto_3b
+
+    .line 506
+    :cond_62
+    :goto_62
+    monitor-exit v6
+    :try_end_63
+    .catchall {:try_start_22 .. :try_end_63} :catchall_11a
+
+    .line 507
     invoke-interface {v2}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
     move-result-object v3
 
-    :goto_56
+    :goto_67
     invoke-interface {v3}, Ljava/util/Iterator;->hasNext()Z
 
     move-result v4
 
-    if-eqz v4, :cond_87
+    if-eqz v4, :cond_a4
 
     invoke-interface {v3}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
@@ -888,25 +912,37 @@
 
     check-cast v4, Lcom/k4/soundtrigger/K4StRetry$Hung;
 
-    .line 504
+    .line 508
     const-string v5, "K4StRetry"
 
-    .line 505
+    iget-object v6, v4, Lcom/k4/soundtrigger/K4StRetry$Hung;->when:Ljava/lang/String;
+
+    .line 509
     invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->callState(I)Ljava/lang/String;
-
-    move-result-object v6
-
-    new-instance v7, Ljava/lang/StringBuilder;
-
-    invoke-direct {v7}, Ljava/lang/StringBuilder;-><init>()V
-
-    const-string v8, "sound trigger HAL call still running after 3000 ms during a call ("
-
-    invoke-virtual {v7, v8}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
     move-result-object v7
 
-    invoke-virtual {v7, v6}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    new-instance v8, Ljava/lang/StringBuilder;
+
+    invoke-direct {v8}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v9, "sound trigger HAL call still running after 3000 ms "
+
+    invoke-virtual {v8, v9}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v8
+
+    invoke-virtual {v8, v6}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v6
+
+    const-string v8, " ("
+
+    invoke-virtual {v6, v8}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v6
+
+    invoke-virtual {v6, v7}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
     move-result-object v6
 
@@ -922,21 +958,21 @@
 
     iget-object v4, v4, Lcom/k4/soundtrigger/K4StRetry$Hung;->where:Ljava/lang/Exception;
 
-    .line 504
+    .line 508
     invoke-static {v5, v6, v4}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 508
-    goto :goto_56
+    .line 512
+    goto :goto_67
 
-    .line 509
-    :cond_87
+    .line 513
+    :cond_a4
     invoke-interface {v2}, Ljava/util/List;->isEmpty()Z
 
     move-result v0
 
-    if-nez v0, :cond_d4
+    if-nez v0, :cond_f1
 
-    .line 510
+    .line 514
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->CHECK_HUNG_MAX:Ljava/lang/Runnable;
@@ -945,7 +981,7 @@
 
     move-result v0
 
-    if-nez v0, :cond_a1
+    if-nez v0, :cond_be
 
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
@@ -955,8 +991,8 @@
 
     invoke-virtual {v0, v2, v3, v4}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 511
-    :cond_a1
+    .line 515
+    :cond_be
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->OWED_CHECK:Ljava/lang/Runnable;
@@ -965,7 +1001,7 @@
 
     move-result v0
 
-    if-nez v0, :cond_b5
+    if-nez v0, :cond_d2
 
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
@@ -975,19 +1011,19 @@
 
     invoke-virtual {v0, v2, v3, v4}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 513
-    :cond_b5
+    .line 517
+    :cond_d2
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->listenerSaysCall()Z
 
     move-result v0
 
-    if-nez v0, :cond_d4
+    if-nez v0, :cond_f1
 
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->signalWillReport()Z
 
     move-result v0
 
-    if-nez v0, :cond_d4
+    if-nez v0, :cond_f1
 
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
@@ -997,9 +1033,9 @@
 
     move-result v0
 
-    if-nez v0, :cond_d4
+    if-nez v0, :cond_f1
 
-    .line 514
+    .line 518
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
@@ -1008,25 +1044,25 @@
 
     invoke-virtual {v0, v2, v3, v4}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 517
-    :cond_d4
+    .line 521
+    :cond_f1
     invoke-interface {v1}, Ljava/util/List;->isEmpty()Z
 
     move-result v0
 
-    if-nez v0, :cond_fc
+    if-nez v0, :cond_119
 
-    .line 518
+    .line 522
     invoke-interface {v1}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
     move-result-object v0
 
-    :goto_de
+    :goto_fb
     invoke-interface {v0}, Ljava/util/Iterator;->hasNext()Z
 
     move-result v2
 
-    if-eqz v2, :cond_f4
+    if-eqz v2, :cond_111
 
     invoke-interface {v0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
@@ -1042,28 +1078,28 @@
 
     invoke-static {v3, v4, v2}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    goto :goto_de
+    goto :goto_fb
 
-    .line 519
-    :cond_f4
+    .line 523
+    :cond_111
     new-instance v0, Ljava/util/ArrayList;
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
     invoke-static {v0, v1}, Lcom/k4/soundtrigger/K4StRetry;->rebootAll(Ljava/util/List;Ljava/util/List;)V
 
-    .line 521
-    :cond_fc
+    .line 525
+    :cond_119
     return-void
 
-    .line 502
-    :catchall_fd
+    .line 506
+    :catchall_11a
     move-exception v0
 
-    :try_start_fe
-    monitor-exit v5
-    :try_end_ff
-    .catchall {:try_start_fe .. :try_end_ff} :catchall_fd
+    :try_start_11b
+    monitor-exit v6
+    :try_end_11c
+    .catchall {:try_start_11b .. :try_end_11c} :catchall_11a
 
     throw v0
 .end method
@@ -1071,25 +1107,25 @@
 .method private static checkHungMax()V
     .registers 15
 
-    .line 532
+    .line 536
     invoke-static {}, Landroid/os/SystemClock;->uptimeMillis()J
 
     move-result-wide v0
 
-    .line 533
+    .line 537
     nop
 
-    .line 534
+    .line 538
     new-instance v2, Ljava/util/ArrayList;
 
     invoke-direct {v2}, Ljava/util/ArrayList;-><init>()V
 
-    .line 535
+    .line 539
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v3
 
-    .line 536
+    .line 540
     :try_start_d
     sget-object v4, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
@@ -1112,34 +1148,34 @@
 
     if-eqz v9, :cond_41
 
-    .line 537
+    .line 541
     invoke-interface {v4}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
     move-result-object v9
 
     check-cast v9, Lcom/k4/soundtrigger/K4StRetry$Hung;
 
-    .line 538
+    .line 542
     iget-wide v10, v9, Lcom/k4/soundtrigger/K4StRetry$Hung;->since:J
 
     sub-long v10, v0, v10
 
-    .line 539
+    .line 543
     const-wide/32 v12, 0xafc8
 
     cmp-long v14, v10, v12
 
     if-ltz v14, :cond_3b
 
-    .line 540
+    .line 544
     invoke-interface {v2, v9}, Ljava/util/List;->add(Ljava/lang/Object;)Z
 
-    .line 541
+    .line 545
     invoke-interface {v4}, Ljava/util/Iterator;->remove()V
 
     goto :goto_40
 
-    .line 543
+    .line 547
     :cond_3b
     sub-long/2addr v12, v10
 
@@ -1147,17 +1183,17 @@
 
     move-result-wide v7
 
-    .line 545
+    .line 549
     :goto_40
     goto :goto_1d
 
-    .line 546
+    .line 550
     :cond_41
     monitor-exit v3
     :try_end_42
-    .catchall {:try_start_d .. :try_end_42} :catchall_64
+    .catchall {:try_start_d .. :try_end_42} :catchall_84
 
-    .line 547
+    .line 551
     cmp-long v0, v7, v5
 
     if-eqz v0, :cond_4d
@@ -1168,7 +1204,7 @@
 
     invoke-virtual {v0, v1, v7, v8}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 548
+    .line 552
     :cond_4d
     invoke-interface {v2}, Ljava/util/List;->isEmpty()Z
 
@@ -1178,32 +1214,66 @@
 
     return-void
 
-    .line 549
+    .line 553
     :cond_54
     const-string v0, "K4StRetry"
 
-    const-string v1, "sound trigger HAL call hung for 48 s during a call: treating the HAL as dead, rebooting it now before blocked system_server threads trip the system_server watchdog (this restarts the audio HAL)"
+    .line 554
+    const/4 v1, 0x0
 
+    invoke-interface {v2, v1}, Ljava/util/List;->get(I)Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Lcom/k4/soundtrigger/K4StRetry$Hung;
+
+    iget-object v1, v1, Lcom/k4/soundtrigger/K4StRetry$Hung;->when:Ljava/lang/String;
+
+    new-instance v3, Ljava/lang/StringBuilder;
+
+    invoke-direct {v3}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v4, "sound trigger HAL call hung for 48 s "
+
+    invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v3
+
+    invoke-virtual {v3, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    const-string v3, ": treating the HAL as dead, rebooting it now before blocked system_server threads trip the system_server watchdog (this restarts the audio HAL)"
+
+    invoke-virtual {v1, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v1
+
+    .line 553
     invoke-static {v0, v1}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 552
+    .line 556
     new-instance v0, Ljava/util/ArrayList;
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
     invoke-static {v0, v2}, Lcom/k4/soundtrigger/K4StRetry;->rebootAll(Ljava/util/List;Ljava/util/List;)V
 
-    .line 553
+    .line 557
     return-void
 
-    .line 546
-    :catchall_64
+    .line 550
+    :catchall_84
     move-exception v0
 
-    :try_start_65
+    :try_start_85
     monitor-exit v3
-    :try_end_66
-    .catchall {:try_start_65 .. :try_end_66} :catchall_64
+    :try_end_86
+    .catchall {:try_start_85 .. :try_end_86} :catchall_84
 
     throw v0
 .end method
@@ -1211,10 +1281,10 @@
 .method private static currentMode()I
     .registers 2
 
-    .line 452
+    .line 454
     sget v0, Lcom/k4/soundtrigger/K4StRetry;->sMode:I
 
-    .line 453
+    .line 455
     if-eqz v0, :cond_9
 
     const/16 v1, -0x64
@@ -1223,16 +1293,16 @@
 
     return v0
 
-    .line 454
+    .line 456
     :cond_9
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sAm:Landroid/media/AudioManager;
 
-    .line 455
+    .line 457
     if-nez v1, :cond_e
 
     return v0
 
-    .line 457
+    .line 459
     :cond_e
     :try_start_e
     invoke-virtual {v1}, Landroid/media/AudioManager;->getMode()I
@@ -1243,37 +1313,37 @@
 
     return v0
 
-    .line 458
+    .line 460
     :catchall_13
     move-exception v1
 
-    .line 459
+    .line 461
     return v0
 .end method
 
 .method public static detached(Ljava/lang/Object;)V
     .registers 6
 
-    .line 326
+    .line 328
     nop
 
-    .line 327
+    .line 329
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 328
+    .line 330
     :try_start_4
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sCallbacks:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v1, p0}, Ljava/util/IdentityHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 329
+    .line 331
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sPending:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v1, p0}, Ljava/util/IdentityHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 330
+    .line 332
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v1, p0}, Ljava/util/IdentityHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;
@@ -1291,18 +1361,18 @@
     :cond_19
     move v1, v2
 
-    .line 331
+    .line 333
     :goto_1a
     instance-of v3, p0, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;
 
     if-eqz v3, :cond_42
 
-    .line 332
+    .line 334
     check-cast p0, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;
 
     iget-object p0, p0, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;->mUnderlying:Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;
 
-    .line 333
+    .line 335
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v3}, Ljava/util/IdentityHashMap;->values()Ljava/util/Collection;
@@ -1321,7 +1391,7 @@
 
     if-eqz v4, :cond_42
 
-    .line 334
+    .line 336
     invoke-interface {v3}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
     move-result-object v4
@@ -1332,21 +1402,21 @@
 
     if-ne v4, p0, :cond_2c
 
-    .line 335
+    .line 337
     invoke-interface {v3}, Ljava/util/Iterator;->remove()V
 
-    .line 336
+    .line 338
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_2c
 
-    .line 340
+    .line 342
     :cond_42
     monitor-exit v0
     :try_end_43
     .catchall {:try_start_4 .. :try_end_43} :catchall_4f
 
-    .line 341
+    .line 343
     if-nez v1, :cond_47
 
     if-lez v2, :cond_4e
@@ -1358,11 +1428,11 @@
 
     invoke-static {p0, v0}, Landroid/util/Slog;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 342
+    .line 344
     :cond_4e
     return-void
 
-    .line 340
+    .line 342
     :catchall_4f
     move-exception p0
 
@@ -1377,22 +1447,22 @@
 .method private static ensureHandlerLocked()V
     .registers 2
 
-    .line 301
+    .line 303
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     if-nez v0, :cond_4a
 
-    .line 302
+    .line 304
     new-instance v0, Landroid/os/HandlerThread;
 
     const-string v1, "K4StRetry"
 
     invoke-direct {v0, v1}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V
 
-    .line 303
+    .line 305
     invoke-virtual {v0}, Landroid/os/HandlerThread;->start()V
 
-    .line 304
+    .line 306
     new-instance v1, Landroid/os/Handler;
 
     invoke-virtual {v0}, Landroid/os/HandlerThread;->getLooper()Landroid/os/Looper;
@@ -1403,17 +1473,17 @@
 
     sput-object v1, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
-    .line 305
+    .line 307
     new-instance v0, Landroid/os/HandlerThread;
 
     const-string v1, "K4StRetryCb"
 
     invoke-direct {v0, v1}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V
 
-    .line 306
+    .line 308
     invoke-virtual {v0}, Landroid/os/HandlerThread;->start()V
 
-    .line 307
+    .line 309
     new-instance v1, Landroid/os/Handler;
 
     invoke-virtual {v0}, Landroid/os/HandlerThread;->getLooper()Landroid/os/Looper;
@@ -1424,17 +1494,17 @@
 
     sput-object v1, Lcom/k4/soundtrigger/K4StRetry;->sCbHandler:Landroid/os/Handler;
 
-    .line 308
+    .line 310
     new-instance v0, Landroid/os/HandlerThread;
 
     const-string v1, "K4StRetryState"
 
     invoke-direct {v0, v1}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V
 
-    .line 309
+    .line 311
     invoke-virtual {v0}, Landroid/os/HandlerThread;->start()V
 
-    .line 310
+    .line 312
     new-instance v1, Landroid/os/Handler;
 
     invoke-virtual {v0}, Landroid/os/HandlerThread;->getLooper()Landroid/os/Looper;
@@ -1445,14 +1515,14 @@
 
     sput-object v1, Lcom/k4/soundtrigger/K4StRetry;->sStateHandler:Landroid/os/Handler;
 
-    .line 311
+    .line 313
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sStateHandler:Landroid/os/Handler;
 
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->REGISTER_STATE:Ljava/lang/Runnable;
 
     invoke-virtual {v0, v1}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 313
+    .line 315
     :cond_4a
     return-void
 .end method
@@ -1460,17 +1530,17 @@
 .method private static fire()V
     .registers 5
 
-    .line 1056
+    .line 1060
     new-instance v0, Ljava/util/ArrayList;
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
-    .line 1057
+    .line 1061
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v1
 
-    .line 1058
+    .line 1062
     :try_start_8
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sPending:Ljava/util/IdentityHashMap;
 
@@ -1493,7 +1563,7 @@
 
     move-result-object v3
 
-    .line 1059
+    .line 1063
     sget-object v4, Lcom/k4/soundtrigger/K4StRetry;->sCallbacks:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v4, v3}, Ljava/util/IdentityHashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;
@@ -1502,27 +1572,27 @@
 
     check-cast v3, Lcom/android/server/soundtrigger_middleware/ISoundTriggerHal$GlobalCallback;
 
-    .line 1060
+    .line 1064
     if-eqz v3, :cond_29
 
     invoke-interface {v0, v3}, Ljava/util/List;->add(Ljava/lang/Object;)Z
 
-    .line 1061
+    .line 1065
     :cond_29
     goto :goto_12
 
-    .line 1062
+    .line 1066
     :cond_2a
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sPending:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v2}, Ljava/util/IdentityHashMap;->clear()V
 
-    .line 1063
+    .line 1067
     monitor-exit v1
     :try_end_30
     .catchall {:try_start_8 .. :try_end_30} :catchall_44
 
-    .line 1064
+    .line 1068
     invoke-interface {v0}, Ljava/util/List;->isEmpty()Z
 
     move-result v1
@@ -1531,11 +1601,11 @@
 
     return-void
 
-    .line 1065
+    .line 1069
     :cond_37
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sReason:Ljava/lang/String;
 
-    .line 1066
+    .line 1070
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sCbHandler:Landroid/os/Handler;
 
     new-instance v3, Lcom/k4/soundtrigger/K4StRetry$21;
@@ -1544,10 +1614,10 @@
 
     invoke-virtual {v2, v3}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 1079
+    .line 1083
     return-void
 
-    .line 1063
+    .line 1067
     :catchall_44
     move-exception v0
 
@@ -1562,14 +1632,14 @@
 .method public static halError(Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;Ljava/lang/RuntimeException;)Ljava/lang/RuntimeException;
     .registers 3
 
-    .line 366
+    .line 368
     invoke-virtual {p1}, Ljava/lang/RuntimeException;->toString()Ljava/lang/String;
 
     move-result-object v0
 
     invoke-static {p0, v0}, Lcom/k4/soundtrigger/K4StRetry;->owe(Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;Ljava/lang/String;)V
 
-    .line 367
+    .line 369
     instance-of p0, p1, Lcom/android/server/soundtrigger_middleware/HalException;
 
     if-eqz p0, :cond_16
@@ -1586,7 +1656,7 @@
 
     return-object p0
 
-    .line 368
+    .line 370
     :cond_16
     return-object p1
 .end method
@@ -1594,14 +1664,14 @@
 .method private static hold(J)V
     .registers 4
 
-    .line 1025
+    .line 1029
     invoke-static {}, Landroid/os/SystemClock;->uptimeMillis()J
 
     move-result-wide v0
 
     add-long/2addr v0, p0
 
-    .line 1026
+    .line 1030
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->sStateHandler:Landroid/os/Handler;
 
     new-instance p1, Lcom/k4/soundtrigger/K4StRetry$20;
@@ -1610,17 +1680,17 @@
 
     invoke-virtual {p0, p1}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 1032
+    .line 1036
     return-void
 .end method
 
 .method private static listenerSaysCall()Z
     .registers 2
 
-    .line 814
+    .line 818
     sget v0, Lcom/k4/soundtrigger/K4StRetry;->sMode:I
 
-    .line 815
+    .line 819
     if-eqz v0, :cond_a
 
     const/16 v1, -0x64
@@ -1641,7 +1711,7 @@
 .method private static noCall(I)Z
     .registers 1
 
-    .line 476
+    .line 478
     if-nez p0, :cond_a
 
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->callBySignals()Z
@@ -1664,12 +1734,12 @@
 .method private static onCallSignals()V
     .registers 4
 
-    .line 837
+    .line 841
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 838
+    .line 842
     :try_start_3
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
@@ -1698,13 +1768,13 @@
     :goto_16
     const/4 v1, 0x1
 
-    .line 839
+    .line 843
     :goto_17
     monitor-exit v0
     :try_end_18
     .catchall {:try_start_3 .. :try_end_18} :catchall_5c
 
-    .line 840
+    .line 844
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->listenerSaysCall()Z
 
     move-result v0
@@ -1719,18 +1789,18 @@
 
     goto :goto_3d
 
-    .line 845
+    .line 849
     :cond_25
     if-eqz v1, :cond_5b
 
-    .line 846
+    .line 850
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
 
     invoke-virtual {v0, v1}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 847
+    .line 851
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
@@ -1739,14 +1809,14 @@
 
     invoke-virtual {v0, v1, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 848
+    .line 852
     const-wide/16 v0, 0x7918
 
     invoke-static {v0, v1}, Lcom/k4/soundtrigger/K4StRetry;->hold(J)V
 
     goto :goto_5b
 
-    .line 841
+    .line 845
     :cond_3d
     :goto_3d
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
@@ -1755,7 +1825,7 @@
 
     invoke-virtual {v0, v2}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 842
+    .line 846
     if-eqz v1, :cond_5b
 
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->signalWillReport()Z
@@ -1770,7 +1840,7 @@
 
     if-nez v0, :cond_5b
 
-    .line 843
+    .line 847
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
@@ -1779,12 +1849,12 @@
 
     invoke-virtual {v0, v1, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 850
+    .line 854
     :cond_5b
     :goto_5b
     return-void
 
-    .line 839
+    .line 843
     :catchall_5c
     move-exception v1
 
@@ -1799,16 +1869,16 @@
 .method private static onMode(I)V
     .registers 4
 
-    .line 821
+    .line 825
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 822
+    .line 826
     :try_start_3
     sput p0, Lcom/k4/soundtrigger/K4StRetry;->sMode:I
 
-    .line 823
+    .line 827
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v1}, Ljava/util/IdentityHashMap;->isEmpty()Z
@@ -1836,13 +1906,13 @@
     :goto_18
     const/4 v1, 0x1
 
-    .line 824
+    .line 828
     :goto_19
     monitor-exit v0
     :try_end_1a
     .catchall {:try_start_3 .. :try_end_1a} :catchall_43
 
-    .line 825
+    .line 829
     if-nez p0, :cond_3b
 
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->signalWillReport()Z
@@ -1853,18 +1923,18 @@
 
     goto :goto_3b
 
-    .line 827
+    .line 831
     :cond_23
     if-eqz v1, :cond_42
 
-    .line 828
+    .line 832
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
 
     invoke-virtual {p0, v0}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 829
+    .line 833
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
@@ -1873,14 +1943,14 @@
 
     invoke-virtual {p0, v0, v1, v2}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 830
+    .line 834
     const-wide/16 v0, 0x7918
 
     invoke-static {v0, v1}, Lcom/k4/soundtrigger/K4StRetry;->hold(J)V
 
     goto :goto_42
 
-    .line 826
+    .line 830
     :cond_3b
     :goto_3b
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
@@ -1889,12 +1959,12 @@
 
     invoke-virtual {p0, v0}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 832
+    .line 836
     :cond_42
     :goto_42
     return-void
 
-    .line 824
+    .line 828
     :catchall_43
     move-exception p0
 
@@ -1917,20 +1987,20 @@
         }
     .end annotation
 
-    .line 747
+    .line 751
     nop
 
-    .line 748
+    .line 752
     nop
 
-    .line 749
+    .line 753
     const/4 v0, 0x1
 
     const/4 v1, 0x0
 
     if-eqz p0, :cond_3b
 
-    .line 750
+    .line 754
     invoke-interface {p0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
     move-result-object p0
@@ -1951,7 +2021,7 @@
 
     check-cast v3, Landroid/media/AudioPlaybackConfiguration;
 
-    .line 751
+    .line 755
     if-eqz v3, :cond_b
 
     invoke-virtual {v3}, Landroid/media/AudioPlaybackConfiguration;->isActive()Z
@@ -1962,11 +2032,11 @@
 
     goto :goto_b
 
-    .line 752
+    .line 756
     :cond_20
     nop
 
-    .line 755
+    .line 759
     :try_start_21
     invoke-virtual {v3}, Landroid/media/AudioPlaybackConfiguration;->getAudioAttributes()Landroid/media/AudioAttributes;
 
@@ -1978,17 +2048,17 @@
     :try_end_29
     .catchall {:try_start_21 .. :try_end_29} :catchall_2a
 
-    .line 758
+    .line 762
     goto :goto_2c
 
-    .line 756
+    .line 760
     :catchall_2a
     move-exception v1
 
-    .line 757
+    .line 761
     const/4 v1, -0x1
 
-    .line 759
+    .line 763
     :goto_2c
     const/4 v3, 0x2
 
@@ -2002,17 +2072,17 @@
 
     if-ne v1, v3, :cond_36
 
-    .line 762
+    .line 766
     :cond_35
     move v2, v0
 
-    .line 764
+    .line 768
     :cond_36
     move v1, v0
 
     goto :goto_b
 
-    .line 750
+    .line 754
     :cond_38
     move p0, v1
 
@@ -2020,23 +2090,23 @@
 
     goto :goto_3c
 
-    .line 749
+    .line 753
     :cond_3b
     move p0, v1
 
-    .line 766
+    .line 770
     :goto_3c
     invoke-static {v0, v1}, Lcom/k4/soundtrigger/K4StRetry;->setSignal(IZ)V
 
-    .line 767
+    .line 771
     sget-boolean v0, Lcom/k4/soundtrigger/K4StRetry;->sAudioActive:Z
 
     if-eq p0, v0, :cond_51
 
-    .line 768
+    .line 772
     sput-boolean p0, Lcom/k4/soundtrigger/K4StRetry;->sAudioActive:Z
 
-    .line 769
+    .line 773
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     if-eqz p0, :cond_4c
@@ -2051,7 +2121,7 @@
     :goto_4e
     invoke-virtual {v0, p0}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 771
+    .line 775
     :cond_51
     return-void
 .end method
@@ -2067,17 +2137,17 @@
         }
     .end annotation
 
-    .line 775
+    .line 779
     nop
 
-    .line 776
+    .line 780
     const/4 v0, 0x2
 
     const/4 v1, 0x0
 
     if-eqz p0, :cond_2f
 
-    .line 777
+    .line 781
     invoke-interface {p0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
     move-result-object p0
@@ -2096,7 +2166,7 @@
 
     check-cast v2, Landroid/media/AudioRecordingConfiguration;
 
-    .line 778
+    .line 782
     if-eqz v2, :cond_9
 
     invoke-virtual {v2}, Landroid/media/AudioRecordingConfiguration;->isClientSilenced()Z
@@ -2107,13 +2177,13 @@
 
     goto :goto_9
 
-    .line 779
+    .line 783
     :cond_1e
     invoke-virtual {v2}, Landroid/media/AudioRecordingConfiguration;->getClientAudioSource()I
 
     move-result v2
 
-    .line 780
+    .line 784
     const/4 v3, 0x7
 
     if-eq v2, v3, :cond_2d
@@ -2128,50 +2198,50 @@
 
     if-ne v2, v3, :cond_2e
 
-    .line 783
+    .line 787
     :cond_2d
     const/4 v1, 0x1
 
-    .line 785
+    .line 789
     :cond_2e
     goto :goto_9
 
-    .line 787
+    .line 791
     :cond_2f
     invoke-static {v0, v1}, Lcom/k4/soundtrigger/K4StRetry;->setSignal(IZ)V
 
-    .line 788
+    .line 792
     return-void
 .end method
 
 .method private static owe(Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;Ljava/lang/String;)V
     .registers 8
 
-    .line 379
+    .line 381
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->callBySignals()Z
 
     move-result v0
 
-    .line 380
+    .line 382
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v1
 
-    .line 381
+    .line 383
     :try_start_7
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->ensureHandlerLocked()V
 
-    .line 382
+    .line 384
     sget v2, Lcom/k4/soundtrigger/K4StRetry;->sMode:I
 
-    .line 383
+    .line 385
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
     sget-object v4, Ljava/lang/Boolean;->TRUE:Ljava/lang/Boolean;
 
     invoke-virtual {v3, p0, v4}, Ljava/util/IdentityHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 384
+    .line 386
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->OWED_CHECK:Ljava/lang/Runnable;
@@ -2190,7 +2260,7 @@
 
     invoke-virtual {p0, v3, v4, v5}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 385
+    .line 387
     :cond_27
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->listenerSaysCall()Z
 
@@ -2214,7 +2284,7 @@
 
     if-nez p0, :cond_4b
 
-    .line 386
+    .line 388
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
@@ -2223,23 +2293,23 @@
 
     invoke-virtual {p0, v3, v4, v5}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 387
+    .line 389
     const-wide/16 v3, 0xfa0
 
     invoke-static {v3, v4}, Lcom/k4/soundtrigger/K4StRetry;->hold(J)V
 
-    .line 389
+    .line 391
     :cond_4b
     monitor-exit v1
     :try_end_4c
     .catchall {:try_start_7 .. :try_end_4c} :catchall_90
 
-    .line 390
+    .line 392
     if-nez v2, :cond_69
 
     if-nez v0, :cond_69
 
-    .line 391
+    .line 393
     const-string p0, "SoundTriggerHalEnforcer"
 
     new-instance v0, Ljava/lang/StringBuilder;
@@ -2264,7 +2334,7 @@
 
     goto :goto_8f
 
-    .line 394
+    .line 396
     :cond_69
     const-string p0, "K4StRetry"
 
@@ -2302,11 +2372,11 @@
 
     invoke-static {p0, p1}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 397
+    .line 399
     :goto_8f
     return-void
 
-    .line 389
+    .line 391
     :catchall_90
     move-exception p0
 
@@ -2321,12 +2391,12 @@
 .method private static owedCheck()V
     .registers 10
 
-    .line 893
+    .line 897
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 894
+    .line 898
     :try_start_3
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
@@ -2359,22 +2429,22 @@
     :goto_18
     move v1, v2
 
-    .line 895
+    .line 899
     :goto_19
     monitor-exit v0
     :try_end_1a
     .catchall {:try_start_3 .. :try_end_1a} :catchall_113
 
-    .line 896
+    .line 900
     if-nez v1, :cond_1f
 
-    .line 897
+    .line 901
     sput-boolean v3, Lcom/k4/soundtrigger/K4StRetry;->sOwedSeenFree:Z
 
-    .line 898
+    .line 902
     return-void
 
-    .line 900
+    .line 904
     :cond_1f
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
@@ -2384,18 +2454,18 @@
 
     invoke-virtual {v0, v1, v4, v5}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 901
+    .line 905
     nop
 
-    .line 902
+    .line 906
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sAm:Landroid/media/AudioManager;
 
-    .line 903
+    .line 907
     const/16 v1, -0x64
 
     if-eqz v0, :cond_37
 
-    .line 905
+    .line 909
     :try_start_30
     invoke-virtual {v0}, Landroid/media/AudioManager;->getMode()I
 
@@ -2403,17 +2473,17 @@
     :try_end_34
     .catchall {:try_start_30 .. :try_end_34} :catchall_35
 
-    .line 908
+    .line 912
     goto :goto_37
 
-    .line 906
+    .line 910
     :catchall_35
     move-exception v0
 
-    .line 907
+    .line 911
     nop
 
-    .line 910
+    .line 914
     :cond_37
     :goto_37
     if-nez v1, :cond_4b
@@ -2442,23 +2512,23 @@
     :cond_4b
     move v0, v3
 
-    .line 912
+    .line 916
     :goto_4c
     invoke-static {}, Landroid/os/SystemClock;->uptimeMillis()J
 
     move-result-wide v4
 
-    .line 913
+    .line 917
     const-wide/16 v6, 0x0
 
     if-nez v0, :cond_57
 
-    .line 914
+    .line 918
     sput-wide v6, Lcom/k4/soundtrigger/K4StRetry;->sAudioOnlySince:J
 
     goto :goto_5f
 
-    .line 915
+    .line 919
     :cond_57
     sget-wide v8, Lcom/k4/soundtrigger/K4StRetry;->sAudioOnlySince:J
 
@@ -2466,10 +2536,10 @@
 
     if-nez v8, :cond_5f
 
-    .line 916
+    .line 920
     sput-wide v4, Lcom/k4/soundtrigger/K4StRetry;->sAudioOnlySince:J
 
-    .line 918
+    .line 922
     :cond_5f
     :goto_5f
     if-eqz v0, :cond_6d
@@ -2491,11 +2561,11 @@
     :cond_6d
     move v0, v3
 
-    .line 919
+    .line 923
     :goto_6e
     if-nez v0, :cond_94
 
-    .line 920
+    .line 924
     if-nez v1, :cond_91
 
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->callBySignals()Z
@@ -2506,19 +2576,19 @@
 
     goto :goto_91
 
-    .line 924
+    .line 928
     :cond_79
     sget-boolean v0, Lcom/k4/soundtrigger/K4StRetry;->sOwedSeenFree:Z
 
     if-nez v0, :cond_80
 
-    .line 925
+    .line 929
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sOwedSeenFree:Z
 
-    .line 926
+    .line 930
     return-void
 
-    .line 928
+    .line 932
     :cond_80
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->listenerSaysCall()Z
 
@@ -2538,15 +2608,15 @@
 
     return-void
 
-    .line 921
+    .line 925
     :cond_91
     :goto_91
     sput-boolean v3, Lcom/k4/soundtrigger/K4StRetry;->sOwedSeenFree:Z
 
-    .line 922
+    .line 926
     return-void
 
-    .line 930
+    .line 934
     :cond_94
     const-string v0, "K4StRetry"
 
@@ -2554,19 +2624,19 @@
 
     invoke-static {v0, v1}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 932
+    .line 936
     sput-wide v6, Lcom/k4/soundtrigger/K4StRetry;->sAudioOnlySince:J
 
-    .line 934
+    .line 938
     :cond_9d
     sput-boolean v3, Lcom/k4/soundtrigger/K4StRetry;->sOwedSeenFree:Z
 
-    .line 937
+    .line 941
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v1
 
-    .line 938
+    .line 942
     :try_start_a2
     new-instance v0, Ljava/util/ArrayList;
 
@@ -2578,7 +2648,7 @@
 
     invoke-direct {v0, v2}, Ljava/util/ArrayList;-><init>(Ljava/util/Collection;)V
 
-    .line 939
+    .line 943
     new-instance v2, Ljava/util/ArrayList;
 
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
@@ -2589,22 +2659,22 @@
 
     invoke-direct {v2, v3}, Ljava/util/ArrayList;-><init>(Ljava/util/Collection;)V
 
-    .line 940
+    .line 944
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v3}, Ljava/util/IdentityHashMap;->clear()V
 
-    .line 941
+    .line 945
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v3}, Ljava/util/IdentityHashMap;->clear()V
 
-    .line 942
+    .line 946
     monitor-exit v1
     :try_end_c3
     .catchall {:try_start_a2 .. :try_end_c3} :catchall_110
 
-    .line 943
+    .line 947
     invoke-interface {v0}, Ljava/util/List;->isEmpty()Z
 
     move-result v1
@@ -2619,18 +2689,18 @@
 
     return-void
 
-    .line 944
+    .line 948
     :cond_d0
     const-string v1, "K4StRetry"
 
     sget v3, Lcom/k4/soundtrigger/K4StRetry;->sMode:I
 
-    .line 945
+    .line 949
     invoke-interface {v0}, Ljava/util/List;->size()I
 
     move-result v4
 
-    .line 946
+    .line 950
     invoke-interface {v2}, Ljava/util/List;->size()I
 
     move-result v5
@@ -2679,16 +2749,16 @@
 
     move-result-object v3
 
-    .line 944
+    .line 948
     invoke-static {v1, v3}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 947
+    .line 951
     invoke-static {v0, v2}, Lcom/k4/soundtrigger/K4StRetry;->rebootAll(Ljava/util/List;Ljava/util/List;)V
 
-    .line 948
+    .line 952
     return-void
 
-    .line 942
+    .line 946
     :catchall_110
     move-exception v0
 
@@ -2699,7 +2769,7 @@
 
     throw v0
 
-    .line 895
+    .line 899
     :catchall_113
     move-exception v1
 
@@ -2725,12 +2795,12 @@
         }
     .end annotation
 
-    .line 956
+    .line 960
     new-instance v0, Ljava/util/IdentityHashMap;
 
     invoke-direct {v0}, Ljava/util/IdentityHashMap;-><init>()V
 
-    .line 957
+    .line 961
     invoke-interface {p0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
     move-result-object v1
@@ -2748,7 +2818,7 @@
 
     check-cast v2, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;
 
-    .line 958
+    .line 962
     iget-object v3, v2, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;->mUnderlying:Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;
 
     if-eqz v3, :cond_20
@@ -2759,11 +2829,11 @@
 
     invoke-virtual {v0, v2, v3}, Ljava/util/IdentityHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 959
+    .line 963
     :cond_20
     goto :goto_9
 
-    .line 960
+    .line 964
     :cond_21
     invoke-interface {p1}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
@@ -2790,13 +2860,13 @@
 
     goto :goto_25
 
-    .line 961
+    .line 965
     :cond_39
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v1
 
-    .line 962
+    .line 966
     :try_start_3c
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
@@ -2816,7 +2886,7 @@
 
     if-eqz v3, :cond_5e
 
-    .line 963
+    .line 967
     invoke-interface {v2}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
     move-result-object v3
@@ -2835,7 +2905,7 @@
 
     goto :goto_46
 
-    .line 965
+    .line 969
     :cond_5e
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
@@ -2855,7 +2925,7 @@
 
     if-eqz v3, :cond_80
 
-    .line 966
+    .line 970
     invoke-interface {v2}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
     move-result-object v3
@@ -2874,18 +2944,18 @@
 
     goto :goto_68
 
-    .line 968
+    .line 972
     :cond_80
     monitor-exit v1
     :try_end_81
     .catchall {:try_start_3c .. :try_end_81} :catchall_db
 
-    .line 969
+    .line 973
     new-instance v0, Ljava/util/IdentityHashMap;
 
     invoke-direct {v0}, Ljava/util/IdentityHashMap;-><init>()V
 
-    .line 970
+    .line 974
     invoke-interface {p0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
     move-result-object p0
@@ -2904,10 +2974,10 @@
 
     check-cast v1, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;
 
-    .line 971
+    .line 975
     iget-object v2, v1, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;->mUnderlying:Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;
 
-    .line 972
+    .line 976
     if-eqz v2, :cond_8a
 
     sget-object v3, Ljava/lang/Boolean;->TRUE:Ljava/lang/Boolean;
@@ -2920,32 +2990,32 @@
 
     goto :goto_8a
 
-    .line 974
+    .line 978
     :cond_a3
     :try_start_a3
     invoke-virtual {v1}, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalEnforcer;->reboot()V
     :try_end_a6
     .catchall {:try_start_a3 .. :try_end_a6} :catchall_a7
 
-    .line 977
+    .line 981
     goto :goto_af
 
-    .line 975
+    .line 979
     :catchall_a7
     move-exception v1
 
-    .line 976
+    .line 980
     const-string v2, "K4StRetry"
 
     const-string v3, "deferred HAL reboot failed"
 
     invoke-static {v2, v3, v1}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 978
+    .line 982
     :goto_af
     goto :goto_8a
 
-    .line 979
+    .line 983
     :cond_b0
     invoke-interface {p1}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
@@ -2964,7 +3034,7 @@
 
     check-cast p1, Lcom/k4/soundtrigger/K4StRetry$Hung;
 
-    .line 980
+    .line 984
     iget-object v1, p1, Lcom/k4/soundtrigger/K4StRetry$Hung;->hal:Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;
 
     sget-object v2, Ljava/lang/Boolean;->TRUE:Ljava/lang/Boolean;
@@ -2977,7 +3047,7 @@
 
     goto :goto_b4
 
-    .line 982
+    .line 986
     :cond_cb
     :try_start_cb
     iget-object p1, p1, Lcom/k4/soundtrigger/K4StRetry$Hung;->hal:Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;
@@ -2986,29 +3056,29 @@
     :try_end_d0
     .catchall {:try_start_cb .. :try_end_d0} :catchall_d1
 
-    .line 985
+    .line 989
     goto :goto_d9
 
-    .line 983
+    .line 987
     :catchall_d1
     move-exception p1
 
-    .line 984
+    .line 988
     const-string v1, "K4StRetry"
 
     const-string v2, "HAL reboot failed"
 
     invoke-static {v1, v2, p1}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 986
+    .line 990
     :goto_d9
     goto :goto_b4
 
-    .line 987
+    .line 991
     :cond_da
     return-void
 
-    .line 968
+    .line 972
     :catchall_db
     move-exception p0
 
@@ -3023,15 +3093,15 @@
 .method public static refused(Ljava/lang/Object;Lcom/android/server/soundtrigger_middleware/HalException;)Ljava/lang/RuntimeException;
     .registers 5
 
-    .line 346
+    .line 348
     invoke-virtual {p1}, Lcom/android/server/soundtrigger_middleware/HalException;->toString()Ljava/lang/String;
 
     move-result-object v0
 
-    .line 347
+    .line 349
     iget p1, p1, Lcom/android/server/soundtrigger_middleware/HalException;->errorCode:I
 
-    .line 348
+    .line 350
     const/16 v1, -0x13
 
     if-eq p1, v1, :cond_35
@@ -3048,7 +3118,7 @@
 
     if-eq p1, v1, :cond_35
 
-    .line 349
+    .line 351
     const-string p0, "K4StRetry"
 
     new-instance p1, Ljava/lang/StringBuilder;
@@ -3071,7 +3141,7 @@
 
     invoke-static {p0, p1}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 350
+    .line 352
     new-instance p0, Lcom/android/server/soundtrigger_middleware/RecoverableException;
 
     const/4 p1, 0x5
@@ -3080,7 +3150,7 @@
 
     return-object p0
 
-    .line 352
+    .line 354
     :cond_35
     const-string p1, "K4StRetry"
 
@@ -3104,12 +3174,12 @@
 
     invoke-static {p1, v1}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 354
+    .line 356
     sget-object p1, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter p1
 
-    .line 355
+    .line 357
     :try_start_50
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sPending:Ljava/util/IdentityHashMap;
 
@@ -3117,15 +3187,15 @@
 
     invoke-virtual {v1, p0, v2}, Ljava/util/IdentityHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 356
+    .line 358
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->ensureHandlerLocked()V
 
-    .line 357
+    .line 359
     monitor-exit p1
     :try_end_5b
     .catchall {:try_start_50 .. :try_end_5b} :catchall_62
 
-    .line 358
+    .line 360
     new-instance p0, Lcom/android/server/soundtrigger_middleware/RecoverableException;
 
     const/4 p1, 0x1
@@ -3134,7 +3204,7 @@
 
     return-object p0
 
-    .line 357
+    .line 359
     :catchall_62
     move-exception p0
 
@@ -3149,13 +3219,13 @@
 .method private static registerState()V
     .registers 11
 
-    .line 562
+    .line 566
     const-string v1, "K4StRetry"
 
-    .line 563
+    .line 567
     nop
 
-    .line 565
+    .line 569
     const/4 v2, 0x1
 
     const/4 v3, 0x0
@@ -3169,12 +3239,12 @@
 
     move-result-object v4
 
-    .line 566
+    .line 570
     sget-boolean v0, Lcom/k4/soundtrigger/K4StRetry;->sModeWatched:Z
 
     if-nez v0, :cond_62
 
-    .line 569
+    .line 573
     const-string v0, "audio"
 
     invoke-static {v0}, Landroid/os/ServiceManager;->checkService(Ljava/lang/String;)Landroid/os/IBinder;
@@ -3183,7 +3253,7 @@
 
     if-eqz v0, :cond_5a
 
-    .line 570
+    .line 574
     const-class v0, Landroid/media/AudioManager;
 
     invoke-virtual {v4, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
@@ -3192,7 +3262,7 @@
 
     check-cast v0, Landroid/media/AudioManager;
 
-    .line 571
+    .line 575
     sget-object v5, Lcom/k4/soundtrigger/K4StRetry;->EXECUTOR:Ljava/util/concurrent/Executor;
 
     new-instance v6, Lcom/k4/soundtrigger/K4StRetry$10;
@@ -3201,18 +3271,18 @@
 
     invoke-virtual {v0, v5, v6}, Landroid/media/AudioManager;->addOnModeChangedListener(Ljava/util/concurrent/Executor;Landroid/media/AudioManager$OnModeChangedListener;)V
 
-    .line 577
+    .line 581
     invoke-virtual {v0}, Landroid/media/AudioManager;->getMode()I
 
     move-result v5
 
-    .line 578
+    .line 582
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sAm:Landroid/media/AudioManager;
 
-    .line 579
+    .line 583
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sModeWatched:Z
 
-    .line 580
+    .line 584
     new-instance v0, Ljava/lang/StringBuilder;
 
     invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
@@ -3239,7 +3309,7 @@
 
     invoke-static {v1, v0}, Landroid/util/Slog;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 581
+    .line 585
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     new-instance v6, Lcom/k4/soundtrigger/K4StRetry$11;
@@ -3250,7 +3320,7 @@
 
     goto :goto_62
 
-    .line 569
+    .line 573
     :cond_5a
     new-instance v0, Ljava/lang/IllegalStateException;
 
@@ -3260,20 +3330,20 @@
 
     throw v0
 
-    .line 588
+    .line 592
     :cond_62
     :goto_62
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sAm:Landroid/media/AudioManager;
     :try_end_64
     .catchall {:try_start_5 .. :try_end_64} :catchall_d5
 
-    .line 590
+    .line 594
     :try_start_64
     sget-boolean v5, Lcom/k4/soundtrigger/K4StRetry;->sPlaybackWatched:Z
 
     if-nez v5, :cond_7b
 
-    .line 591
+    .line 595
     new-instance v5, Lcom/k4/soundtrigger/K4StRetry$12;
 
     invoke-direct {v5}, Lcom/k4/soundtrigger/K4StRetry$12;-><init>()V
@@ -3282,23 +3352,23 @@
 
     invoke-virtual {v0, v5, v6}, Landroid/media/AudioManager;->registerAudioPlaybackCallback(Landroid/media/AudioManager$AudioPlaybackCallback;Landroid/os/Handler;)V
 
-    .line 597
+    .line 601
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sPlaybackWatched:Z
 
-    .line 598
+    .line 602
     invoke-virtual {v0}, Landroid/media/AudioManager;->getActivePlaybackConfigurations()Ljava/util/List;
 
     move-result-object v5
 
     invoke-static {v5}, Lcom/k4/soundtrigger/K4StRetry;->onPlayback(Ljava/util/List;)V
 
-    .line 600
+    .line 604
     :cond_7b
     sget-boolean v5, Lcom/k4/soundtrigger/K4StRetry;->sRecordingWatched:Z
 
     if-nez v5, :cond_92
 
-    .line 601
+    .line 605
     new-instance v5, Lcom/k4/soundtrigger/K4StRetry$13;
 
     invoke-direct {v5}, Lcom/k4/soundtrigger/K4StRetry$13;-><init>()V
@@ -3307,44 +3377,44 @@
 
     invoke-virtual {v0, v5, v6}, Landroid/media/AudioManager;->registerAudioRecordingCallback(Landroid/media/AudioManager$AudioRecordingCallback;Landroid/os/Handler;)V
 
-    .line 607
+    .line 611
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sRecordingWatched:Z
 
-    .line 608
+    .line 612
     invoke-virtual {v0}, Landroid/media/AudioManager;->getActiveRecordingConfigurations()Ljava/util/List;
 
     move-result-object v0
 
     invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->onRecording(Ljava/util/List;)V
 
-    .line 610
+    .line 614
     :cond_92
     sput-boolean v3, Lcom/k4/soundtrigger/K4StRetry;->sAudioSignalsFailed:Z
     :try_end_94
     .catchall {:try_start_64 .. :try_end_94} :catchall_97
 
-    .line 615
+    .line 619
     const/4 v0, 0x0
 
     move v10, v3
 
     goto :goto_9c
 
-    .line 611
+    .line 615
     :catchall_97
     move-exception v0
 
-    .line 612
+    .line 616
     :try_start_98
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sAudioSignalsFailed:Z
 
-    .line 613
+    .line 617
     nop
 
-    .line 614
+    .line 618
     move v10, v2
 
-    .line 616
+    .line 620
     :goto_9c
     sget-boolean v5, Lcom/k4/soundtrigger/K4StRetry;->sScreenWatched:Z
     :try_end_9e
@@ -3352,7 +3422,7 @@
 
     if-nez v5, :cond_b9
 
-    .line 618
+    .line 622
     :try_start_a0
     new-instance v5, Lcom/k4/soundtrigger/K4StRetry$14;
 
@@ -3372,25 +3442,25 @@
 
     invoke-virtual/range {v4 .. v9}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;
 
-    .line 624
+    .line 628
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sScreenWatched:Z
     :try_end_b5
     .catchall {:try_start_a0 .. :try_end_b5} :catchall_b6
 
-    .line 628
+    .line 632
     goto :goto_b9
 
-    .line 625
+    .line 629
     :catchall_b6
     move-exception v0
 
-    .line 626
+    .line 630
     nop
 
-    .line 627
+    .line 631
     move v10, v2
 
-    .line 630
+    .line 634
     :cond_b9
     :goto_b9
     :try_start_b9
@@ -3400,7 +3470,7 @@
 
     if-nez v5, :cond_d4
 
-    .line 632
+    .line 636
     :try_start_bd
     invoke-static {v4}, Lcom/k4/soundtrigger/K4StRetry;->registerTelephony(Landroid/content/Context;)Z
 
@@ -3408,10 +3478,10 @@
 
     if-nez v4, :cond_ce
 
-    .line 633
+    .line 637
     nop
 
-    .line 634
+    .line 638
     if-nez v0, :cond_cd
 
     new-instance v0, Ljava/lang/IllegalStateException;
@@ -3425,49 +3495,49 @@
     :cond_cd
     move v10, v2
 
-    .line 640
+    .line 644
     :cond_ce
     goto :goto_d4
 
-    .line 636
+    .line 640
     :catchall_cf
     move-exception v0
 
-    .line 637
+    .line 641
     :try_start_d0
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sTelFailed:Z
     :try_end_d2
     .catchall {:try_start_d0 .. :try_end_d2} :catchall_d5
 
-    .line 638
+    .line 642
     nop
 
-    .line 639
+    .line 643
     move v10, v2
 
-    .line 646
+    .line 650
     :cond_d4
     :goto_d4
     goto :goto_d8
 
-    .line 642
+    .line 646
     :catchall_d5
     move-exception v0
 
-    .line 644
+    .line 648
     nop
 
-    .line 645
+    .line 649
     move v10, v2
 
-    .line 647
+    .line 651
     :goto_d8
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->updateUnknown()V
 
-    .line 648
+    .line 652
     if-nez v10, :cond_102
 
-    .line 649
+    .line 653
     sget v0, Lcom/k4/soundtrigger/K4StRetry;->sStateRegisterTries:I
 
     if-lez v0, :cond_ff
@@ -3500,14 +3570,14 @@
 
     invoke-static {v1, v0}, Landroid/util/Slog;->i(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 650
+    .line 654
     :cond_ff
     sput v3, Lcom/k4/soundtrigger/K4StRetry;->sStateRegisterTries:I
 
-    .line 651
+    .line 655
     return-void
 
-    .line 653
+    .line 657
     :cond_102
     sget v3, Lcom/k4/soundtrigger/K4StRetry;->sStateRegisterTries:I
 
@@ -3515,7 +3585,7 @@
 
     sput v3, Lcom/k4/soundtrigger/K4StRetry;->sStateRegisterTries:I
 
-    .line 654
+    .line 658
     const/16 v4, 0x3c
 
     if-eq v3, v2, :cond_113
@@ -3528,11 +3598,11 @@
 
     if-nez v2, :cond_149
 
-    .line 655
+    .line 659
     :cond_113
     nop
 
-    .line 656
+    .line 660
     if-ge v3, v4, :cond_119
 
     const-string v2, "1 s"
@@ -3585,10 +3655,10 @@
 
     move-result-object v0
 
-    .line 655
+    .line 659
     invoke-static {v1, v0}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 658
+    .line 662
     :cond_149
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sStateHandler:Landroid/os/Handler;
 
@@ -3606,14 +3676,14 @@
     :goto_154
     invoke-virtual {v0, v1, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 659
+    .line 663
     return-void
 .end method
 
 .method private static registerTelephony(Landroid/content/Context;)Z
     .registers 4
 
-    .line 668
+    .line 672
     const-string v0, "isub"
 
     invoke-static {v0}, Landroid/os/ServiceManager;->checkService(Ljava/lang/String;)Landroid/os/IBinder;
@@ -3634,7 +3704,7 @@
 
     goto :goto_41
 
-    .line 672
+    .line 676
     :cond_12
     const-class v0, Landroid/telephony/SubscriptionManager;
 
@@ -3644,7 +3714,7 @@
 
     check-cast v0, Landroid/telephony/SubscriptionManager;
 
-    .line 673
+    .line 677
     const-class v2, Landroid/telephony/TelephonyManager;
 
     invoke-virtual {p0, v2}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
@@ -3653,7 +3723,7 @@
 
     check-cast p0, Landroid/telephony/TelephonyManager;
 
-    .line 674
+    .line 678
     const/4 v2, 0x1
 
     if-eqz v0, :cond_3c
@@ -3662,14 +3732,14 @@
 
     goto :goto_3c
 
-    .line 679
+    .line 683
     :cond_28
     sput-object v0, Lcom/k4/soundtrigger/K4StRetry;->sSubs:Landroid/telephony/SubscriptionManager;
 
-    .line 680
+    .line 684
     sput-object p0, Lcom/k4/soundtrigger/K4StRetry;->sTel:Landroid/telephony/TelephonyManager;
 
-    .line 681
+    .line 685
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->STATE_EXECUTOR:Ljava/util/concurrent/Executor;
 
     new-instance v1, Lcom/k4/soundtrigger/K4StRetry$15;
@@ -3678,44 +3748,44 @@
 
     invoke-virtual {v0, p0, v1}, Landroid/telephony/SubscriptionManager;->addOnSubscriptionsChangedListener(Ljava/util/concurrent/Executor;Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
 
-    .line 687
+    .line 691
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sTelWatched:Z
 
-    .line 688
+    .line 692
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->syncSubscriptions()V
 
-    .line 689
+    .line 693
     return v2
 
-    .line 675
+    .line 679
     :cond_3c
     :goto_3c
     sput-boolean v1, Lcom/k4/soundtrigger/K4StRetry;->sTelFailed:Z
 
-    .line 676
+    .line 680
     sput-boolean v2, Lcom/k4/soundtrigger/K4StRetry;->sTelWatched:Z
 
-    .line 677
+    .line 681
     return v2
 
-    .line 669
+    .line 673
     :cond_41
     :goto_41
     sput-boolean v1, Lcom/k4/soundtrigger/K4StRetry;->sTelFailed:Z
 
-    .line 670
+    .line 674
     return v1
 .end method
 
 .method private static resync()V
     .registers 8
 
-    .line 854
+    .line 858
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->currentMode()I
 
     move-result v0
 
-    .line 855
+    .line 859
     const/16 v1, -0x64
 
     const-wide/16 v2, 0x1388
@@ -3724,12 +3794,12 @@
 
     if-ne v0, v1, :cond_34
 
-    .line 857
+    .line 861
     invoke-static {}, Landroid/os/SystemClock;->uptimeMillis()J
 
     move-result-wide v0
 
-    .line 858
+    .line 862
     sget-wide v6, Lcom/k4/soundtrigger/K4StRetry;->sUnknownSince:J
 
     cmp-long v4, v6, v4
@@ -3738,7 +3808,7 @@
 
     sput-wide v0, Lcom/k4/soundtrigger/K4StRetry;->sUnknownSince:J
 
-    .line 859
+    .line 863
     :cond_18
     sget-wide v4, Lcom/k4/soundtrigger/K4StRetry;->sUnknownSince:J
 
@@ -3750,17 +3820,17 @@
 
     if-gez v0, :cond_2a
 
-    .line 860
+    .line 864
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->RESYNC:Ljava/lang/Runnable;
 
     invoke-virtual {v0, v1, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 861
+    .line 865
     return-void
 
-    .line 863
+    .line 867
     :cond_2a
     const-string v0, "K4StRetry"
 
@@ -3768,33 +3838,33 @@
 
     invoke-static {v0, v1}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 865
+    .line 869
     nop
 
-    .line 866
+    .line 870
     const/4 v0, 0x0
 
     goto :goto_36
 
-    .line 867
+    .line 871
     :cond_34
     sput-wide v4, Lcom/k4/soundtrigger/K4StRetry;->sUnknownSince:J
 
-    .line 871
+    .line 875
     :goto_36
     invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->noCall(I)Z
 
     move-result v0
 
-    .line 872
+    .line 876
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v1
 
-    .line 873
+    .line 877
     if-nez v0, :cond_54
 
-    .line 876
+    .line 880
     :try_start_3f
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->listenerSaysCall()Z
 
@@ -3814,13 +3884,13 @@
 
     invoke-virtual {v0, v4, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 877
+    .line 881
     :cond_52
     monitor-exit v1
 
     return-void
 
-    .line 879
+    .line 883
     :cond_54
     new-instance v0, Ljava/util/ArrayList;
 
@@ -3832,7 +3902,7 @@
 
     invoke-direct {v0, v2}, Ljava/util/ArrayList;-><init>(Ljava/util/Collection;)V
 
-    .line 880
+    .line 884
     new-instance v2, Ljava/util/ArrayList;
 
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
@@ -3843,22 +3913,22 @@
 
     invoke-direct {v2, v3}, Ljava/util/ArrayList;-><init>(Ljava/util/Collection;)V
 
-    .line 881
+    .line 885
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sOwed:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v3}, Ljava/util/IdentityHashMap;->clear()V
 
-    .line 882
+    .line 886
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v3}, Ljava/util/IdentityHashMap;->clear()V
 
-    .line 883
+    .line 887
     monitor-exit v1
     :try_end_75
     .catchall {:try_start_3f .. :try_end_75} :catchall_b6
 
-    .line 884
+    .line 888
     invoke-interface {v0}, Ljava/util/List;->isEmpty()Z
 
     move-result v1
@@ -3873,11 +3943,11 @@
 
     return-void
 
-    .line 885
+    .line 889
     :cond_82
     const-string v1, "K4StRetry"
 
-    .line 886
+    .line 890
     invoke-interface {v0}, Ljava/util/List;->size()I
 
     move-result v3
@@ -3920,16 +3990,16 @@
 
     move-result-object v3
 
-    .line 885
+    .line 889
     invoke-static {v1, v3}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 887
+    .line 891
     invoke-static {v0, v2}, Lcom/k4/soundtrigger/K4StRetry;->rebootAll(Ljava/util/List;Ljava/util/List;)V
 
-    .line 888
+    .line 892
     return-void
 
-    .line 883
+    .line 887
     :catchall_b6
     move-exception v0
 
@@ -3944,12 +4014,12 @@
 .method private static schedule(JLjava/lang/String;)V
     .registers 5
 
-    .line 1010
+    .line 1014
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 1011
+    .line 1015
     :try_start_3
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sPending:Ljava/util/IdentityHashMap;
 
@@ -3963,40 +4033,40 @@
 
     return-void
 
-    .line 1012
+    .line 1016
     :cond_d
     monitor-exit v0
     :try_end_e
     .catchall {:try_start_3 .. :try_end_e} :catchall_25
 
-    .line 1013
+    .line 1017
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->FIRE:Ljava/lang/Runnable;
 
     invoke-virtual {v0, v1}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
 
-    .line 1014
+    .line 1018
     sput-object p2, Lcom/k4/soundtrigger/K4StRetry;->sReason:Ljava/lang/String;
 
-    .line 1015
+    .line 1019
     sget-object p2, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->FIRE:Ljava/lang/Runnable;
 
     invoke-virtual {p2, v0, p0, p1}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 1016
+    .line 1020
     const-wide/16 v0, 0x3e8
 
     add-long/2addr p0, v0
 
     invoke-static {p0, p1}, Lcom/k4/soundtrigger/K4StRetry;->hold(J)V
 
-    .line 1017
+    .line 1021
     return-void
 
-    .line 1012
+    .line 1016
     :catchall_25
     move-exception p0
 
@@ -4011,27 +4081,27 @@
 .method public static setCallback(Ljava/lang/Object;Lcom/android/server/soundtrigger_middleware/ISoundTriggerHal$GlobalCallback;)V
     .registers 4
 
-    .line 317
+    .line 319
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 318
+    .line 320
     :try_start_3
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sCallbacks:Ljava/util/IdentityHashMap;
 
     invoke-virtual {v1, p0, p1}, Ljava/util/IdentityHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 319
+    .line 321
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->ensureHandlerLocked()V
 
-    .line 320
+    .line 322
     monitor-exit v0
 
-    .line 321
+    .line 323
     return-void
 
-    .line 320
+    .line 322
     :catchall_d
     move-exception p0
 
@@ -4045,19 +4115,19 @@
 .method private static setSignal(IZ)V
     .registers 4
 
-    .line 792
+    .line 796
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->callBySignals()Z
 
     move-result v0
 
-    .line 793
+    .line 797
     if-nez p0, :cond_9
 
     sput-boolean p1, Lcom/k4/soundtrigger/K4StRetry;->sTelBusy:Z
 
     goto :goto_11
 
-    .line 794
+    .line 798
     :cond_9
     const/4 v1, 0x1
 
@@ -4067,15 +4137,15 @@
 
     goto :goto_11
 
-    .line 795
+    .line 799
     :cond_f
     sput-boolean p1, Lcom/k4/soundtrigger/K4StRetry;->sVoiceRecording:Z
 
-    .line 796
+    .line 800
     :goto_11
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->updateUnknown()V
 
-    .line 797
+    .line 801
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->callBySignals()Z
 
     move-result p0
@@ -4088,7 +4158,7 @@
 
     invoke-virtual {p0, p1}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 798
+    .line 802
     :cond_21
     return-void
 .end method
@@ -4096,7 +4166,7 @@
 .method private static signalWillReport()Z
     .registers 1
 
-    .line 471
+    .line 473
     sget-boolean v0, Lcom/k4/soundtrigger/K4StRetry;->sTelBusy:Z
 
     if-nez v0, :cond_f
@@ -4127,7 +4197,7 @@
 .method private static syncSubscriptions()V
     .registers 5
 
-    .line 695
+    .line 699
     :try_start_0
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sSubs:Landroid/telephony/SubscriptionManager;
 
@@ -4135,15 +4205,15 @@
 
     move-result-object v0
 
-    .line 696
+    .line 700
     new-instance v1, Ljava/util/HashSet;
 
     invoke-direct {v1}, Ljava/util/HashSet;-><init>()V
 
-    .line 697
+    .line 701
     if-eqz v0, :cond_2b
 
-    .line 698
+    .line 702
     invoke-interface {v0}, Ljava/util/List;->iterator()Ljava/util/Iterator;
 
     move-result-object v0
@@ -4161,7 +4231,7 @@
 
     check-cast v2, Landroid/telephony/SubscriptionInfo;
 
-    .line 699
+    .line 703
     if-eqz v2, :cond_2a
 
     invoke-virtual {v2}, Landroid/telephony/SubscriptionInfo;->getSubscriptionId()I
@@ -4174,11 +4244,11 @@
 
     invoke-virtual {v1, v2}, Ljava/util/HashSet;->add(Ljava/lang/Object;)Z
 
-    .line 700
+    .line 704
     :cond_2a
     goto :goto_11
 
-    .line 702
+    .line 706
     :cond_2b
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sSubCalls:Ljava/util/HashMap;
 
@@ -4197,14 +4267,14 @@
 
     if-eqz v2, :cond_58
 
-    .line 703
+    .line 707
     invoke-interface {v0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
     move-result-object v2
 
     check-cast v2, Lcom/k4/soundtrigger/K4StRetry$SubCall;
 
-    .line 704
+    .line 708
     iget v3, v2, Lcom/k4/soundtrigger/K4StRetry$SubCall;->subId:I
 
     invoke-static {v3}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
@@ -4217,12 +4287,12 @@
 
     if-nez v3, :cond_57
 
-    .line 705
+    .line 709
     invoke-interface {v0}, Ljava/util/Iterator;->remove()V
     :try_end_50
     .catchall {:try_start_0 .. :try_end_50} :catchall_93
 
-    .line 707
+    .line 711
     :try_start_50
     iget-object v3, v2, Lcom/k4/soundtrigger/K4StRetry$SubCall;->tm:Landroid/telephony/TelephonyManager;
 
@@ -4230,19 +4300,19 @@
     :try_end_55
     .catchall {:try_start_50 .. :try_end_55} :catchall_56
 
-    .line 710
+    .line 714
     goto :goto_57
 
-    .line 708
+    .line 712
     :catchall_56
     move-exception v2
 
-    .line 712
+    .line 716
     :cond_57
     :goto_57
     goto :goto_35
 
-    .line 713
+    .line 717
     :cond_58
     :try_start_58
     invoke-virtual {v1}, Ljava/util/HashSet;->iterator()Ljava/util/Iterator;
@@ -4262,7 +4332,7 @@
 
     check-cast v1, Ljava/lang/Integer;
 
-    .line 714
+    .line 718
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sSubCalls:Ljava/util/HashMap;
 
     invoke-virtual {v2, v1}, Ljava/util/HashMap;->containsKey(Ljava/lang/Object;)Z
@@ -4273,7 +4343,7 @@
 
     goto :goto_5c
 
-    .line 715
+    .line 719
     :cond_71
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sTel:Landroid/telephony/TelephonyManager;
 
@@ -4285,7 +4355,7 @@
 
     move-result-object v2
 
-    .line 716
+    .line 720
     new-instance v3, Lcom/k4/soundtrigger/K4StRetry$SubCall;
 
     invoke-virtual {v1}, Ljava/lang/Integer;->intValue()I
@@ -4294,20 +4364,20 @@
 
     invoke-direct {v3, v4, v2}, Lcom/k4/soundtrigger/K4StRetry$SubCall;-><init>(ILandroid/telephony/TelephonyManager;)V
 
-    .line 719
+    .line 723
     sget-object v4, Lcom/k4/soundtrigger/K4StRetry;->STATE_EXECUTOR:Ljava/util/concurrent/Executor;
 
     invoke-virtual {v2, v4, v3}, Landroid/telephony/TelephonyManager;->registerTelephonyCallback(Ljava/util/concurrent/Executor;Landroid/telephony/TelephonyCallback;)V
 
-    .line 720
+    .line 724
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sSubCalls:Ljava/util/HashMap;
 
     invoke-virtual {v2, v1, v3}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 721
+    .line 725
     goto :goto_5c
 
-    .line 722
+    .line 726
     :cond_8f
     const/4 v0, 0x0
 
@@ -4315,19 +4385,19 @@
     :try_end_92
     .catchall {:try_start_58 .. :try_end_92} :catchall_93
 
-    .line 732
+    .line 736
     goto :goto_bf
 
-    .line 723
+    .line 727
     :catchall_93
     move-exception v0
 
-    .line 724
+    .line 728
     const/4 v1, 0x1
 
     sput-boolean v1, Lcom/k4/soundtrigger/K4StRetry;->sTelFailed:Z
 
-    .line 725
+    .line 729
     invoke-static {v0}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
 
     move-result-object v0
@@ -4354,7 +4424,7 @@
 
     invoke-static {v1, v0}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 726
+    .line 730
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sStateHandler:Landroid/os/Handler;
 
     new-instance v1, Lcom/k4/soundtrigger/K4StRetry$16;
@@ -4365,21 +4435,21 @@
 
     invoke-virtual {v0, v1, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    .line 733
+    .line 737
     :goto_bf
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->updateTelephony()V
 
-    .line 734
+    .line 738
     return-void
 .end method
 
 .method private static updateTelephony()V
     .registers 5
 
-    .line 738
+    .line 742
     nop
 
-    .line 739
+    .line 743
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sSubCalls:Ljava/util/HashMap;
 
     invoke-virtual {v0}, Ljava/util/HashMap;->values()Ljava/util/Collection;
@@ -4407,7 +4477,7 @@
 
     check-cast v3, Lcom/k4/soundtrigger/K4StRetry$SubCall;
 
-    .line 740
+    .line 744
     iget v4, v3, Lcom/k4/soundtrigger/K4StRetry$SubCall;->state:I
 
     if-eqz v4, :cond_23
@@ -4420,27 +4490,27 @@
 
     const/4 v2, 0x1
 
-    .line 741
+    .line 745
     :cond_23
     goto :goto_d
 
-    .line 742
+    .line 746
     :cond_24
     invoke-static {v1, v2}, Lcom/k4/soundtrigger/K4StRetry;->setSignal(IZ)V
 
-    .line 743
+    .line 747
     return-void
 .end method
 
 .method private static updateUnknown()V
     .registers 6
 
-    .line 802
+    .line 806
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->callBySignals()Z
 
     move-result v0
 
-    .line 803
+    .line 807
     sget-boolean v1, Lcom/k4/soundtrigger/K4StRetry;->sTelFailed:Z
 
     const/4 v2, 0x1
@@ -4474,7 +4544,7 @@
     :goto_1c
     move v1, v2
 
-    .line 804
+    .line 808
     :goto_1d
     sget-object v3, Lcom/k4/soundtrigger/K4StRetry;->sSubCalls:Ljava/util/HashMap;
 
@@ -4499,7 +4569,7 @@
 
     check-cast v4, Lcom/k4/soundtrigger/K4StRetry$SubCall;
 
-    .line 805
+    .line 809
     iget v4, v4, Lcom/k4/soundtrigger/K4StRetry$SubCall;->state:I
 
     const/4 v5, -0x1
@@ -4508,11 +4578,11 @@
 
     move v1, v2
 
-    .line 806
+    .line 810
     :cond_39
     goto :goto_27
 
-    .line 807
+    .line 811
     :cond_3a
     if-eqz v1, :cond_46
 
@@ -4526,11 +4596,11 @@
 
     sput-wide v2, Lcom/k4/soundtrigger/K4StRetry;->sSignalsUnknownSince:J
 
-    .line 808
+    .line 812
     :cond_46
     sput-boolean v1, Lcom/k4/soundtrigger/K4StRetry;->sSignalsUnknown:Z
 
-    .line 809
+    .line 813
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->callBySignals()Z
 
     move-result v1
@@ -4543,7 +4613,7 @@
 
     invoke-virtual {v0, v1}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 810
+    .line 814
     :cond_55
     return-void
 .end method
@@ -4551,12 +4621,12 @@
 .method public static watchdogClosed(Ljava/lang/Object;)V
     .registers 5
 
-    .line 434
+    .line 436
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 435
+    .line 437
     :try_start_3
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
@@ -4566,7 +4636,7 @@
 
     check-cast v1, Lcom/k4/soundtrigger/K4StRetry$Hung;
 
-    .line 436
+    .line 438
     if-nez v1, :cond_14
 
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sClosed:Ljava/util/WeakHashMap;
@@ -4575,19 +4645,19 @@
 
     invoke-virtual {v2, p0, v3}, Ljava/util/WeakHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 437
+    .line 439
     :cond_14
     monitor-exit v0
     :try_end_15
     .catchall {:try_start_3 .. :try_end_15} :catchall_40
 
-    .line 438
+    .line 440
     if-eqz v1, :cond_3f
 
-    .line 439
+    .line 441
     const-string p0, "K4StRetry"
 
-    .line 440
+    .line 442
     invoke-static {}, Landroid/os/SystemClock;->uptimeMillis()J
 
     move-result-wide v2
@@ -4624,14 +4694,14 @@
 
     move-result-object v0
 
-    .line 439
+    .line 441
     invoke-static {p0, v0}, Landroid/util/Slog;->w(Ljava/lang/String;Ljava/lang/String;)I
 
-    .line 442
+    .line 444
     :cond_3f
     return-void
 
-    .line 437
+    .line 439
     :catchall_40
     move-exception p0
 
@@ -4646,16 +4716,16 @@
 .method public static watchdogExpired(Ljava/lang/Object;Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;Ljava/lang/Exception;)V
     .registers 9
 
-    .line 405
+    .line 407
     sget-object v0, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 406
+    .line 408
     :try_start_3
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->ensureHandlerLocked()V
 
-    .line 409
+    .line 411
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sClosed:Ljava/util/WeakHashMap;
 
     invoke-virtual {v1, p0}, Ljava/util/WeakHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;
@@ -4668,13 +4738,13 @@
 
     return-void
 
-    .line 410
+    .line 412
     :cond_10
     monitor-exit v0
     :try_end_11
     .catchall {:try_start_3 .. :try_end_11} :catchall_51
 
-    .line 412
+    .line 414
     invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->currentMode()I
 
     move-result v0
@@ -4690,13 +4760,13 @@
     :cond_1b
     const/4 v0, 0x0
 
-    .line 413
+    .line 415
     :goto_1c
     sget-object v1, Lcom/k4/soundtrigger/K4StRetry;->sLock:Ljava/lang/Object;
 
     monitor-enter v1
 
-    .line 414
+    .line 416
     :try_start_1f
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sClosed:Ljava/util/WeakHashMap;
 
@@ -4710,11 +4780,11 @@
 
     return-void
 
-    .line 415
+    .line 417
     :cond_29
     if-nez v0, :cond_40
 
-    .line 416
+    .line 418
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->sHung:Ljava/util/IdentityHashMap;
 
     new-instance v3, Lcom/k4/soundtrigger/K4StRetry$Hung;
@@ -4727,37 +4797,37 @@
 
     invoke-virtual {v2, p0, v3}, Ljava/util/IdentityHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    .line 417
+    .line 419
     sget-object p0, Lcom/k4/soundtrigger/K4StRetry;->sHandler:Landroid/os/Handler;
 
     sget-object v2, Lcom/k4/soundtrigger/K4StRetry;->CHECK_HUNG:Ljava/lang/Runnable;
 
     invoke-virtual {p0, v2}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 
-    .line 419
+    .line 421
     :cond_40
     monitor-exit v1
     :try_end_41
     .catchall {:try_start_1f .. :try_end_41} :catchall_4e
 
-    .line 420
+    .line 422
     if-eqz v0, :cond_4d
 
-    .line 423
+    .line 425
     const-string p0, "SoundTriggerHalWatchdog"
 
     const-string v0, "HAL deadline expired. Rebooting."
 
     invoke-static {p0, v0, p2}, Landroid/util/Slog;->e(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
 
-    .line 424
+    .line 426
     invoke-virtual {p1}, Lcom/android/server/soundtrigger_middleware/SoundTriggerHalWatchdog;->reboot()V
 
-    .line 426
+    .line 428
     :cond_4d
     return-void
 
-    .line 419
+    .line 421
     :catchall_4e
     move-exception p0
 
@@ -4768,7 +4838,7 @@
 
     throw p0
 
-    .line 410
+    .line 412
     :catchall_51
     move-exception p0
 
