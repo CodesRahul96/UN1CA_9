@@ -176,6 +176,10 @@ if $BUILD_ROM; then
         $BUILD_FAILED && exit 1
 
         LOG_STEP_OUT
+
+        LOG_STEP_IN true "Verifying rebuilt dex files with the ART verifier"
+        "$SRC_DIR/scripts/internal/check_dex_verify.sh" || exit 1
+        LOG_STEP_OUT
     fi
 
     LOG_STEP_IN true "Regenerating boot image profile"
