@@ -69,9 +69,18 @@ import java.util.concurrent.Executor;
  *       reboots: it leaves nothing to resync (the enforcer only records a model after a successful load). A load
  *       that fails otherwise (not a HalException: conversion error, non-DeadObject RemoteException) goes through
  *       halError() like any HAL error (2.), and a load that hangs past 3 s through watchdogExpired() (3.).
- *     - while a refusal is pending: onResourcesAvailable() on that HAL stack's global callback when the HAL's
- *       concurrency ends: all playback stopped (+5 s: audio HAL output standby lags the player state) or the
- *       screen turned off (+2 s: the HAL switches to the LPI path). One retry per event, no timers. The callback
+ *     - while a refusal is pending: onResourcesAvailable() on that HAL stack's global callback when all playback
+ *       stopped (+5 s: audio HAL output standby lags the player state) or the screen turned off (+2 s), and on a
+ *       timer: 10 s, 30 s, 1, 2, 5 min after a refusal, then every 10 min while it keeps being refused (the step
+ *       goes back to 10 s once no refusal came for 15 min). The timer is needed because the refusal is NOT caused
+ *       by playback (test phone 2026-10-24: Google's DSP model from HotwordEnrollmentOKGoogleEx3HEXAGON loads and
+ *       starts during playback, screen on and off, on the NON_LPI_BARGE_IN usecase, and an active LPI session is
+ *       moved to non-LPI and back when playback starts / stops; a tester log of 2026-10-23 has the same pcmC0D10c
+ *       "Out of memory" refusal for Bixby's model in LPI mode with nothing playing, also in the HAL's own boot
+ *       probe). It is the kernel refusing a new LSM client (msm_lsm_open: q6lsm_client_alloc() NULL, i.e. no free
+ *       LSM session or the APR LSM service refusing the port), which playback or the screen do not change.
+ *       Timer retries take no wakelock (uptime delays: asleep, they run at the next wakeup). A retry costs one
+ *       failed HAL load (5 pcm opens, ~0.5 s of a HAL thread). The callback
  *       runs on a separate thread (K4StRetryCb): SoundTriggerModule.onResourcesAvailable takes the module monitor,
  *       which a hung Session HAL call holds, and the decision thread (K4StRetry) must never wait for a HAL call.
  *
@@ -119,6 +128,10 @@ public final class K4StRetry {
     private static final int INTERNAL_ERROR = 5;
     private static final long AUDIO_IDLE_DELAY_MS = 5000;
     private static final long SCREEN_OFF_DELAY_MS = 2000;
+    /** Timed retries of a refused load (busy): the delay after the n-th refusal in a row, the last one repeats. */
+    private static final long[] BACKOFF_MS = {10000, 30000, 60000, 120000, 300000, 600000};
+    /** A refusal this long after the previous one starts the backoff from its first step again. */
+    private static final long BACKOFF_RESET_MS = 15 * 60000;
     /**
      * After the last call signal ended, owed reboots wait this long (cancelled when a call starts again). A redial or
      * call-back within half a minute (dropped call, voicemail, "call me back") is common and must not meet a
@@ -224,6 +237,9 @@ public final class K4StRetry {
     private static volatile boolean sAudioActive;
     private static boolean sScreenWatched;
     private static String sReason;
+    /** Timed retry state (decision thread): next BACKOFF_MS step, uptime of the last busy refusal. */
+    private static int sBackoffStep;
+    private static long sLastRefusal = Long.MIN_VALUE / 2;
     /** Keeps short delayed retries / reboots from stalling in suspend (Handler delays are uptime). State thread. */
     private static PowerManager.WakeLock sWakeLock;
     private static long sWakeUntil;
@@ -249,7 +265,27 @@ public final class K4StRetry {
     private static final Runnable FIRE = new Runnable() {
         @Override
         public void run() {
-            fire();
+            fire(sReason);
+        }
+    };
+    /** Decision thread: a busy refusal was recorded; arm the timed retry unless one is already armed. */
+    private static final Runnable ARM_BACKOFF = new Runnable() {
+        @Override
+        public void run() {
+            long now = SystemClock.uptimeMillis();
+            if (now - sLastRefusal > BACKOFF_RESET_MS) sBackoffStep = 0;
+            sLastRefusal = now;
+            if (sHandler.hasCallbacks(BACKOFF_FIRE)) return;
+            long ms = BACKOFF_MS[Math.min(sBackoffStep, BACKOFF_MS.length - 1)];
+            if (sBackoffStep < BACKOFF_MS.length - 1) sBackoffStep++;
+            sHandler.postDelayed(BACKOFF_FIRE, ms);
+            Slog.i(TAG, "refused sound model: next timed load retry in " + (ms / 1000) + " s");
+        }
+    };
+    private static final Runnable BACKOFF_FIRE = new Runnable() {
+        @Override
+        public void run() {
+            fire("timed retry");
         }
     };
     private static final Runnable REGISTER_STATE = new Runnable() {
@@ -352,11 +388,12 @@ public final class K4StRetry {
             Slog.w(TAG, "HAL refused the model, not rebooting the HAL: " + msg);
             return new RecoverableException(INTERNAL_ERROR, msg);
         }
-        Slog.w(TAG, "HAL refused the model (busy), not rebooting the HAL; loading it again when audio stops"
-                + " or the screen turns off: " + msg);
+        Slog.w(TAG, "HAL refused the model (busy: the kernel had no LSM session for it), not rebooting the HAL;"
+                + " loading it again on a timer, when audio stops or the screen turns off: " + msg);
         synchronized (sLock) {
             sPending.put(enforcer, Boolean.TRUE);
             ensureHandlerLocked();
+            sHandler.post(ARM_BACKOFF);
         }
         return new RecoverableException(RESOURCE_CONTENTION, msg);
     }
@@ -1058,7 +1095,7 @@ public final class K4StRetry {
 
     /** Handler thread: the callbacks run on the callback thread (SoundTriggerModule.onResourcesAvailable takes the
      *  module monitor, which a hung Session HAL call holds; the decision thread must never wait for it). */
-    private static void fire() {
+    private static void fire(final String reason) {
         final List<ISoundTriggerHal.GlobalCallback> cbs = new ArrayList<>();
         synchronized (sLock) {
             for (Object enforcer : sPending.keySet()) {
@@ -1068,7 +1105,6 @@ public final class K4StRetry {
             sPending.clear();
         }
         if (cbs.isEmpty()) return;
-        final String reason = sReason;
         sCbHandler.post(new Runnable() {
             @Override
             public void run() {

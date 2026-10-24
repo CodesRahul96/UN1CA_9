@@ -1,6 +1,9 @@
 .class Lcom/k4/soundtrigger/K4StRetry$12;
-.super Landroid/media/AudioManager$AudioPlaybackCallback;
+.super Ljava/lang/Object;
 .source "K4StRetry.java"
+
+# interfaces
+.implements Landroid/media/AudioManager$OnModeChangedListener;
 
 
 # annotations
@@ -18,28 +21,20 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 596
-    invoke-direct {p0}, Landroid/media/AudioManager$AudioPlaybackCallback;-><init>()V
+    .line 613
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public onPlaybackConfigChanged(Ljava/util/List;)V
+.method public onModeChanged(I)V
     .registers 2
-    .annotation system Ldalvik/annotation/Signature;
-        value = {
-            "(",
-            "Ljava/util/List<",
-            "Landroid/media/AudioPlaybackConfiguration;",
-            ">;)V"
-        }
-    .end annotation
 
-    .line 599
-    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonPlayback(Ljava/util/List;)V
+    .line 616
+    invoke-static {p1}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonMode(I)V
 
-    .line 600
+    .line 617
     return-void
 .end method

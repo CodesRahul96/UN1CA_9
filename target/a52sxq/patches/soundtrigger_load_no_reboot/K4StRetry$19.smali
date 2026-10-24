@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 1007
+    .line 1032
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -30,15 +30,32 @@
 
 # virtual methods
 .method public run()V
-    .registers 4
+    .registers 3
 
-    .line 1010
-    const-wide/16 v0, 0x7d0
+    .line 1035
+    const-string v0, "audio stopped"
 
-    const-string v2, "screen off"
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsReason()Ljava/lang/String;
 
-    invoke-static {v0, v1, v2}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smschedule(JLjava/lang/String;)V
+    move-result-object v1
 
-    .line 1011
+    invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_17
+
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsHandler()Landroid/os/Handler;
+
+    move-result-object v0
+
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetFIRE()Ljava/lang/Runnable;
+
+    move-result-object v1
+
+    invoke-virtual {v0, v1}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
+
+    .line 1036
+    :cond_17
     return-void
 .end method

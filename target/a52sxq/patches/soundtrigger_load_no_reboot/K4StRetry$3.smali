@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 261
+    .line 285
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -30,11 +30,13 @@
 
 # virtual methods
 .method public run()V
-    .registers 1
+    .registers 2
 
-    .line 264
-    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonCallSignals()V
+    .line 288
+    const-string v0, "timed retry"
 
-    .line 265
+    invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smfire(Ljava/lang/String;)V
+
+    .line 289
     return-void
 .end method

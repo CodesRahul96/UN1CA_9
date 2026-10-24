@@ -7,8 +7,8 @@
 
 
 # annotations
-.annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->registerState()V
+.annotation system Ldalvik/annotation/EnclosingClass;
+    value = Lcom/k4/soundtrigger/K4StRetry;
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -17,22 +17,11 @@
 .end annotation
 
 
-# instance fields
-.field final synthetic val$mode:I
-
-
 # direct methods
-.method constructor <init>(I)V
-    .registers 2
-    .annotation system Ldalvik/annotation/Signature;
-        value = {
-            "()V"
-        }
-    .end annotation
+.method constructor <init>()V
+    .registers 1
 
-    .line 586
-    iput p1, p0, Lcom/k4/soundtrigger/K4StRetry$11;->val$mode:I
-
+    .line 565
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -41,13 +30,11 @@
 
 # virtual methods
 .method public run()V
-    .registers 2
+    .registers 1
 
-    .line 589
-    iget v0, p0, Lcom/k4/soundtrigger/K4StRetry$11;->val$mode:I
+    .line 568
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smcheckHungMax()V
 
-    invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smonMode(I)V
-
-    .line 590
+    .line 569
     return-void
 .end method

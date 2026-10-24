@@ -1,14 +1,11 @@
 .class Lcom/k4/soundtrigger/K4StRetry$16;
-.super Ljava/lang/Object;
+.super Landroid/content/BroadcastReceiver;
 .source "K4StRetry.java"
-
-# interfaces
-.implements Ljava/lang/Runnable;
 
 
 # annotations
 .annotation system Ldalvik/annotation/EnclosingMethod;
-    value = Lcom/k4/soundtrigger/K4StRetry;->syncSubscriptions()V
+    value = Lcom/k4/soundtrigger/K4StRetry;->registerState()V
 .end annotation
 
 .annotation system Ldalvik/annotation/InnerClass;
@@ -21,20 +18,28 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 731
-    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+    .line 660
+    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
 
     return-void
 .end method
 
 
 # virtual methods
-.method public run()V
-    .registers 1
+.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
+    .registers 3
 
-    .line 734
-    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smsyncSubscriptions()V
+    .line 663
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsHandler()Landroid/os/Handler;
 
-    .line 735
+    move-result-object p1
+
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetSCREEN_OFF()Ljava/lang/Runnable;
+
+    move-result-object p2
+
+    invoke-virtual {p1, p2}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
+
+    .line 664
     return-void
 .end method

@@ -21,7 +21,7 @@
 .method constructor <init>()V
     .registers 1
 
-    .line 249
+    .line 265
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -30,11 +30,15 @@
 
 # virtual methods
 .method public run()V
-    .registers 1
+    .registers 2
 
-    .line 252
-    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smfire()V
+    .line 268
+    invoke-static {}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$sfgetsReason()Ljava/lang/String;
 
-    .line 253
+    move-result-object v0
+
+    invoke-static {v0}, Lcom/k4/soundtrigger/K4StRetry;->-$$Nest$smfire(Ljava/lang/String;)V
+
+    .line 269
     return-void
 .end method
