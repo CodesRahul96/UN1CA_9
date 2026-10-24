@@ -4449,6 +4449,10 @@
 
     invoke-static {p0}, Lcom/k4/dressroom/FrameSize;->applyHole(Landroid/view/View;)V
 
+    const-string p1, "frame resized"
+
+    invoke-static {p1}, Lcom/k4/dressroom/HomeClock;->releaseHeights(Ljava/lang/String;)V
+
     invoke-static {p0}, Lcom/k4/dressroom/FrameSize;->refit(Landroid/view/View;)V
 
     sget-object p1, Ljava/util/Locale;->US:Ljava/util/Locale;

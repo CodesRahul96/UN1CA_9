@@ -259,6 +259,32 @@ def hrs(body):
 assert re.search(r"^\.field public final a:Lpe/d;$", open(f).read(), re.M), "ResetStretchDataUseCase.a (clock data repository)"
 patch(f, "public final a(Lcom/samsung/android/lockscreen/editor/item/domain/entity/item/clock/positionsuggestion/SuggestionState;)V", hrs,
       "ResetStretchDataUseCase.a -> HomeClock.stretchReset")
+# ... and the stretch heights Samsung fits to the subject (ApplyStretchResultUseCase, the vo.t coroutine of the stretch
+#     area listener): fontHeight = calculateStretchHeightList(...) goes through HomeClock.stretchHeights (the restored
+#     home clock keeps its saved heights until it is moved, resized or changed)
+f = by_text('"apply fontHeight="')
+CDP = "Lcom/samsung/android/lockscreen/editor/item/domain/entity/item/clock/"
+SH = (r"(    :goto_\d+\n)"
+      r"    invoke-virtual \{(\w+)\}, {cd}ClockData;->getClockFontData\(\){cd}ClockFontData;\n\n"
+      r"    move-result-object (\w+)\n\n"
+      r"    invoke-virtual \{\3\}, {cd}ClockFontData;->getClockStretchData\(\){cd}ClockStretchData;\n\n"
+      r"    move-result-object \3\n\n"
+      r"    invoke-virtual \{\3\}, {cd}ClockStretchData;->getFontHeight\(\)Ljava/util/List;\n\n"
+      r"    move-result-object \3\n\n"
+      r"    invoke-static \{\3, (\w+)\}, Lkotlin/jvm/internal/Intrinsics;->areEqual\(Ljava/lang/Object;Ljava/lang/Object;\)Z\n\n"
+      r"    move-result \3\n\n"
+      r"    if-eqz \3, :\w+\n\n"
+      r"    const-string(?:/jumbo)? \w+, \"skip update fontHeight because it\\'s same with previous\"\n").replace("{cd}", re.escape(CDP))
+def hsh(body):
+    m = re.findall(SH, body)
+    assert len(m) == 1, "ApplyStretchResult: fontHeight compare %d" % len(m)
+    label, data, tmp, fit = m[0]
+    assert low(body, data) and low(body, fit), "ApplyStretchResult registers"
+    assert re.search(r"    invoke-virtual \{\w+, %s\}, %sClockStretchData;->setFontHeight\(Ljava/util/List;\)V\n" % (fit, re.escape(CDP)), body), "ApplyStretchResult: setFontHeight(fit)"
+    call = ("    invoke-static {%s, %s}, %s->stretchHeights(Ljava/lang/Object;Ljava/util/List;)Ljava/util/List;\n\n"
+            "    move-result-object %s\n\n") % (data, fit, HC, fit)
+    return re.sub(SH, lambda mm: mm.group(1) + call + mm.group(0)[len(mm.group(1)):], body, count=1)
+patch(f, "public final invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;", hsh, "ApplyStretchResult (%s) -> HomeClock.stretchHeights" % cls(f))
 yb = open(glob.glob(root + "/smali*/yc/b0.smali")[0]).read()
 assert re.search(r"^\.method public static b\(Lcom/samsung/android/lockscreen/editor/item/domain/entity/item/clock/ClockData;\)%s$" % re.escape(WCB), yb, re.M), "yc.b0.b (bundle from ClockData)"
 

@@ -766,6 +766,7 @@ public final class EditXf {
                 }
                 if (end) {
                     if (sFitDirty) {
+                        HomeClock.releaseHeights("picture moved");
                         refit();
                     }
                     showSwitchLater(v);
