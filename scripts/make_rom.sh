@@ -150,6 +150,12 @@ if $BUILD_ROM; then
     LOG_STEP_OUT
 
     if [ -d "$APKTOOL_DIR" ]; then
+        LOG_STEP_IN true "Checking smali invoke register counts"
+        python3 "$SRC_DIR/scripts/internal/check_smali_invokes.py" "$APKTOOL_DIR" || exit 1
+        LOG_STEP_OUT
+    fi
+
+    if [ -d "$APKTOOL_DIR" ]; then
         LOG_STEP_IN true "Building APKs/JARs"
 
         while IFS= read -r f; do
