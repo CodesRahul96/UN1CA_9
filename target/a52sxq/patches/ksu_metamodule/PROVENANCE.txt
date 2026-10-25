@@ -42,7 +42,9 @@ What it does on this phone (5.4 kernel, erofs system/vendor/product/odm):
     bone-machine 5.4.302 kernel (/proc/config.gz). erofs lower layers are fine (overlayfs only needs an upper/work
     dir on a writable fs, which it does not use here unless /data/adb/modules/.rw exists).
   - post-mount.sh: ksud kernel nuke-ext4-sysfs (supported by this ksud).
-  Known limit: a module installed before the metamodule is not in the image and stays unmounted until reinstalled.
+  A module installed before the metamodule (none yet, or another one such as Mountify) is not in the image:
+  k4-ksu-metamodule copies it in at boot_completed the way metainstall.sh would (same conditions, cp -af under
+  ksud's busybox, metainstall.sh's own label functions), so it is mounted from the next boot on; no reinstall.
 
 Alternatives looked at (all metamodules in the official KernelSU-Modules-Repo org):
   - meta-mm (Magic Mount, 7a72) v1.0.1-sprout: GitHub repo is a placeholder, its sourceUrl
