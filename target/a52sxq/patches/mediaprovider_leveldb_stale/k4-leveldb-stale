@@ -50,7 +50,14 @@ LIST="$R/data/system/packages.list"
 NL='
 '
 
-log() { echo "k4-leveldb-stale: $*" >> "$LOGF"; }
+# kmsg is opened for write, not append (k4leveldb has no append permission on kmsg_device); the test log is appended
+log() {
+    if [ "$LOGF" = /dev/kmsg ]; then
+        echo "k4-leveldb-stale: $*" > /dev/kmsg
+    else
+        echo "k4-leveldb-stale: $*" >> "$LOGF"
+    fi
+}
 
 # context <path>: the SELinux context of <path> itself (not following a symlink)
 context() {
