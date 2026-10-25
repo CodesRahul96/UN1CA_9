@@ -22,18 +22,25 @@
 #             KernelSU manager is therefore the opt-out, and switching metamodules (uninstall, reboot, install the
 #             other one) is never raced: the boot in between finds the last one gone and stands down for good.
 #             persist.sys.k4.ksu_metamodule=1 re-arms it once (clears the markers, then goes back to automatic).
-#       ksud installs into /data/adb/modules_update and links /data/adb/metamodule at once; ksud's next
-#       post-fs-data moves it into /data/adb/modules and runs its metamount.sh, so module files appear from the
-#       NEXT boot on (one extra reboot after the first boot with KernelSU on this ROM; ksud refuses to install
-#       anything before boot_completed, and its mount step runs long before that).
+#       ksud installs into /data/adb/modules_update and links /data/adb/metamodule at once; this hook then completes
+#       the install itself, the way ksud's next post-fs-data would (handle_updated_modules: the staged directory
+#       replaces /data/adb/modules/<id>, which holds only module.prop and the "update" marker): while a metamodule
+#       with a metainstall.sh is pending ("update" marker), ksud refuses EVERY module install ("Installation
+#       Blocked ... Current state: Pending changes ... Reboot to apply changes first") - what testers hit installing
+#       TEE Simulator on the first boot of 9.3.83. So modules install at once; their files are mounted from the next
+#       boot on (ksud's mount step runs at post-fs-data; ksud refuses to install anything before boot_completed).
 #       It never touches another metamodule or any other module; a failed install is cleaned up (only what this
 #       run created) and retried on the next boot, at most 3 times.
 #       Update: the shipped zip is the ROM's build 1.3.1-k4.1 (versionCode 13101; Adreno GPU driver modules are
 #       left to the GPU driver selector, label fixes, see meta-overlayfs-k4/K4_CHANGES.txt). An installed
 #       meta-overlayfs with a lower versionCode (the unmodified 1.3.1 = 13100, which an earlier build installed and
-#       which bootlooped the phone with a GPU driver module) is updated the same way (ksud module install over it,
-#       its modules image is kept), unless it is disabled, marked for removal or already has an update pending.
-#       A newer one (a later upstream release the user installed) is left alone.
+#       which bootlooped the phone with a GPU driver module) is updated IN PLACE: the zip's files replace the
+#       installed ones one by one (atomic renames; the arch binary as meta-overlayfs, like its customize.sh does),
+#       its modules image and mount point stay as they are. Not through `ksud module install`: that stages a copy
+#       and leaves the metamodule pending (see above) until a reboot, and its staged directory could not be swapped
+#       in now - the installed one's image is loop-mounted under it and is the live overlay's lower layer.
+#       Not done when it is disabled, marked for removal or already has an update pending. A newer one (a later
+#       upstream release the user installed) is left alone.
 #       Result: sys.k4.ksu_meta, log /data/adb/.k4_metamodule.log and the kernel log.
 #
 # Host tests: K4KSU_ROOT (path prefix), K4KSU_PROPFILE (properties in a file), K4KSU_KSUD (ksud to run),
@@ -158,20 +165,82 @@ update() {
         return 0
     fi
     echo $((tries + 1)) > "$TRIES"
-    log "updating $ID $vc to $ZIP_VC (try $((tries + 1))): $KSUD module install $ZIP"
-    # the modules image is mounted read-write: flush it before the installer copies it
-    sync
-    "$KSUD" module install "$ZIP" >> "$LOGF" 2>&1
-    rc=$?
-    if [ "$rc" = 0 ] && [ "$(vc_of "$ADB/modules_update/$ID/module.prop")" = "$ZIP_VC" ]; then
+    log "updating $ID $vc to $ZIP_VC in place (try $((tries + 1)))"
+    if update_in_place "$m"; then
         rm -f "$TRIES"
-        status updated "$ID updated from $vc to $ZIP_VC: active from the next boot on"
+        status updated "$ID updated from $vc to $ZIP_VC in place: nothing pending, module installs work right away"
     else
-        # only the pending update is ours to remove; the installed metamodule stays as it was
-        rm -rf "${ADB:?}/modules_update/$ID"
-        status active "metamodule $ID $vc installed; update to $ZIP_VC failed (exit $rc), retried next boot"
+        status active "metamodule $ID $vc installed; in-place update to $ZIP_VC failed, retried next boot"
     fi
     return 0
+}
+
+# the binary the zip's customize.sh installs as meta-overlayfs on this device
+arch_binary() {
+    case "$(gp ro.product.cpu.abi)" in
+        x86_64) echo meta-overlayfs-x86_64 ;;
+        *) echo meta-overlayfs-aarch64 ;;
+    esac
+}
+
+# update_in_place <module dir>: every file of the zip (but customize.sh, which only picks the binary and makes the
+# image, and the binaries, of which the device's one becomes meta-overlayfs) replaces the installed one: written next
+# to it, given its mode and label (a new file: mode from the zip, label of module.prop), renamed over it. Files the
+# zip does not have (modules.img, mnt/) are not touched. Checked afterwards.
+update_in_place() {
+    t="$ADB/.k4_metamodule.tmp"
+    rm -rf "$t"
+    mkdir -p "$t" && (cd "$t" && unzip -q -o "$ZIP") > /dev/null 2>&1 || { rm -rf "$t"; return 1; }
+    b="$(arch_binary)"
+    [ -f "$t/$b" ] || { rm -rf "$t"; return 1; }
+    pairs=""
+    for f in $(cd "$t" && find . -type f | sed 's|^\./||' | LC_ALL=C sort); do
+        case "$f" in
+            customize.sh | meta-overlayfs-aarch64 | meta-overlayfs-x86_64 | module.prop) continue ;;
+            */* | *[!A-Za-z0-9._-]*) continue ;;  # the release has no subdirectories or odd names
+        esac
+        pairs="$pairs $f:$f"
+    done
+    # module.prop (the versionCode) last: an interrupted update is retried on the next boot
+    pairs="$pairs $b:meta-overlayfs module.prop:module.prop"
+    for p in $pairs; do
+        src="$t/${p%%:*}"
+        dst="$1/${p#*:}"
+        cmp -s "$src" "$dst" && continue
+        cp "$src" "$dst.k4new" || { rm -rf "$t" "$dst.k4new"; return 1; }
+        if [ -f "$dst" ]; then
+            chmod "$(stat -c %a "$dst")" "$dst.k4new"
+            chcon --reference="$dst" "$dst.k4new" 2> /dev/null
+        else
+            chmod "$(stat -c %a "$src")" "$dst.k4new"
+            chcon --reference="$1/module.prop" "$dst.k4new" 2> /dev/null
+        fi
+        [ "${p#*:}" = meta-overlayfs ] && chmod 755 "$dst.k4new"
+        mv -f "$dst.k4new" "$dst" || { rm -rf "$t" "$dst.k4new"; return 1; }
+    done
+    for p in $pairs; do
+        cmp -s "$t/${p%%:*}" "$1/${p#*:}" || { rm -rf "$t"; return 1; }
+    done
+    rm -rf "$t"
+    return 0
+}
+
+# complete a fresh `ksud module install` of $ID now instead of on the next boot (see the header): the staged
+# directory replaces /data/adb/modules/$ID (module.prop + "update" only), like ksud's handle_updated_modules. Only
+# when nothing is mounted under that directory (never true for a fresh install, checked anyway).
+complete_install() {
+    u="$ADB/modules_update/$ID"
+    m="$ADB/modules/$ID"
+    [ -d "$u" ] || return 1
+    [ -n "$(awk -v d="$m/" 'index($2 "/", d) == 1' /proc/mounts 2> /dev/null)" ] && return 1
+    if [ -d "$m" ]; then
+        for f in "$m"/* "$m"/.[!.]*; do
+            [ -e "$f" ] || continue
+            case "${f##*/}" in module.prop | update) ;; *) return 1 ;; esac
+        done
+        rm -rf "$m" || return 1
+    fi
+    mv "$u" "$m"
 }
 
 # undo what a failed `ksud module install` of $ID left behind (only called when none of it existed before)
@@ -255,7 +324,11 @@ apply() {
     if [ "$rc" = 0 ] && is_meta_prop "$ADB/modules_update/$ID/module.prop" && [ "$(find_meta)" = "$ID" ]; then
         echo "$ID" > "$SEEN"
         rm -f "$TRIES"
-        status installed "$ID installed: module files are mounted from the next boot on"
+        if complete_install; then
+            status installed "$ID installed (completed now, nothing pending): module files are mounted from the next boot on"
+        else
+            status installed "$ID installed: pending until the next boot (module installs are blocked until then)"
+        fi
     else
         cleanup_failed
         status failed "ksud module install failed (exit $rc), cleaned up, retried next boot"
