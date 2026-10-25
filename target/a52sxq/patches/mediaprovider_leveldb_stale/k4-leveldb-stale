@@ -1,0 +1,163 @@
+#!/system/bin/sh
+# k4-leveldb-stale - remove MediaProvider backup dirs that an older MediaProvider uid left behind.
+# Installed by target/a52sxq/patches/mediaprovider_leveldb_stale, started by init (service k4_leveldb_stale) when user
+# 0's credential-encrypted storage unlocks (sys.user.0.ce_available=true, before StorageManager mounts emulated;0 and
+# MediaProvider's FuseDaemon opens its backup) and again at sys.boot_completed=1 (other users whose storage is
+# unlocked by then; MediaProvider picks those up at its next start). Idempotent and cheap: a clean run is one grep
+# and one stat per backup dir, and it logs nothing.
+#
+# MediaProvider keeps a LevelDB backup of its database in /data/media/<user>/.transforms/recovery/leveldb-<name>
+# (internal, external_primary, ownership, deleted-files-external_primary, <volume id>), mode 2750, owned by
+# MediaProvider's uid. Phones that were updated without a wipe across the S26U base switch (2026-10-10) got a new
+# MediaProvider app id (e.g. 10293 -> 10274), so the old dirs are owned by a uid that no longer is MediaProvider's:
+# FuseDaemon's DB::Open fails on every start ("LOCK: Permission denied", then "Leveldb setup is missing" /
+# "Missing leveldb connection" on every backup write) and the backup stays off. It is only a backup of the live
+# database, MediaProvider creates a missing dir again ("Leveldb connection established"), and a dir it cannot open
+# is of no use to it, so such a dir is removed.
+#
+# What it removes, and nothing else:
+#   - only /data/media/<numeric user>/.transforms/recovery/leveldb-<[A-Za-z0-9_-]+>, where none of <user>,
+#     .transforms, recovery and the leveldb dir is a symlink and recovery resolves to exactly that path;
+#   - only when the dir is a real directory labelled media_rw_data_file and owned by an app uid of that user
+#     (<user>*100000 + 10000..19999) other than the current MediaProvider uid of that user (packages.list, exactly
+#     one of com.google.android.providers.media.module / com.android.providers.media.module); a dir owned by
+#     anything else (root, media_rw, another user) is reported and left alone;
+#   - only when every entry in it is a regular file (no symlink, no subdirectory) with a LevelDB file name (LOCK,
+#     LOG, LOG.old, CURRENT, MANIFEST-<n>, <n>.ldb/.log/.sst/.dbtmp); otherwise the dir is reported and left alone;
+#   - the files are unlinked from inside the dir after cd + re-checking its physical path, inode and owner (a dir
+#     swapped in after the check is not touched), then the empty dir is removed with rmdir (never rm -r).
+# Dirs whose owner matches but whose MLS categories differ from what that uid would get are only reported:
+# media_rw_data_file is an mlstrustedobject, so the categories do not stop MediaProvider (it writes into the
+# c37-labelled recovery dir on these phones too). Users whose storage is still locked have encrypted names here, so
+# there is no .transforms dir to look at. The SELinux domain k4leveldb (sepolicy.cil) may unlink files and rmdir dirs
+# of type media_rw_data_file only, never write, create or rename anything, and init gives the process
+# CAP_DAC_OVERRIDE only.
+#
+# Host tests (test/run.sh): K4LDB_ROOT (path prefix), K4LDB_LOG (log file instead of /dev/kmsg), K4LDB_LABELS (file
+# of "<path> <context>" lines instead of the real SELinux contexts). init starts the service with a clean
+# environment, so none of them is set on a phone.
+R="${K4LDB_ROOT:-}"
+LOGF="${K4LDB_LOG:-/dev/kmsg}"
+LABELS="${K4LDB_LABELS:-}"
+LIST="$R/data/system/packages.list"
+NL='
+'
+
+log() { echo "k4-leveldb-stale: $*" >> "$LOGF"; }
+
+# context <path>: the SELinux context of <path> itself (not following a symlink)
+context() {
+    if [ -n "$LABELS" ]; then
+        c1="?"
+        while read -r p c; do
+            [ "$p" = "$1" ] && c1="$c"
+        done < "$LABELS"
+        echo "$c1"
+    else
+        stat -c %C "$1" 2> /dev/null
+    fi
+}
+
+# leveldb_file <name>: is it a name LevelDB writes into a database dir
+leveldb_file() {
+    case "$1" in
+        LOCK | LOG | LOG.old | CURRENT) return 0 ;;
+        MANIFEST-*) n="${1#MANIFEST-}" ;;
+        *.ldb | *.log | *.sst | *.dbtmp) n="${1%.*}" ;;
+        *) return 1 ;;
+    esac
+    case "$n" in '' | *[!0-9]*) return 1 ;; esac
+    return 0
+}
+
+# MediaProvider's app id: exactly one MediaProvider package (both names would mean the active one is unknown)
+M="$(grep -E '^com\.(google\.)?android\.providers\.media\.module [0-9]+ ' "$LIST" 2> /dev/null)"
+APPID=""
+set -f
+IFS="$NL"
+for line in $M; do
+    IFS=' '
+    # shellcheck disable=SC2086
+    set -- $line
+    if [ -n "$APPID" ] && [ "$APPID" != "$2" ]; then
+        unset IFS
+        log "more than one MediaProvider package in packages.list, nothing done"
+        exit 0
+    fi
+    APPID="$2"
+    IFS="$NL"
+done
+unset IFS
+set +f
+case "$APPID" in '' | *[!0-9]*) exit 0 ;; esac
+[ "$APPID" -ge 10000 ] && [ "$APPID" -le 19999 ] || { log "MediaProvider uid $APPID is not an app uid, nothing done"; exit 0; }
+
+# remove_dir <dir> <inode> <owner>: unlink the LevelDB files of <dir> from inside it, then rmdir it
+remove_dir() {
+    (
+        cd "$1" 2> /dev/null || exit 3
+        [ "$(pwd -P)" = "$1" ] || exit 4
+        [ "$(stat -c '%i %u' . 2> /dev/null)" = "$2 $3" ] || exit 5
+        for f in * .*; do
+            case "$f" in . | ..) continue ;; esac
+            [ -e "$f" ] || [ -L "$f" ] || continue
+            [ -f "$f" ] && [ ! -L "$f" ] && leveldb_file "$f" || exit 6
+        done
+        for f in * .*; do
+            case "$f" in . | ..) continue ;; esac
+            [ -e "$f" ] || [ -L "$f" ] || continue
+            rm -f -- "./$f" || exit 7
+        done
+        exit 0
+    )
+    rc=$?
+    case $rc in
+        0) rmdir -- "$1" 2> /dev/null || return 8 ;;
+        6) log "left alone $1: it holds something that is not a LevelDB file" ;;
+    esac
+    return $rc
+}
+
+for udir in "$R"/data/media/*; do
+    u="${udir##*/}"
+    case "$u" in '' | *[!0-9]*) continue ;; esac
+    [ ${#u} -le 6 ] || continue
+    rec="$udir/.transforms/recovery"
+    [ -L "$udir" ] || [ -L "$udir/.transforms" ] || [ -L "$rec" ] && { log "left alone user $u: symlink in $rec"; continue; }
+    [ -d "$rec" ] || continue
+    [ "$(cd "$rec" 2> /dev/null && pwd -P)" = "$rec" ] || { log "left alone user $u: $rec is not where it should be"; continue; }
+    want=$((u * 100000 + APPID))
+    lo=$((u * 100000 + 10000))
+    hi=$((u * 100000 + 19999))
+    a=$((APPID - 10000))
+    cats="c$((a & 255)),c$((256 + ((a >> 8) & 255))),c$((512 + (u & 255))),c$((768 + ((u >> 8) & 255)))"
+    for d in "$rec"/leveldb-*; do
+        n="${d##*/}"
+        [ -e "$d" ] || [ -L "$d" ] || continue
+        case "${n#leveldb-}" in '' | *[!A-Za-z0-9_-]*) log "left alone $d: unexpected name"; continue ;; esac
+        [ -L "$d" ] && { log "left alone $d: symlink"; continue; }
+        [ -d "$d" ] || { log "left alone $d: not a directory"; continue; }
+        st="$(stat -c '%i %u' "$d" 2> /dev/null)"
+        ino="${st% *}"
+        own="${st#* }"
+        case "$own" in '' | *[!0-9]*) log "left alone $d: cannot stat it"; continue ;; esac
+        ctx="$(context "$d")"
+        case "$ctx" in u:object_r:media_rw_data_file:s0 | u:object_r:media_rw_data_file:s0:*) ;; *) log "left alone $d: label $ctx"; continue ;; esac
+        if [ "$own" = "$want" ]; then
+            [ "${ctx#u:object_r:media_rw_data_file:s0}" = ":$cats" ] ||
+                log "note $d: owner $own is MediaProvider's but the categories are ${ctx#u:object_r:media_rw_data_file:s0:} (expected $cats), left alone"
+            continue
+        fi
+        if [ "$own" -lt "$lo" ] || [ "$own" -gt "$hi" ]; then
+            log "left alone $d: owner $own is not an app uid of user $u (MediaProvider is $want)"
+            continue
+        fi
+        if remove_dir "$d" "$ino" "$own"; then
+            log "removed stale MediaProvider backup $d (owner $own, MediaProvider is $want); MediaProvider recreates it"
+        else
+            rc=$?
+            [ $rc = 6 ] || log "could not remove $d (owner $own, step $rc)"
+        fi
+    done
+done
+exit 0
