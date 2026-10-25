@@ -95,7 +95,8 @@ next_boot() {
 run() {
     : > "$T/kmsg"
     env K4KSU_ROOT="$R" K4KSU_PROPFILE="$T/props" K4KSU_KMSG="$T/kmsg" K4KSU_ZIP="${ZIP:-$REALZIP}" \
-        K4KSU_NOMAGISK="${NOMAGISK-1}" K4KSU_BUSYBOX="${BBOX-}" K4KSU_FAKEIMG=1 KT="$T" PATH="${XPATH:-$PATH}" \
+        K4KSU_NOMAGISK="${NOMAGISK-1}" K4KSU_BUSYBOX="${BBOX-}" K4KSU_FAKEIMG=1 \
+        K4KSU_GPU_DRIVER="${GPU:-$T/none/k4-gpu-driver}" KT="$T" PATH="${XPATH:-$PATH}" \
         "$SH" "$SCRIPT" "$@"
     local rc=$?
     if $VERBOSE; then sed "s/^/    [$CASE] /" "$T/kmsg"; fi
@@ -116,11 +117,11 @@ rm -f "$ADB/ksud"
 run gate
 eq gate "$(prop sys.k4.ksu_meta_gate)" none
 
-CASE="gate: turned off"
+CASE="gate: turned off (apply still runs: the metamodule part is off, the GPU driver guard script is not)"
 device
 echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
 run gate
-eq gate "$(prop sys.k4.ksu_meta_gate)" off
+eq gate "$(prop sys.k4.ksu_meta_gate)" ksu
 
 CASE="fresh KernelSU: installs, mounted from the next boot"
 device
@@ -582,6 +583,78 @@ for fn in copy_selinux_contexts k4_dir_labels; do
     b="$(sed -n "/^$fn() {/,/^}/p" "$HERE/../meta-overlayfs-k4/metainstall.sh")"
     [ -n "$a" ] && [ "$a" = "$b" ] && ok || bad "$fn differs from metainstall.sh"
 done
+
+# --- GPU driver guard script in ksud's post-fs-data.d -------------------------------------------------------------
+GSH() { echo "$ADB/post-fs-data.d/k4_gpu_driver_guard.sh"; }
+: > "$T/k4-gpu-driver"
+
+CASE="guard script: written on a ROM with the GPU driver selector, runs its guard"
+device
+GPU="$T/k4-gpu-driver" run apply
+eq status "$(prop sys.k4.ksu_meta)" installed
+yes_ "written" "$(GSH)"
+eq "mode" "$(stat -c %a "$(GSH)")" 755
+eq "dir mode" "$(stat -c %a "$ADB/post-fs-data.d")" 755
+eq "runs the guard" "$(tail -n 1 "$(GSH)")" "exec /system/bin/sh \"$T/k4-gpu-driver\" guard"
+grep -q -x -F "[ -f \"$T/k4-gpu-driver\" ] || exit 0" "$(GSH)" && ok || bad "no ROM check"
+head -n 1 "$(GSH)" | grep -q -x '#!/system/bin/sh' && ok || bad "shebang"
+grep -q "GPU driver guard written" "$ADB/.k4_metamodule.log" && ok || bad "log"
+no_ "no temp" "$(GSH).k4new"
+touch -d @1000000000 "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+eq "unchanged: not rewritten" "$(stat -c %Y "$(GSH)")" 1000000000
+grep -q "GPU driver guard written" "$ADB/.k4_metamodule.log" && bad "rewritten" || ok
+echo "# changed" >> "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+grep -q "# changed" "$(GSH)" && bad "not restored" || ok
+chmod 644 "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+eq "not executable: restored" "$(stat -c %a "$(GSH)")" 755
+
+CASE="guard script: other scripts in post-fs-data.d and the directory's mode are left alone"
+device
+mkdir -p "$ADB/post-fs-data.d" && chmod 700 "$ADB/post-fs-data.d" && echo mine > "$ADB/post-fs-data.d/user.sh"
+GPU="$T/k4-gpu-driver" run apply
+yes_ "written" "$(GSH)"
+eq "dir mode kept" "$(stat -c %a "$ADB/post-fs-data.d")" 700
+eq "user script kept" "$(cat "$ADB/post-fs-data.d/user.sh")" mine
+
+CASE="guard script: never through a link"
+device
+mkdir -p "$T/elsewhere" && ln -s "$T/elsewhere" "$ADB/post-fs-data.d"
+GPU="$T/k4-gpu-driver" run apply
+no_ "nothing written through the link" "$T/elsewhere/k4_gpu_driver_guard.sh"
+rm -f "$ADB/post-fs-data.d" && mkdir -p "$ADB/post-fs-data.d" && ln -s "$T/elsewhere/x" "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+no_ "link target not created" "$T/elsewhere/x"
+
+CASE="guard script: also with persist.sys.k4.ksu_metamodule=0 (metamodule part off) and an opt-out"
+device
+echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
+GPU="$T/k4-gpu-driver" run apply
+eq status "$(prop sys.k4.ksu_meta)" off
+yes_ "written" "$(GSH)"
+eq "no install" "$(calls)" 0
+device
+echo "removed meta-overlayfs" > "$ADB/.k4_metamodule_optout"
+GPU="$T/k4-gpu-driver" run apply
+eq status "$(prop sys.k4.ksu_meta)" optout
+yes_ "written" "$(GSH)"
+
+CASE="guard script: not without the selector, KernelSU, in safe mode or with Magisk"
+device
+GPU="$T/no-such-k4-gpu-driver" run apply
+no_ "no selector" "$(GSH)"
+device; rm -f "$ADB/ksud"
+GPU="$T/k4-gpu-driver" run apply
+no_ "no KernelSU" "$(GSH)"
+device; echo "persist.sys.safemode=1" >> "$T/props"
+GPU="$T/k4-gpu-driver" run apply
+no_ "safe mode" "$(GSH)"
+device
+mkdir -p "$T/mbin" && printf '#!/bin/sh\n' > "$T/mbin/magisk" && chmod 755 "$T/mbin/magisk"
+GPU="$T/k4-gpu-driver" NOMAGISK="" XPATH="$T/mbin:$PATH" run apply
+no_ "Magisk" "$(GSH)"
 
 CASE="usage"
 device

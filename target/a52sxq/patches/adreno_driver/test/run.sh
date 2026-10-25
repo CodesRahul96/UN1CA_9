@@ -559,5 +559,95 @@ eq "external line" "$(cut -f 5 "$(L)")" adreno_ext
 device; staged u_0849_0_m V@0849.0 mine; boot
 eq "added line: empty module field" "$(awk -F '\t' '{ print NF ":" $5 }' "$(L)")" "5:"
 
+# --- guard: driver modules get skip_mount before any metamodule mounts (KernelSU) ---------------------------------
+# guard: as ksud's post-fs-data.d script / the init.rc action runs it (u:r:ksu), before ksud moves updates in
+guard() {
+    K4GPU_ROOT="$R" K4GPU_PROPFILE="$T/props" K4GPU_KMSG=/dev/null "$SH" "$SCRIPT" guard > "$T/gout" 2>&1
+    eq "guard exit status" "$?" 0
+    [ -s "$T/gout" ] && bad "guard printed: $(head -c 300 "$T/gout")"
+    $VERBOSE && { echo "--- [$CASE] guard log"; cat "$R/data/adb/.k4_gpu_guard.log" 2> /dev/null; }
+    return 0
+}
+GL() { echo "$R/data/adb/.k4_gpu_guard.log"; }
+ours() { head -n 1 "$1" 2> /dev/null | grep -q '^k4-gpu-driver: Adreno GPU driver module' && ok || bad "$2: $1 not our skip_mount"; }
+nofile() { [ -e "$1" ] || [ -L "$1" ] && bad "$2: $1 exists" || ok; }
+plain_mod() { mkdir -p "$R/data/adb/modules/$1/system/etc"; printf 'id=%s\n' "$1" > "$R/data/adb/modules/$1/module.prop"; }
+
+CASE="guard: an installed KernelSU driver module gets skip_mount; the selector still imports it"
+device; ksu_module modules adreno_g V@0849.0; plain_mod plain_g
+guard
+ours "$R/data/adb/modules/adreno_g/skip_mount" marked
+eq "marker mode" "$(stat -c %a "$R/data/adb/modules/adreno_g/skip_mount")" 644
+nofile "$R/data/adb/modules/plain_g/skip_mount" "plain module"
+eq "guard prop" "$(prop sys.k4.gpu_guard)" adreno_g
+has "log" "adreno_g ($R/data/adb/modules): Adreno GPU driver module, skip_mount set (selector check: ok)" "$(GL)"
+boot
+eq "imported and selected" "$(prop persist.sys.k4.gpu_driver)" "$(mslot adreno_g)"
+eq "trial" "$(prop persist.sys.k4.gpu_trial)" pending
+eq "mounted by the selector" "$(prop sys.k4.gpu_user_active)" "$(mslot adreno_g)"
+before="$(cat "$R/data/adb/modules/adreno_g/skip_mount")"
+guard
+eq "idempotent" "$(cat "$R/data/adb/modules/adreno_g/skip_mount")" "$before"
+eq "idempotent prop" "$(prop sys.k4.gpu_guard)" adreno_g
+
+CASE="guard: a fresh install (modules_update) - marked before ksud moves it in, the first boot after the install"
+device
+mkdir -p "$R/data/adb/modules/adreno_n" && printf 'id=adreno_n\n' > "$R/data/adb/modules/adreno_n/module.prop" && : > "$R/data/adb/modules/adreno_n/update"
+ksu_module modules_update adreno_n V@0849.0
+guard
+ours "$R/data/adb/modules_update/adreno_n/skip_mount" "staged copy marked"
+nofile "$R/data/adb/modules/adreno_n/skip_mount" "placeholder (no driver files) not marked"
+# ksud's handle_updated_modules: the staged directory replaces modules/<id>
+rm -rf "$R/data/adb/modules/adreno_n" && mv "$R/data/adb/modules_update/adreno_n" "$R/data/adb/modules/adreno_n"
+ours "$R/data/adb/modules/adreno_n/skip_mount" "moved in with it"
+boot
+eq "imported and selected" "$(prop persist.sys.k4.gpu_driver)" "$(mslot adreno_n)"
+
+CASE="guard: Mountify / Magic Mount layout, 32-bit only, rejected by the allowlist, disabled - all marked"
+device
+mkdir -p "$R/data/adb/modules/mfy_drv/system/vendor" && printf 'id=mfy_drv\n' > "$R/data/adb/modules/mfy_drv/module.prop"
+fake_set "$R/data/adb/modules/mfy_drv/system/vendor" V@0849.0
+ksu_module modules drv32 V@0849.0 32
+ksu_module modules drv_extra V@0849.0 && fake_lib "$R/data/adb/modules/drv_extra/vendor/lib64/libsec-ril.so" -
+ksu_module modules drv_off V@0849.0 && : > "$R/data/adb/modules/drv_off/disable"
+guard
+for x in mfy_drv drv32 drv_extra drv_off; do ours "$R/data/adb/modules/$x/skip_mount" "$x"; done
+has "32-bit reason" "drv32 ($R/data/adb/modules): Adreno GPU driver module, skip_mount set (selector check: only 32-bit libraries)" "$(GL)"
+has "allowlist reason" "drv_extra ($R/data/adb/modules): Adreno GPU driver module, skip_mount set (selector check: unexpected file: libsec-ril.so)" "$(GL)"
+eq "guard prop" "$(prop sys.k4.gpu_guard)" "drv32 drv_extra drv_off mfy_drv"
+
+CASE="guard: a module's own skip_mount is never touched; ours goes when the driver set is gone"
+device
+ksu_module modules drv_own V@0849.0 && echo "my own" > "$R/data/adb/modules/drv_own/skip_mount"
+ksu_module modules drv_empty V@0849.0 && : > "$R/data/adb/modules/drv_empty/skip_mount"
+ksu_module modules drv_link V@0849.0 && ln -s /nonexistent "$R/data/adb/modules/drv_link/skip_mount"
+plain_mod plain_own && echo "user skip" > "$R/data/adb/modules/plain_own/skip_mount"
+plain_mod was_drv && echo "k4-gpu-driver: Adreno GPU driver module: old" > "$R/data/adb/modules/was_drv/skip_mount"
+guard
+eq "own content" "$(cat "$R/data/adb/modules/drv_own/skip_mount")" "my own"
+eq "own empty" "$(stat -c %s "$R/data/adb/modules/drv_empty/skip_mount")" 0
+eq "own link" "$(readlink "$R/data/adb/modules/drv_link/skip_mount")" /nonexistent
+eq "plain module's own" "$(cat "$R/data/adb/modules/plain_own/skip_mount")" "user skip"
+nofile "$R/data/adb/modules/was_drv/skip_mount" "ours removed from a module without a driver set"
+has "own logged" "drv_own ($R/data/adb/modules): Adreno GPU driver module with its own skip_mount, left as it is" "$(GL)"
+eq "guard prop (only ours)" "$(prop sys.k4.gpu_guard)" ""
+
+CASE="guard: nothing with Magisk, nothing without modules, odd directory names skipped"
+device; magisk_module adreno_mg V@0849.0
+guard
+nofile "$R/data/adb/modules/adreno_mg/skip_mount" "Magisk"
+device; rm -rf "$R/data/adb/modules" "$R/data/adb/modules_update"
+guard
+nofile "$R/data/adb/.k4_gpu_guard.log" "no modules: no log"
+device; ksu_module modules "bad id" V@0849.0
+guard
+nofile "$R/data/adb/modules/bad id/skip_mount" "odd id"
+device; ksu_module modules drv_ro V@0849.0 && chmod 555 "$R/data/adb/modules/drv_ro"
+if [ "$(id -u)" != 0 ]; then
+    guard
+    has "write failure logged" "drv_ro ($R/data/adb/modules): Adreno GPU driver module, could not set skip_mount" "$(GL)"
+fi
+chmod 755 "$R/data/adb/modules/drv_ro"
+
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]

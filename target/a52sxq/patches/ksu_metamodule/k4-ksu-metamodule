@@ -59,6 +59,15 @@
 #       is not tried again until it is reinstalled (.k4_metamodule_import_failed). The image is the live overlay's
 #       lower layer, but a new mnt/<id> directory is not part of any mounted layer (metainstall.sh adds modules the
 #       same way at runtime). Mounted from the next boot on. Result: sys.k4.ksu_meta_import.
+#       GPU driver guard: on a ROM with the GPU driver selector (/system/bin/k4-gpu-driver), writes
+#       /data/adb/post-fs-data.d/k4_gpu_driver_guard.sh (only when missing or different), which runs
+#       `k4-gpu-driver guard`: ksud executes post-fs-data.d scripts first thing in its post-fs-data, before it moves
+#       updated modules in and before any metamodule's post-fs-data.sh / metamount.sh, and the guard gives every
+#       Adreno GPU driver module a skip_mount file, so no metamodule (Mountify, magic mount, ... not only
+#       meta-overlayfs) mounts one with KernelSU's vendor_file labels (SurfaceFlinger abort, bootloop) and the
+#       selector imports it instead, with its fallback. The same guard also runs from the end of init.rc (see
+#       k4-gpu-driver). Done on every boot with KernelSU (not with Magisk, not in safe mode), also with
+#       persist.sys.k4.ksu_metamodule=0: that turns off the metamodule part only.
 #
 # Host tests: K4KSU_ROOT (path prefix), K4KSU_PROPFILE (properties in a file), K4KSU_KSUD (ksud to run),
 # K4KSU_ZIP / K4KSU_ZIP_SHA256 (the zip and its pin), K4KSU_KMSG (kernel log file), K4KSU_NOMAGISK (skip the
@@ -79,6 +88,9 @@ SEEN="$ADB/.k4_metamodule_seen"
 TRIES="$ADB/.k4_metamodule_tries"
 LOGF="$ADB/.k4_metamodule.log"
 IMPORT_FAILED="$ADB/.k4_metamodule_import_failed"
+# the GPU driver selector (target/a52sxq/patches/adreno_driver) and the ksud post-fs-data.d script that runs its guard
+GPU_DRIVER="${K4KSU_GPU_DRIVER:-/system/bin/k4-gpu-driver}"
+GUARD_SH="$ADB/post-fs-data.d/k4_gpu_driver_guard.sh"
 # ksud's busybox: metainstall.sh runs under it (ksud executes install scripts with `busybox sh`, applets first), so
 # the import does too - same cp, chcon (--reference), find, mount
 BB="${K4KSU_BUSYBOX-$ADB/ksu/bin/busybox}"
@@ -145,10 +157,8 @@ find_meta() {
 }
 
 gate() {
-    if [ "$(gp $P)" = 0 ]; then
-        sp sys.k4.ksu_meta_gate off
-        return
-    fi
+    # persist.sys.k4.ksu_metamodule=0 is handled by apply: it turns off the metamodule part only, not the GPU driver
+    # guard script (see gpu_guard_script)
     # stat of a ksu_file: only possible while the KernelSU policy is loaded (see the header)
     if [ -e "$ADB/ksud" ]; then
         sp sys.k4.ksu_meta_gate ksu
@@ -456,13 +466,48 @@ import_modules() {
     fi
 }
 
+# --- GPU driver guard script (see the header: "GPU driver guard") --------------------------------------------------
+
+guard_script_text() {
+    cat << EOF
+#!/system/bin/sh
+# K4_UN1CA ROM (GPU driver selector, target/a52sxq/patches/adreno_driver), written by /system/bin/k4-ksu-metamodule
+# on every boot_completed. KernelSU's ksud runs it first thing at post-fs-data, before any metamodule mounts modules:
+# every Adreno GPU driver module gets a skip_mount file, so no metamodule (meta-overlayfs, Mountify, ...) mounts one
+# and the ROM's GPU driver selector imports it instead (stock SELinux labels, allowlist, trial boot with fallback).
+# Without that ROM it does nothing.
+[ -f "$GPU_DRIVER" ] || exit 0
+exec /system/bin/sh "$GPU_DRIVER" guard
+EOF
+}
+
+# (re)writes /data/adb/post-fs-data.d/k4_gpu_driver_guard.sh when it is missing or differs (only on a ROM with the GPU
+# driver selector); never follows a link there, and leaves the directory's mode alone when it exists
+gpu_guard_script() {
+    [ -f "$GPU_DRIVER" ] || return 0
+    want="$(guard_script_text)"
+    if [ -f "$GUARD_SH" ] && [ ! -L "$GUARD_SH" ] && [ -x "$GUARD_SH" ] && [ "$(cat "$GUARD_SH" 2> /dev/null)" = "$want" ]; then
+        return 0
+    fi
+    d="${GUARD_SH%/*}"
+    if [ -L "$d" ] || [ -L "$GUARD_SH" ] || { [ -e "$d" ] && [ ! -d "$d" ]; }; then
+        log "GPU driver guard: $d or $GUARD_SH is not a plain directory / file, not written"
+        return 0
+    fi
+    if [ ! -d "$d" ]; then
+        mkdir "$d" && chmod 0755 "$d" || { log "GPU driver guard: could not create $d"; return 0; }
+    fi
+    if printf '%s\n' "$want" > "$GUARD_SH.k4new" && chmod 0755 "$GUARD_SH.k4new" && mv -f "$GUARD_SH.k4new" "$GUARD_SH"; then
+        log "GPU driver guard written: $GUARD_SH (Adreno driver modules get skip_mount before any metamodule mounts)"
+    else
+        rm -f "$GUARD_SH.k4new"
+        log "GPU driver guard: could not write $GUARD_SH"
+    fi
+}
+
 apply() {
     : > "$LOGF" 2> /dev/null
     mode="$(gp $P)"
-    if [ "$mode" = 0 ]; then
-        status off "turned off (persist.sys.k4.ksu_metamodule=0)"
-        return
-    fi
     if [ ! -f "$KSUD" ]; then
         status none "no KernelSU (no /data/adb/ksud)"
         return
@@ -473,6 +518,11 @@ apply() {
     fi
     if [ "$(gp persist.sys.safemode)" = 1 ] || [ "$(gp ro.sys.safemode)" = 1 ]; then
         status safemode "safe mode boot, nothing done"
+        return
+    fi
+    gpu_guard_script
+    if [ "$mode" = 0 ]; then
+        status off "turned off (persist.sys.k4.ksu_metamodule=0)"
         return
     fi
     if [ "$mode" = 1 ]; then
