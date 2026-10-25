@@ -129,7 +129,10 @@ eq "ksud calls" "$(calls)" 1
 eq "ksud args" "$(cat "$T/ksud.calls")" "module install $REALZIP"
 yes_ link "$ADB/metamodule"
 eq "link target" "$(readlink "$ADB/metamodule")" "$ADB/modules/meta-overlayfs"
-yes_ staged "$ADB/modules_update/meta-overlayfs/metamount.sh"
+# completed at once (nothing pending: ksud would block every other module install until a reboot)
+yes_ "in place" "$ADB/modules/meta-overlayfs/metamount.sh"
+no_ "nothing staged" "$ADB/modules_update/meta-overlayfs"
+no_ "no update marker" "$ADB/modules/meta-overlayfs/update"
 eq seen "$(cat "$ADB/.k4_metamodule_seen")" meta-overlayfs
 no_ tries "$ADB/.k4_metamodule_tries"
 no_ optout "$ADB/.k4_metamodule_optout"
@@ -246,28 +249,40 @@ run apply
 eq status "$(prop sys.k4.ksu_meta)" none
 eq "no install" "$(calls)" 0
 
-CASE="unmodified meta-overlayfs 1.3.1 installed: updated once to the K4 build"
+CASE="unmodified meta-overlayfs 1.3.1 installed: updated in place to the K4 build, nothing pending"
 device
 meta_installed 13100
+m="$ADB/modules/meta-overlayfs"
+echo image > "$m/modules.img"; mkdir -p "$m/mnt/plain_mod"; echo f > "$m/mnt/plain_mod/f"
+echo oldbin > "$m/meta-overlayfs"; chmod 755 "$m/meta-overlayfs" "$m/metamount.sh"
 module modules plain_mod
 before="$(tree_sum "$ADB/modules/plain_mod")"
 run apply
 eq status "$(prop sys.k4.ksu_meta)" updated
-eq "ksud calls" "$(calls)" 1
-eq "ksud args" "$(cat "$T/ksud.calls")" "module install $REALZIP"
-eq "staged versionCode" "$(sed -n 's/^versionCode=//p' "$ADB/modules_update/meta-overlayfs/module.prop")" 13101
-eq "installed one still there" "$(cat "$ADB/modules/meta-overlayfs/metamount.sh")" "old metamount"
+eq "no ksud install" "$(calls)" 0
+for f in metainstall.sh metamount.sh module.prop K4_CHANGES.txt metauninstall.sh post-mount.sh uninstall.sh; do
+    unzip -p "$REALZIP" "$f" | cmp -s - "$m/$f" && ok || bad "$f is not the zip's"
+done
+unzip -p "$REALZIP" meta-overlayfs-aarch64 | cmp -s - "$m/meta-overlayfs" && ok || bad "binary not the zip's aarch64 one"
+eq "binary mode" "$(stat -c %a "$m/meta-overlayfs")" 755
+eq "script mode kept" "$(stat -c %a "$m/metamount.sh")" 755
+no_ "no customize.sh" "$m/customize.sh"
+no_ "no arch binaries" "$m/meta-overlayfs-aarch64"
+eq "image untouched" "$(cat "$m/modules.img")" image
+eq "image content untouched" "$(cat "$m/mnt/plain_mod/f")" f
+no_ "nothing staged" "$ADB/modules_update/meta-overlayfs"
+no_ "no update marker" "$m/update"
+no_ "no temp" "$ADB/.k4_metamodule.tmp"
+eq "link kept" "$(readlink "$ADB/metamodule")" "$m"
 eq "other module untouched" "$(tree_sum "$ADB/modules/plain_mod")" "$before"
-no_ tries "$ADB/.k4_metamodule_tries"
-grep -q "updated from 13100 to 13101" "$ADB/.k4_metamodule.log" && ok || bad "log"
+grep -q "updated from 13100 to 13101 in place" "$ADB/.k4_metamodule.log" && ok || bad "log"
 run apply
 eq "same boot again" "$(prop sys.k4.ksu_meta)" active
-eq "no second update" "$(calls)" 1
 next_boot
 run apply
 eq "next boot" "$(prop sys.k4.ksu_meta)" active
-eq "still one install" "$(calls)" 1
 eq "K4 build in place" "$(sed -n 's/^versionCode=//p' "$ADB/modules/meta-overlayfs/module.prop")" 13101
+eq "never a ksud install" "$(calls)" 0
 
 CASE="newer meta-overlayfs (the user's own update): left alone"
 device
@@ -286,22 +301,23 @@ for mark in disable remove pending; do
     eq "$mark no install" "$(calls)" 0
 done
 
-CASE="update fails: the installed one stays, at most 3 tries"
+CASE="in-place update fails (module directory not writable): the installed one stays, at most 3 tries"
 device
 meta_installed 13100
+chmod 555 "$ADB/modules/meta-overlayfs"
 before="$(tree_sum "$ADB/modules/meta-overlayfs")"
 for i in 1 2 3; do
-    FAKE_KSUD_FAIL=1 run apply
+    run apply
     eq "status $i" "$(prop sys.k4.ksu_meta)" active
-    eq "calls $i" "$(calls)" "$i"
-    no_ "staged $i" "$ADB/modules_update/meta-overlayfs"
-    yes_ "link $i" "$ADB/metamodule"
+    eq "tries $i" "$(cat "$ADB/.k4_metamodule_tries")" "$i"
     eq "installed untouched $i" "$(tree_sum "$ADB/modules/meta-overlayfs")" "$before"
+    no_ "no temp $i" "$ADB/.k4_metamodule.tmp"
     next_boot
 done
-FAKE_KSUD_FAIL=1 run apply
+run apply
 eq "4th boot" "$(prop sys.k4.ksu_meta)" active
-eq "not tried a 4th time" "$(calls)" 3
+grep -q "failed 3 times" "$ADB/.k4_metamodule.log" && ok || bad "not tried a 4th time"
+chmod 755 "$ADB/modules/meta-overlayfs"
 
 CASE="update: zip not the pinned build"
 device

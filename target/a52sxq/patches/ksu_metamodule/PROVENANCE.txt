@@ -75,4 +75,5 @@ K4 changes (meta-overlayfs-k4/K4_CHANGES.txt; each changed script says what chan
   4. metamount.sh: the image copy of an uninstalled module is removed (metauninstall.sh runs before the image is
      mounted and skips it; a reinstall of the same id then also mounted the old version's leftover files).
   k4-ksu-metamodule updates an installed meta-overlayfs with a lower versionCode (the unmodified 13100, installed
-  by 9.3.81) to this build.
+  by 9.3.81) to this build in place, and completes a fresh install at once (no pending state: ksud blocks every
+  module install while a metamodule is pending, "Installation Blocked ... Reboot to apply changes first").
