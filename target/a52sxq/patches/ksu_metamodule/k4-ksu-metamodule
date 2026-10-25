@@ -42,10 +42,37 @@
 #       Not done when it is disabled, marked for removal or already has an update pending. A newer one (a later
 #       upstream release the user installed) is left alone.
 #       Result: sys.k4.ksu_meta, log /data/adb/.k4_metamodule.log and the kernel log.
+#       Modules installed before the metamodule (import): meta-overlayfs mounts only what its metainstall.sh copied
+#       into its modules.img when a module was installed through it, so a module installed earlier (no metamodule
+#       yet, or another metamodule such as Mountify) stayed unmounted until it was reinstalled. While meta-overlayfs
+#       is the metamodule (and not disabled, marked for removal or pending), every module in /data/adb/modules that
+#       metainstall.sh would have copied - a system/ directory; not disabled, marked for removal, skip_mount or
+#       pending an update; not a metamodule; not an Adreno GPU driver module (the GPU driver selector imports those)
+#       - and that has no copy in the image yet is copied into it the way metainstall.sh does it: system/ vendor/
+#       product/ system_ext/ odm/ oem/ with cp -af and ksud's busybox, every file and directory given the module's
+#       label (copy_selinux_contexts), directories that exist on the partition the partition's label (K4 change 3,
+#       k4_dir_labels; both functions are metainstall.sh's own, test/run.sh checks they stay identical), and like
+#       KernelSU's installer a system/<partition> that is a real directory while /<partition> is a native one
+#       (layout left by Mountify / Magic Mount; Mountify's <partition> -> ./system/<partition> link is dropped) is
+#       moved out to <partition>/ in the copy (system/<partition> -> a ../<partition> link). Copied to mnt/.k4import.<id> first and renamed to mnt/<id> when complete, so a
+#       partial copy is never mounted. A module already in the image is never touched; a module whose copy failed
+#       is not tried again until it is reinstalled (.k4_metamodule_import_failed). The image is the live overlay's
+#       lower layer, but a new mnt/<id> directory is not part of any mounted layer (metainstall.sh adds modules the
+#       same way at runtime). Mounted from the next boot on. Result: sys.k4.ksu_meta_import.
+#       GPU driver guard: on a ROM with the GPU driver selector (/system/bin/k4-gpu-driver), writes
+#       /data/adb/post-fs-data.d/k4_gpu_driver_guard.sh (only when missing or different), which runs
+#       `k4-gpu-driver guard`: ksud executes post-fs-data.d scripts first thing in its post-fs-data, before it moves
+#       updated modules in and before any metamodule's post-fs-data.sh / metamount.sh, and the guard gives every
+#       Adreno GPU driver module a skip_mount file, so no metamodule (Mountify, magic mount, ... not only
+#       meta-overlayfs) mounts one with KernelSU's vendor_file labels (SurfaceFlinger abort, bootloop) and the
+#       selector imports it instead, with its fallback. The same guard also runs from the end of init.rc (see
+#       k4-gpu-driver). Done on every boot with KernelSU (not with Magisk, not in safe mode), also with
+#       persist.sys.k4.ksu_metamodule=0: that turns off the metamodule part only.
 #
 # Host tests: K4KSU_ROOT (path prefix), K4KSU_PROPFILE (properties in a file), K4KSU_KSUD (ksud to run),
 # K4KSU_ZIP / K4KSU_ZIP_SHA256 (the zip and its pin), K4KSU_KMSG (kernel log file), K4KSU_NOMAGISK (skip the
-# magisk-in-PATH check).
+# magisk-in-PATH check), K4KSU_BUSYBOX (busybox for the import, empty: the current shell's tools), K4KSU_FAKEIMG
+# (the image is a plain directory: mnt/ counts as mounted).
 
 R="${K4KSU_ROOT:-}"
 ADB="$R/data/adb"
@@ -60,12 +87,19 @@ OPT="$ADB/.k4_metamodule_optout"
 SEEN="$ADB/.k4_metamodule_seen"
 TRIES="$ADB/.k4_metamodule_tries"
 LOGF="$ADB/.k4_metamodule.log"
+IMPORT_FAILED="$ADB/.k4_metamodule_import_failed"
+# the GPU driver selector (target/a52sxq/patches/adreno_driver) and the ksud post-fs-data.d script that runs its guard
+GPU_DRIVER="${K4KSU_GPU_DRIVER:-/system/bin/k4-gpu-driver}"
+GUARD_SH="$ADB/post-fs-data.d/k4_gpu_driver_guard.sh"
+# ksud's busybox: metainstall.sh runs under it (ksud executes install scripts with `busybox sh`, applets first), so
+# the import does too - same cp, chcon (--reference), find, mount
+BB="${K4KSU_BUSYBOX-$ADB/ksu/bin/busybox}"
 MAX_TRIES=3
 P=persist.sys.k4.ksu_metamodule
 
 log() {
     echo "k4-ksu-metamodule: $*" 2> /dev/null > "${K4KSU_KMSG:-/dev/kmsg}"
-    [ "$MODE" = apply ] && echo "$*" >> "$LOGF" 2> /dev/null
+    case "$MODE" in apply | import) echo "$*" >> "$LOGF" 2> /dev/null ;; esac
 }
 
 gp() {
@@ -123,10 +157,8 @@ find_meta() {
 }
 
 gate() {
-    if [ "$(gp $P)" = 0 ]; then
-        sp sys.k4.ksu_meta_gate off
-        return
-    fi
+    # persist.sys.k4.ksu_metamodule=0 is handled by apply: it turns off the metamodule part only, not the GPU driver
+    # guard script (see gpu_guard_script)
     # stat of a ksu_file: only possible while the KernelSU policy is loaded (see the header)
     if [ -e "$ADB/ksud" ]; then
         sp sys.k4.ksu_meta_gate ksu
@@ -252,13 +284,230 @@ cleanup_failed() {
     fi
 }
 
+# --- modules installed before the metamodule (see the header: "import") ---------------------------------------------
+
+# meta-overlayfs-k4/metainstall.sh's own function, unchanged (test/run.sh checks that the two are identical)
+# Copy SELinux contexts from src tree to destination by mirroring each entry.
+copy_selinux_contexts() {
+    command -v chcon >/dev/null 2>&1 || return 0
+
+    SRC="$1"
+    DST="$2"
+
+    if [ -z "$SRC" ] || [ -z "$DST" ] || [ ! -e "$SRC" ] || [ ! -e "$DST" ]; then
+        return 0
+    fi
+
+    CHCON_FLAG=""
+    if [ -L "$SRC" ]; then
+        CHCON_FLAG="-h"
+    fi
+    chcon $CHCON_FLAG --reference="$SRC" "$DST" 2>/dev/null || true
+
+    find "$SRC" -print | while IFS= read -r PATH_SRC; do
+        if [ "$PATH_SRC" = "$SRC" ]; then
+            continue
+        fi
+        REL_PATH="${PATH_SRC#"${SRC}/"}"
+        PATH_DST="$DST/$REL_PATH"
+        if [ -e "$PATH_DST" ] || [ -L "$PATH_DST" ]; then
+            CHCON_FLAG=""
+            if [ -L "$PATH_SRC" ]; then
+                CHCON_FLAG="-h"
+            fi
+            chcon $CHCON_FLAG --reference="$PATH_SRC" "$PATH_DST" 2>/dev/null || true
+        fi
+    done
+}
+
+# meta-overlayfs-k4/metainstall.sh's own function, unchanged (test/run.sh checks that the two are identical)
+# K4: directories that exist on the partition take its label (change 3); $1 = image copy, $2 = partition root
+k4_dir_labels() {
+    command -v chcon >/dev/null 2>&1 || return 0
+    [ -d "$1" ] && [ ! -L "$1" ] || return 0
+    find "$1" -type d | while IFS= read -r K4_D; do
+        K4_R="${K4_D#"$1"}"
+        K4_P="$2$K4_R"
+        if [ -d "$K4_P" ] && [ ! -L "$K4_P" ]; then
+            chcon --reference="$K4_P" "$K4_D" 2>/dev/null || true
+        fi
+    done
+}
+
+# a module carrying an Adreno GPU driver set (the GPU driver selector's own detection, as in metainstall.sh): never
+# copied into the image, whether or not the selector exists - mounted from there it bootlooped the phone
+gpu_driver_module() {
+    for v in "$1/vendor" "$1/system/vendor"; do
+        for l in lib64 lib; do
+            [ -f "$v/$l/egl/libGLESv2_adreno.so" ] && return 0
+        done
+    done
+    return 1
+}
+
+img_mounted() {
+    if [ -n "$K4KSU_FAKEIMG" ]; then
+        [ -d "$1" ]
+    else
+        mountpoint -q "$1" 2> /dev/null
+    fi
+}
+
+# the ids of the modules metainstall.sh would have copied into the image (see the header), image or not
+import_candidates() {
+    for d in "$ADB"/modules/*; do
+        [ -d "$d" ] && [ ! -L "$d" ] || continue
+        id="${d##*/}"
+        # a KernelSU module id ([a-zA-Z][a-zA-Z0-9._-]+, ksud's validate_module_id); anything else is hand-made
+        case "$id" in [A-Za-z]?*) ;; *) continue ;; esac
+        case "$id" in *[!A-Za-z0-9._-]*) continue ;; esac
+        [ "$id" = "$ID" ] && continue
+        [ -f "$d/module.prop" ] || continue
+        is_meta_prop "$d/module.prop" && continue
+        [ -e "$d/disable" ] || [ -e "$d/remove" ] || [ -e "$d/skip_mount" ] || [ -e "$d/update" ] && continue
+        [ -e "$ADB/modules_update/$id" ] && continue
+        [ -d "$d/system" ] || continue
+        gpu_driver_module "$d" && continue
+        echo "$id"
+    done
+}
+
+# import_one <id> <image mount point>: the module's partition directories into <mnt>/<id>, like metainstall.sh's
+# post_install_to_image (all or nothing: copied next to it, renamed when complete)
+import_one() {
+    d="$ADB/modules/$1"
+    t="$2/.k4import.$1"
+    rm -rf "$t"
+    mkdir "$t" || return 1
+    chown 0:0 "$t" 2> /dev/null
+    chmod 0755 "$t"
+    chcon u:object_r:system_file:s0 "$t" 2> /dev/null
+    for p in system vendor product system_ext odm oem; do
+        [ -d "$d/$p" ] || continue
+        cp -af "$d/$p" "$t/" || { rm -rf "$t"; return 1; }
+        copy_selinux_contexts "$d/$p" "$t/$p"
+    done
+    # KernelSU's installer (handle_partition) moves system/<partition> out when /<partition> is a native directory;
+    # a module installed under Mountify / Magic Mount still has it inside system/ (Mountify adds a <partition> ->
+    # ./system/<partition> link next to it, replaced here by the directory itself)
+    for p in vendor system_ext product odm; do
+        [ -d "$t/system/$p" ] && [ ! -L "$t/system/$p" ] && [ -d "$R/$p" ] && [ ! -L "$R/$p" ] || continue
+        [ -L "$t/$p" ] && rm -f "$t/$p"
+        if [ -e "$t/$p" ] || [ -L "$t/$p" ]; then
+            log "import: $1 has both $p/ and system/$p/, not imported"
+            rm -rf "$t"
+            return 1
+        fi
+        mv "$t/system/$p" "$t/$p" && ln -s "../$p" "$t/system/$p" || { rm -rf "$t"; return 1; }
+        chcon -h u:object_r:system_file:s0 "$t/system/$p" 2> /dev/null
+    done
+    for p in system vendor product system_ext odm oem; do
+        k4_dir_labels "$t/$p" "$R/$p"
+    done
+    mv "$t" "$2/$1"
+}
+
+# runs under ksud's busybox (import_modules starts it): every candidate without a copy in the image is copied
+do_import() {
+    m="$ADB/modules/$ID"
+    img="$m/modules.img"
+    mnt="$m/mnt"
+    [ -f "$img" ] || { log "import: no $ID modules image"; return 0; }
+    ids="$(import_candidates)"
+    [ -n "$ids" ] || { sp sys.k4.ksu_meta_import none; return 0; }
+    if ! img_mounted "$mnt"; then
+        # as metainstall.sh's ensure_image_mounted
+        mkdir -p "$mnt"
+        chcon u:object_r:ksu_file:s0 "$img" 2> /dev/null
+        if ! mount -t ext4 -o loop,rw,noatime "$img" "$mnt"; then
+            log "import: could not mount $img"
+            sp sys.k4.ksu_meta_import "failed: image not mounted"
+            return 0
+        fi
+    fi
+    rm -rf "$mnt"/.k4import.* 2> /dev/null
+    done_ids=""
+    failed_ids=""
+    for id in $ids; do
+        [ -e "$mnt/$id" ] || [ -L "$mnt/$id" ] && continue
+        sig="$id $(stat -c %i "$ADB/modules/$id" 2> /dev/null)"
+        if grep -q -x -F "$sig" "$IMPORT_FAILED" 2> /dev/null; then
+            failed_ids="$failed_ids $id"
+            continue
+        fi
+        # metainstall.sh's set_perm "$MNT_DIR" 0 0 0755
+        chown 0:0 "$mnt" 2> /dev/null
+        chmod 0755 "$mnt"
+        chcon u:object_r:system_file:s0 "$mnt" 2> /dev/null
+        if import_one "$id" "$mnt"; then
+            done_ids="$done_ids $id"
+            log "import: $id (installed before the metamodule) copied into the $ID image, mounted from the next boot on"
+        else
+            echo "$sig" >> "$IMPORT_FAILED"
+            failed_ids="$failed_ids $id"
+            log "import: copying $id into the $ID image failed (not tried again until it is reinstalled)"
+        fi
+    done
+    v="${done_ids# }"
+    [ -n "$failed_ids" ] && v="${v:+$v; }failed:$failed_ids"
+    sp sys.k4.ksu_meta_import "${v:-none}"
+}
+
+# the import, under ksud's busybox when there is one (see BB)
+import_modules() {
+    m="$ADB/modules/$ID"
+    if [ -e "$m/disable" ] || [ -e "$m/remove" ] || [ -e "$ADB/modules_update/$ID" ] || [ ! -f "$m/metamount.sh" ]; then
+        return 0
+    fi
+    if [ -n "$BB" ] && [ -x "$BB" ]; then
+        ASH_STANDALONE=1 "$BB" sh "$0" import
+    else
+        do_import
+    fi
+}
+
+# --- GPU driver guard script (see the header: "GPU driver guard") --------------------------------------------------
+
+guard_script_text() {
+    cat << EOF
+#!/system/bin/sh
+# K4_UN1CA ROM (GPU driver selector, target/a52sxq/patches/adreno_driver), written by /system/bin/k4-ksu-metamodule
+# on every boot_completed. KernelSU's ksud runs it first thing at post-fs-data, before any metamodule mounts modules:
+# every Adreno GPU driver module gets a skip_mount file, so no metamodule (meta-overlayfs, Mountify, ...) mounts one
+# and the ROM's GPU driver selector imports it instead (stock SELinux labels, allowlist, trial boot with fallback).
+# Without that ROM it does nothing.
+[ -f "$GPU_DRIVER" ] || exit 0
+exec /system/bin/sh "$GPU_DRIVER" guard
+EOF
+}
+
+# (re)writes /data/adb/post-fs-data.d/k4_gpu_driver_guard.sh when it is missing or differs (only on a ROM with the GPU
+# driver selector); never follows a link there, and leaves the directory's mode alone when it exists
+gpu_guard_script() {
+    [ -f "$GPU_DRIVER" ] || return 0
+    want="$(guard_script_text)"
+    if [ -f "$GUARD_SH" ] && [ ! -L "$GUARD_SH" ] && [ -x "$GUARD_SH" ] && [ "$(cat "$GUARD_SH" 2> /dev/null)" = "$want" ]; then
+        return 0
+    fi
+    d="${GUARD_SH%/*}"
+    if [ -L "$d" ] || [ -L "$GUARD_SH" ] || { [ -e "$d" ] && [ ! -d "$d" ]; }; then
+        log "GPU driver guard: $d or $GUARD_SH is not a plain directory / file, not written"
+        return 0
+    fi
+    if [ ! -d "$d" ]; then
+        mkdir "$d" && chmod 0755 "$d" || { log "GPU driver guard: could not create $d"; return 0; }
+    fi
+    if printf '%s\n' "$want" > "$GUARD_SH.k4new" && chmod 0755 "$GUARD_SH.k4new" && mv -f "$GUARD_SH.k4new" "$GUARD_SH"; then
+        log "GPU driver guard written: $GUARD_SH (Adreno driver modules get skip_mount before any metamodule mounts)"
+    else
+        rm -f "$GUARD_SH.k4new"
+        log "GPU driver guard: could not write $GUARD_SH"
+    fi
+}
+
 apply() {
     : > "$LOGF" 2> /dev/null
     mode="$(gp $P)"
-    if [ "$mode" = 0 ]; then
-        status off "turned off (persist.sys.k4.ksu_metamodule=0)"
-        return
-    fi
     if [ ! -f "$KSUD" ]; then
         status none "no KernelSU (no /data/adb/ksud)"
         return
@@ -271,6 +520,11 @@ apply() {
         status safemode "safe mode boot, nothing done"
         return
     fi
+    gpu_guard_script
+    if [ "$mode" = 0 ]; then
+        status off "turned off (persist.sys.k4.ksu_metamodule=0)"
+        return
+    fi
     if [ "$mode" = 1 ]; then
         rm -f "$OPT" "$SEEN" "$TRIES"
         sp $P ""
@@ -281,9 +535,11 @@ apply() {
     if [ -n "$meta" ]; then
         [ "$(cat "$SEEN" 2> /dev/null)" = "$meta" ] || echo "$meta" > "$SEEN"
         if [ "$meta" = "$ID" ]; then
-            update && return
-            rm -f "$TRIES"
-            status active "metamodule $ID installed"
+            if ! update; then
+                rm -f "$TRIES"
+                status active "metamodule $ID installed"
+            fi
+            import_modules
         else
             rm -f "$TRIES"
             status "other:$meta" "the user's metamodule $meta is installed, nothing done"
@@ -326,6 +582,7 @@ apply() {
         rm -f "$TRIES"
         if complete_install; then
             status installed "$ID installed (completed now, nothing pending): module files are mounted from the next boot on"
+            import_modules
         else
             status installed "$ID installed: pending until the next boot (module installs are blocked until then)"
         fi
@@ -339,6 +596,7 @@ MODE="$1"
 case "$1" in
     gate) gate ;;
     apply) apply ;;
+    import) do_import ;;  # started by apply (import_modules), under ksud's busybox
     *) echo "usage: k4-ksu-metamodule gate|apply" >&2; exit 2 ;;
 esac
 exit 0

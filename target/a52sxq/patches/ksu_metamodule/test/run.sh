@@ -36,6 +36,8 @@ id="$(unzip -p "$3" module.prop | sed -n 's/^id=//p')"
 mkdir -p "$ADB/modules_update/$id" || exit 1
 (cd "$ADB/modules_update/$id" && unzip -q -o "$3") || exit 1
 [ -n "${FAKE_KSUD_FAIL:-}" ] && { echo "! Failed to install module script"; exit 1; }
+# FAKE_KSUD_IMG=1: the metamodule's customize.sh made its modules image (here a directory, K4KSU_FAKEIMG)
+[ -n "${FAKE_KSUD_IMG:-}" ] && { : > "$ADB/modules_update/$id/modules.img"; mkdir -p "$ADB/modules_update/$id/mnt"; }
 mkdir -p "$ADB/modules/$id"
 cp "$ADB/modules_update/$id/module.prop" "$ADB/modules/$id/module.prop"
 touch "$ADB/modules/$id/update"
@@ -93,7 +95,9 @@ next_boot() {
 run() {
     : > "$T/kmsg"
     env K4KSU_ROOT="$R" K4KSU_PROPFILE="$T/props" K4KSU_KMSG="$T/kmsg" K4KSU_ZIP="${ZIP:-$REALZIP}" \
-        K4KSU_NOMAGISK="${NOMAGISK-1}" KT="$T" PATH="${XPATH:-$PATH}" "$SH" "$SCRIPT" "$@"
+        K4KSU_NOMAGISK="${NOMAGISK-1}" K4KSU_BUSYBOX="${BBOX-}" K4KSU_FAKEIMG=1 \
+        K4KSU_GPU_DRIVER="${GPU:-$T/none/k4-gpu-driver}" KT="$T" PATH="${XPATH:-$PATH}" \
+        "$SH" "$SCRIPT" "$@"
     local rc=$?
     if $VERBOSE; then sed "s/^/    [$CASE] /" "$T/kmsg"; fi
     return $rc
@@ -113,11 +117,11 @@ rm -f "$ADB/ksud"
 run gate
 eq gate "$(prop sys.k4.ksu_meta_gate)" none
 
-CASE="gate: turned off"
+CASE="gate: turned off (apply still runs: the metamodule part is off, the GPU driver guard script is not)"
 device
 echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
 run gate
-eq gate "$(prop sys.k4.ksu_meta_gate)" off
+eq gate "$(prop sys.k4.ksu_meta_gate)" ksu
 
 CASE="fresh KernelSU: installs, mounted from the next boot"
 device
@@ -380,6 +384,277 @@ run apply
 eq "re-armed retry" "$(prop sys.k4.ksu_meta)" installed
 eq "retried" "$(calls)" 4
 no_ tries "$ADB/.k4_metamodule_tries"
+
+# --- modules installed before the metamodule: imported into the image ------------------------------------------
+# an installed K4 meta-overlayfs with its image (a directory here, K4KSU_FAKEIMG) and the mount script
+meta_with_image() {
+    meta_installed "${1:-13101}"
+    if [ "${1:-13101}" = 13101 ]; then
+        for f in metainstall.sh metamount.sh module.prop K4_CHANGES.txt metauninstall.sh post-mount.sh uninstall.sh; do
+            unzip -p "$REALZIP" "$f" > "$ADB/modules/meta-overlayfs/$f"
+        done
+        unzip -p "$REALZIP" meta-overlayfs-aarch64 > "$ADB/modules/meta-overlayfs/meta-overlayfs"
+    fi
+    : > "$ADB/modules/meta-overlayfs/modules.img"
+    mkdir -p "$ADB/modules/meta-overlayfs/mnt"
+    MNT="$ADB/modules/meta-overlayfs/mnt"
+}
+# an Adreno driver module (<lib dir under the module>, e.g. vendor/lib64)
+gpu_mod() {
+    mkdir -p "$ADB/modules/$1/$2/egl"
+    printf 'id=%s\nname=%s\nversionCode=1\n' "$1" "$1" > "$ADB/modules/$1/module.prop"
+    echo gles > "$ADB/modules/$1/$2/egl/libGLESv2_adreno.so"
+    mkdir -p "$ADB/modules/$1/system"
+}
+
+CASE="import: a module installed before the metamodule is copied into the image"
+device
+meta_with_image
+module modules plain_mod
+mkdir -p "$ADB/modules/plain_mod/vendor/etc" "$ADB/modules/plain_mod/product/app"
+echo v > "$ADB/modules/plain_mod/vendor/etc/v.conf"; echo p > "$ADB/modules/plain_mod/product/app/p.apk"
+ln -s ../vendor "$ADB/modules/plain_mod/system/vendor"
+echo "#!/system/bin/sh" > "$ADB/modules/plain_mod/service.sh"
+before="$(tree_sum "$ADB/modules/plain_mod")"
+run apply
+eq status "$(prop sys.k4.ksu_meta)" active
+eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+eq "system copied" "$(cat "$MNT/plain_mod/system/etc/plain_mod.txt")" "file of plain_mod"
+eq "vendor copied" "$(cat "$MNT/plain_mod/vendor/etc/v.conf")" v
+eq "product copied" "$(cat "$MNT/plain_mod/product/app/p.apk")" p
+eq "system/vendor link kept" "$(readlink "$MNT/plain_mod/system/vendor")" ../vendor
+no_ "only partition directories" "$MNT/plain_mod/service.sh"
+no_ "no module.prop in the image" "$MNT/plain_mod/module.prop"
+no_ "no temp" "$MNT/.k4import.plain_mod"
+eq "module untouched" "$(tree_sum "$ADB/modules/plain_mod")" "$before"
+eq "no ksud call" "$(calls)" 0
+grep -q "import: plain_mod (installed before the metamodule) copied" "$ADB/.k4_metamodule.log" && ok || bad "log"
+img="$(tree_sum "$MNT")"
+run apply
+eq "idempotent: nothing more" "$(prop sys.k4.ksu_meta_import)" none
+eq "idempotent: image unchanged" "$(tree_sum "$MNT")" "$img"
+next_boot
+run apply
+eq "next boot: nothing more" "$(prop sys.k4.ksu_meta_import)" none
+
+CASE="import: a module already in the image is never touched"
+device
+meta_with_image
+module modules plain_mod
+mkdir -p "$MNT/plain_mod/system/etc" && echo "metainstall copy" > "$MNT/plain_mod/system/etc/plain_mod.txt"
+run apply
+eq import "$(prop sys.k4.ksu_meta_import)" none
+eq "copy untouched" "$(cat "$MNT/plain_mod/system/etc/plain_mod.txt")" "metainstall copy"
+
+CASE="import: modules metainstall.sh would not copy are skipped"
+device
+meta_with_image
+for x in disabled removed skipmount pending; do module modules "m_$x"; done
+touch "$ADB/modules/m_disabled/disable" "$ADB/modules/m_removed/remove" "$ADB/modules/m_skipmount/skip_mount"
+touch "$ADB/modules/m_pending/update"; module modules_update m_pending
+module modules nosys && rm -rf "$ADB/modules/nosys/system" && mkdir -p "$ADB/modules/nosys/vendor/etc"
+module modules otherid && mv "$ADB/modules/otherid" "$ADB/modules/_bad"
+module modules noprop && rm -f "$ADB/modules/noprop/module.prop"
+gpu_mod gpu64 vendor/lib64
+gpu_mod gpu32sys system/vendor/lib
+module modules keep
+run apply
+eq "only the plain one" "$(prop sys.k4.ksu_meta_import)" keep
+for x in m_disabled m_removed m_skipmount m_pending nosys _bad noprop gpu64 gpu32sys meta-overlayfs; do
+    no_ "$x not imported" "$MNT/$x"
+done
+yes_ "keep imported" "$MNT/keep/system/etc/keep.txt"
+# enabled later: imported on that boot, mounted from the next
+rm -f "$ADB/modules/m_disabled/disable"
+run apply
+eq "re-enabled module" "$(prop sys.k4.ksu_meta_import)" m_disabled
+
+CASE="import: system/vendor left inside system/ (Mountify / Magic Mount layout) is moved out like KernelSU's installer"
+device
+meta_with_image
+mkdir -p "$R/vendor/etc" "$R/system"
+ln -s ../product "$R/system_ext"   # a partition that is a link: left inside system/
+module modules mfy_mod
+mkdir -p "$ADB/modules/mfy_mod/system/vendor/etc" "$ADB/modules/mfy_mod/system/system_ext/etc"
+ln -s ./system/vendor "$ADB/modules/mfy_mod/vendor"   # what Mountify's metainstall.sh adds
+echo x > "$ADB/modules/mfy_mod/system/vendor/etc/x.conf"
+echo y > "$ADB/modules/mfy_mod/system/system_ext/etc/y.conf"
+before="$(tree_sum "$ADB/modules/mfy_mod")"
+run apply
+eq import "$(prop sys.k4.ksu_meta_import)" mfy_mod
+eq "moved to vendor/" "$(cat "$MNT/mfy_mod/vendor/etc/x.conf")" x
+eq "link left in system/" "$(readlink "$MNT/mfy_mod/system/vendor")" ../vendor
+[ -d "$MNT/mfy_mod/vendor" ] && [ ! -L "$MNT/mfy_mod/vendor" ] && ok || bad "Mountify's vendor link not replaced by the directory"
+eq "system_ext (a link on the device) stays" "$(cat "$MNT/mfy_mod/system/system_ext/etc/y.conf")" y
+eq "module untouched" "$(tree_sum "$ADB/modules/mfy_mod")" "$before"
+
+CASE="import: failed copy - nothing half-done, not retried until reinstalled"
+device
+meta_with_image
+mkdir -p "$R/vendor"
+module modules both_mod
+mkdir -p "$ADB/modules/both_mod/system/vendor/etc" "$ADB/modules/both_mod/vendor/etc"
+module modules ok_mod
+run apply
+eq import "$(prop sys.k4.ksu_meta_import)" "ok_mod; failed: both_mod"
+no_ "not imported" "$MNT/both_mod"
+no_ "no temp" "$MNT/.k4import.both_mod"
+yes_ "the other one is" "$MNT/ok_mod/system"
+run apply
+eq "not retried" "$(prop sys.k4.ksu_meta_import)" "failed: both_mod"
+grep -c "both_mod" "$ADB/.k4_metamodule_import_failed" | grep -q -x 1 && ok || bad "recorded once"
+rm -rf "$ADB/modules/both_mod/vendor"
+cp -a "$ADB/modules/both_mod" "$ADB/modules/both_mod.new" && rm -rf "$ADB/modules/both_mod" && mv "$ADB/modules/both_mod.new" "$ADB/modules/both_mod"
+run apply
+eq "reinstalled: retried" "$(prop sys.k4.ksu_meta_import)" both_mod
+if [ "$(id -u)" != 0 ]; then
+    module modules unreadable && chmod 000 "$ADB/modules/unreadable/system/etc/unreadable.txt"
+    run apply 2> /dev/null
+    eq "unreadable file" "$(prop sys.k4.ksu_meta_import)" "failed: unreadable"
+    no_ "no temp" "$MNT/.k4import.unreadable"
+    no_ "not imported" "$MNT/unreadable"
+    chmod 644 "$ADB/modules/unreadable/system/etc/unreadable.txt"
+fi
+
+CASE="import: a leftover temp copy of an interrupted run is removed and redone"
+device
+meta_with_image
+module modules plain_mod
+mkdir -p "$MNT/.k4import.plain_mod/system" && echo half > "$MNT/.k4import.plain_mod/system/half"
+run apply
+eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+no_ "temp gone" "$MNT/.k4import.plain_mod"
+no_ "half file not in the copy" "$MNT/plain_mod/system/half"
+
+CASE="import: not while meta-overlayfs is disabled / marked for removal / pending, or without its image"
+for mark in disable remove pending noimage; do
+    device
+    meta_with_image
+    module modules plain_mod
+    case $mark in
+        pending) mkdir -p "$ADB/modules_update/meta-overlayfs" ;;
+        noimage) rm -f "$ADB/modules/meta-overlayfs/modules.img" ;;
+        *) touch "$ADB/modules/meta-overlayfs/$mark" ;;
+    esac
+    run apply
+    no_ "$mark: not imported" "$MNT/plain_mod"
+done
+
+CASE="import: another metamodule (Mountify) - nothing imported"
+device
+module modules mountify 1
+ln -s "$ADB/modules/mountify" "$ADB/metamodule"
+module modules plain_mod
+run apply
+eq status "$(prop sys.k4.ksu_meta)" other:mountify
+eq import "$(prop sys.k4.ksu_meta_import)" ""
+
+CASE="import: right after a fresh install of the metamodule (mounted from the next boot, its first)"
+device
+module modules plain_mod
+FAKE_KSUD_IMG=1 run apply
+eq status "$(prop sys.k4.ksu_meta)" installed
+eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+yes_ "in the new image" "$ADB/modules/meta-overlayfs/mnt/plain_mod/system/etc/plain_mod.txt"
+
+CASE="import: after the in-place update of the unmodified 1.3.1"
+device
+meta_with_image 13100
+echo "old metamount" > "$ADB/modules/meta-overlayfs/metamount.sh"
+module modules plain_mod
+run apply
+eq status "$(prop sys.k4.ksu_meta)" updated
+eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+
+CASE="import: runs under ksud's busybox when there is one"
+device
+meta_with_image
+module modules plain_mod
+printf '#!/usr/bin/env bash\necho "$*" >> "%s/bb.calls"\n[ "$1" = sh ] && shift\nexec bash "$@"\n' "$T" > "$T/busybox"
+chmod 755 "$T/busybox"
+BBOX="$T/busybox" run apply
+eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+grep -q -x "sh $SCRIPT import" "$T/bb.calls" && ok || bad "busybox not used: $(cat "$T/bb.calls" 2> /dev/null)"
+rm -f "$T/bb.calls"
+
+CASE="import: label functions identical to meta-overlayfs-k4/metainstall.sh"
+for fn in copy_selinux_contexts k4_dir_labels; do
+    a="$(sed -n "/^$fn() {/,/^}/p" "$SCRIPT")"
+    b="$(sed -n "/^$fn() {/,/^}/p" "$HERE/../meta-overlayfs-k4/metainstall.sh")"
+    [ -n "$a" ] && [ "$a" = "$b" ] && ok || bad "$fn differs from metainstall.sh"
+done
+
+# --- GPU driver guard script in ksud's post-fs-data.d -------------------------------------------------------------
+GSH() { echo "$ADB/post-fs-data.d/k4_gpu_driver_guard.sh"; }
+: > "$T/k4-gpu-driver"
+
+CASE="guard script: written on a ROM with the GPU driver selector, runs its guard"
+device
+GPU="$T/k4-gpu-driver" run apply
+eq status "$(prop sys.k4.ksu_meta)" installed
+yes_ "written" "$(GSH)"
+eq "mode" "$(stat -c %a "$(GSH)")" 755
+eq "dir mode" "$(stat -c %a "$ADB/post-fs-data.d")" 755
+eq "runs the guard" "$(tail -n 1 "$(GSH)")" "exec /system/bin/sh \"$T/k4-gpu-driver\" guard"
+grep -q -x -F "[ -f \"$T/k4-gpu-driver\" ] || exit 0" "$(GSH)" && ok || bad "no ROM check"
+head -n 1 "$(GSH)" | grep -q -x '#!/system/bin/sh' && ok || bad "shebang"
+grep -q "GPU driver guard written" "$ADB/.k4_metamodule.log" && ok || bad "log"
+no_ "no temp" "$(GSH).k4new"
+touch -d @1000000000 "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+eq "unchanged: not rewritten" "$(stat -c %Y "$(GSH)")" 1000000000
+grep -q "GPU driver guard written" "$ADB/.k4_metamodule.log" && bad "rewritten" || ok
+echo "# changed" >> "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+grep -q "# changed" "$(GSH)" && bad "not restored" || ok
+chmod 644 "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+eq "not executable: restored" "$(stat -c %a "$(GSH)")" 755
+
+CASE="guard script: other scripts in post-fs-data.d and the directory's mode are left alone"
+device
+mkdir -p "$ADB/post-fs-data.d" && chmod 700 "$ADB/post-fs-data.d" && echo mine > "$ADB/post-fs-data.d/user.sh"
+GPU="$T/k4-gpu-driver" run apply
+yes_ "written" "$(GSH)"
+eq "dir mode kept" "$(stat -c %a "$ADB/post-fs-data.d")" 700
+eq "user script kept" "$(cat "$ADB/post-fs-data.d/user.sh")" mine
+
+CASE="guard script: never through a link"
+device
+mkdir -p "$T/elsewhere" && ln -s "$T/elsewhere" "$ADB/post-fs-data.d"
+GPU="$T/k4-gpu-driver" run apply
+no_ "nothing written through the link" "$T/elsewhere/k4_gpu_driver_guard.sh"
+rm -f "$ADB/post-fs-data.d" && mkdir -p "$ADB/post-fs-data.d" && ln -s "$T/elsewhere/x" "$(GSH)"
+GPU="$T/k4-gpu-driver" run apply
+no_ "link target not created" "$T/elsewhere/x"
+
+CASE="guard script: also with persist.sys.k4.ksu_metamodule=0 (metamodule part off) and an opt-out"
+device
+echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
+GPU="$T/k4-gpu-driver" run apply
+eq status "$(prop sys.k4.ksu_meta)" off
+yes_ "written" "$(GSH)"
+eq "no install" "$(calls)" 0
+device
+echo "removed meta-overlayfs" > "$ADB/.k4_metamodule_optout"
+GPU="$T/k4-gpu-driver" run apply
+eq status "$(prop sys.k4.ksu_meta)" optout
+yes_ "written" "$(GSH)"
+
+CASE="guard script: not without the selector, KernelSU, in safe mode or with Magisk"
+device
+GPU="$T/no-such-k4-gpu-driver" run apply
+no_ "no selector" "$(GSH)"
+device; rm -f "$ADB/ksud"
+GPU="$T/k4-gpu-driver" run apply
+no_ "no KernelSU" "$(GSH)"
+device; echo "persist.sys.safemode=1" >> "$T/props"
+GPU="$T/k4-gpu-driver" run apply
+no_ "safe mode" "$(GSH)"
+device
+mkdir -p "$T/mbin" && printf '#!/bin/sh\n' > "$T/mbin/magisk" && chmod 755 "$T/mbin/magisk"
+GPU="$T/k4-gpu-driver" NOMAGISK="" XPATH="$T/mbin:$PATH" run apply
+no_ "Magisk" "$(GSH)"
 
 CASE="usage"
 device

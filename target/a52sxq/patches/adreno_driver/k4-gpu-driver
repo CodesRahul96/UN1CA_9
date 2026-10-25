@@ -4,6 +4,8 @@
 #   k4-gpu-driver boot <stock version>      (init, k4_gpu_driver.rc, post-fs-data, domain k4gpu, blocking)
 #   k4-gpu-driver settle <seconds>          (init, on boot_completed with trial=testing; promotes the trial to ok
 #                                            only after the device has run <seconds> with no system_server restart)
+#   k4-gpu-driver guard                     (KernelSU only, in KernelSU's domain u:r:ksu, before any metamodule
+#                                            mounts modules: marks driver modules skip_mount, see below)
 #
 # "boot" runs after the root manager's own post-fs-data step (KernelSU's ksud and Magisk add theirs to init.rc, which
 # init processes before /system/etc/init/*.rc), so whatever a metamodule / magic mount / Mountify mounted over /vendor
@@ -23,6 +25,16 @@
 #     meta-overlayfs 1.3.1 mounted it with KernelSU's default label vendor_file instead, SurfaceFlinger could not
 #     load libEGL_adreno.so and the phone bootlooped into recovery (9.3.81, 2026-10-24); the "already mounted" path
 #     cannot help there, since the stock driver it would fall back to is hidden under the same mount.
+#     Any other metamodule (Mountify, magic mount, hybrid mount, ...) would mount it the same way, so "guard" gives
+#     every driver module a skip_mount file - the standard KernelSU/Magisk "do not mount this module" that
+#     metamodules honour (meta-overlayfs mount.rs, Mountify's metamount) - before the metamodule's mount, on every
+#     boot, also the first one after the install (ksud installs into modules_update/<id>; skip_mount set there
+#     moves in with it). It runs twice: from the end of /system/etc/init/hw/init.rc (KernelSU appends its own
+#     "on post-fs-data ... ksud post-fs-data" to that file when init reads it, so this action runs right before
+#     ksud's; it needs no file on /data, so it also covers the first boot after KernelSU was set up) and from
+#     /data/adb/post-fs-data.d/k4_gpu_driver_guard.sh, which ksud runs first thing in its post-fs-data (before it
+#     moves updated modules in, before every metamodule script) and which k4-ksu-metamodule writes on boot_completed:
+#     the second still covers every later boot if a KernelSU build ever put its init.rc part first.
 #   - Settings > K4_UN1CA > UI > GPU driver > Add driver: Settings validates the zip and stages the set in
 #     /data/k4gpu/incoming/u_<id>/ (+ "ready"); it is validated again and moved to /data/k4gpu/store/u_<id> here.
 #   - A driver flashed into /vendor itself (TWRP zip): no mount, the default entry is labeled with its version.
@@ -366,6 +378,21 @@ slot_name() {
     echo "${b}_${h}"
 }
 
+# module_driver <module dir>: does the module carry an Adreno driver set? src = its vendor-like root (vendor/ or
+# system/vendor/), is32 = 1 if it has only 32-bit libraries. The one detection of driver modules (boot and guard).
+module_driver() {
+    src=""
+    is32=""
+    for v in "$1/vendor" "$1/system/vendor"; do
+        if [ -f "$v/lib64/egl/libGLESv2_adreno.so" ]; then
+            src="$v"
+            break
+        fi
+        [ -f "$v/lib/egl/libGLESv2_adreno.so" ] && [ -z "$src" ] && { src="$v"; is32=1; }
+    done
+    [ -n "$src" ]
+}
+
 boot() {
     # once per boot: a second run would take this run's own mounts for a root manager's
     if [ "$(gp ${S}scan)" = 1 ]; then
@@ -481,16 +508,7 @@ boot() {
         case "$m" in
             */modules/*) [ -d "$ADB/modules_update/$id" ] && continue ;;  # an update is waiting: that one counts
         esac
-        src=""
-        is32=""
-        for v in "$m/vendor" "$m/system/vendor"; do
-            if [ -f "$v/lib64/egl/libGLESv2_adreno.so" ]; then
-                src="$v"
-                break
-            fi
-            [ -f "$v/lib/egl/libGLESv2_adreno.so" ] && [ -z "$src" ] && { src="$v"; is32=1; }
-        done
-        [ -n "$src" ] || continue
+        module_driver "$m" || continue
         # module ids are [A-Za-z0-9._+-] (what KernelSU/Magisk allow); anything else is a hand-made directory - skip it
         name_ok "$id" || { log "skip module with an unusable id"; continue; }
         s="m_$(slot_name "$id")"
@@ -693,6 +711,54 @@ space_ok() {
     return 0
 }
 
+# guard: KernelSU, before any metamodule mounts modules (see the header): every driver module gets a skip_mount file
+# (KernelSU's / Magisk's standard "do not mount this module"; meta-overlayfs, Mountify and the other metamodules honour
+# it), so only this selector puts its files in place - imported with the stock labels, the allowlist and a trial boot.
+# The file says it is ours (first line starts with GUARD_MARK); a module's own skip_mount is never touched, ours is
+# removed again from a module that no longer carries a driver set. Disabled modules are marked too (enabled again,
+# they are covered from the start). Nothing with Magisk (it mounts modules itself; a mounted driver is reported).
+GUARD_MARK="k4-gpu-driver:"
+GUARD_LOG="$ADB/.k4_gpu_guard.log"
+glog() {
+    echo "k4-gpu-driver: guard: $*" 2> /dev/null > "${K4GPU_KMSG:-/dev/kmsg}"
+    echo "$*" >> "$GUARD_LOG" 2> /dev/null
+}
+guard() {
+    [ -d "$ADB/magisk" ] && return 0
+    [ -d "$ADB/modules" ] || [ -d "$ADB/modules_update" ] || return 0
+    # a short log of the last runs (it runs twice per boot: init.rc and ksud's post-fs-data.d)
+    [ "$(stat -c %s "$GUARD_LOG" 2> /dev/null || echo 0)" -gt 65536 ] && : > "$GUARD_LOG"
+    marked=""
+    for m in "$ADB"/modules/* "$ADB"/modules_update/*; do
+        [ -d "$m" ] && [ ! -L "$m" ] || continue
+        id="${m##*/}"
+        name_ok "$id" || continue
+        f="$m/skip_mount"
+        first=""
+        [ -f "$f" ] && [ ! -L "$f" ] && read -r first < "$f" 2> /dev/null
+        if module_driver "$m"; then
+            case "$first" in "$GUARD_MARK"*) marked="$marked $id"; continue ;; esac
+            if [ -e "$f" ] || [ -L "$f" ]; then
+                glog "$id (${m%/*}): Adreno GPU driver module with its own skip_mount, left as it is"
+                continue
+            fi
+            if [ -n "$is32" ]; then why="only 32-bit libraries"; else why="$(check_set "$src")"; fi
+            if { echo "$GUARD_MARK Adreno GPU driver module: no metamodule mounts it, the ROM's GPU driver selector imports it (Settings > K4_UN1CA > UI > GPU driver). Set again on every boot." > "$f"; } 2> /dev/null; then
+                chmod 0644 "$f" 2> /dev/null  # ksud runs post-fs-data.d scripts with umask 0
+                marked="$marked $id"
+                glog "$id (${m%/*}): Adreno GPU driver module, skip_mount set (selector check: $why)"
+            else
+                glog "$id (${m%/*}): Adreno GPU driver module, could not set skip_mount"
+            fi
+        else
+            case "$first" in
+                "$GUARD_MARK"*) rm -f "$f" && glog "$id (${m%/*}): no driver set any more, its skip_mount removed" ;;
+            esac
+        fi
+    done
+    sp ${S}guard "${marked# }"
+}
+
 # settle <seconds>: run from the rc on boot_completed when trial=testing. Promote the trial to "ok" only after the
 # device has run <seconds> past boot_completed with no system_server restart. If the device reboots or system_server
 # crashes inside the window, the trial stays "testing" and the next boot reverts to the stock driver (failsafe).
@@ -731,6 +797,7 @@ settle() {
 case "$1" in
     boot) boot ;;
     settle) settle "$2" ;;
-    *) echo "usage: k4-gpu-driver boot|settle [<arg>]" >&2; exit 2 ;;
+    guard) guard ;;
+    *) echo "usage: k4-gpu-driver boot|settle [<arg>]|guard" >&2; exit 2 ;;
 esac
 exit 0

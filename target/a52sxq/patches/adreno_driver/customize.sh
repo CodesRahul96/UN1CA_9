@@ -163,6 +163,36 @@ RC="$WORK_DIR/system/system/etc/init/k4_gpu_driver.rc"
 } > "$RC"
 SET_METADATA "system" "system/etc/init/k4_gpu_driver.rc" 0 0 644 "u:object_r:system_file:s0"
 
+# KernelSU: no metamodule (meta-overlayfs, Mountify, ...) may mount a driver module - mounted with KernelSU's default
+# label vendor_file it bootloops the phone (SurfaceFlinger abort, 9.3.81) and skips the failsafe above. `k4-gpu-driver
+# guard` gives every driver module a skip_mount file; it must run before ksud's post-fs-data, where the metamodule
+# mounts. KernelSU's kernel appends its "on post-fs-data / exec u:r:ksu:s0 root -- /data/adb/ksud post-fs-data" to
+# init.rc when init reads it (at EOF: kernel/runtime/ksud_integration.c read_proxy), and init runs the actions of one
+# trigger in the order it parsed them: init.rc first (its own post-fs-data block with installkey /data comes earlier
+# in the file), then its imports and /system/etc/init. So an action at the end of init.rc is the last one before
+# ksud's. It runs in KernelSU's own domain, like ksud's line right after it (and like the k4_ksu_meta service): without
+# KernelSU that domain does not exist, the exec's child cannot set it and exits, init logs it and goes on.
+# k4-ksu-metamodule also writes the same guard into ksud's post-fs-data.d (covers later boots if a KernelSU build ever
+# put its part first). Bounded: the guard only looks at module directories.
+INIT_RC="$WORK_DIR/system/system/etc/init/hw/init.rc"
+[ -f "$INIT_RC" ] || ABORT "adreno_driver: no /system/etc/init/hw/init.rc"
+if ! grep -q "k4-gpu-driver guard" "$INIT_RC"; then
+    grep -q "^on post-fs-data$" "$INIT_RC" || ABORT "adreno_driver: no post-fs-data action in init.rc"
+    grep -q "^ *installkey /data$" "$INIT_RC" || ABORT "adreno_driver: init.rc does not install the /data key at post-fs-data"
+    [ -z "$(tail -c 1 "$INIT_RC")" ] || echo >> "$INIT_RC"
+    cat >> "$INIT_RC" << 'EOF'
+
+# K4: KernelSU metamodules never mount an Adreno GPU driver module: skip_mount for each, right before ksud's
+# post-fs-data (KernelSU appends it after this line); the GPU driver selector imports them (target/a52sxq/patches/
+# adreno_driver, /system/bin/k4-gpu-driver). Without KernelSU the domain does not exist and this does nothing.
+on post-fs-data
+    exec u:r:ksu:s0 root root -- /system/bin/timeout 20 /system/bin/sh /system/bin/k4-gpu-driver guard
+EOF
+fi
+[ "$(grep -c "k4-gpu-driver guard" "$INIT_RC")" = 1 ] && [ "$(tail -n 1 "$INIT_RC")" = \
+    "    exec u:r:ksu:s0 root root -- /system/bin/timeout 20 /system/bin/sh /system/bin/k4-gpu-driver guard" ] || \
+    ABORT "adreno_driver: the guard action is not the last one of init.rc"
+
 # init mounts the sets (bind mounts only: the files keep their own labels, init only needs mounton on the targets).
 PLAT_CIL="$WORK_DIR/system/system/etc/selinux/plat_sepolicy.cil"
 if ! grep -q "^; k4 gpu driver selector" "$PLAT_CIL"; then
@@ -228,4 +258,4 @@ grep -q -x -F "(allow system_app k4_gpu_prop (property_service (set)))" "$PLAT_C
 SET_PROP "system" "ro.k4.gpu_drivers" "$GPU_DEFAULT $GPU_SETS"
 LOG "- GPU driver selector: stock $GPU_STOCK default, $(sed "s/_/./g; s/^/V@0/; s/ /, V@0/g" <<< "$GPU_SETS") selectable, user drivers via k4-gpu-driver"
 for v in $GPU_SETS; do unset "GPU_BINDS_$v" "GPU_SQE_$v" "GPU_VK_$v"; done
-unset GPU_DEFAULT GPU_SETS GPU_STOCK GPU_STOCK_VER VK13 SRC DST VER BINDS B LABEL VKXML RC PLAT_CIL PLAT_FC PLAT_PC v t d f n a
+unset GPU_DEFAULT GPU_SETS GPU_STOCK GPU_STOCK_VER VK13 SRC DST VER BINDS B LABEL VKXML RC INIT_RC PLAT_CIL PLAT_FC PLAT_PC v t d f n a
