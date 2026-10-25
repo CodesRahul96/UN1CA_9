@@ -369,5 +369,59 @@ run
 unchanged
 quiet
 
+CASE="ce: user 0 only"
+device
+rm -rf "$REC/leveldb-internal"
+ldb "$REC/leveldb-internal" $OLD "$CTX_OLD"
+ldb "$R/data/media/150/.transforms/recovery/leveldb-internal" $OLD
+run ce
+removed "$REC/leveldb-internal"
+has "removed stale MediaProvider backup $REC/leveldb-internal"
+hasnt "user 150"
+
+CASE="late: every user but 0"
+device
+rm -rf "$REC/leveldb-internal"
+ldb "$REC/leveldb-internal" $OLD "$CTX_OLD"
+ldb "$R/data/media/150/.transforms/recovery/leveldb-internal" $OLD
+ldb "$R/data/media/10/.transforms/recovery/leveldb-internal" 1023
+K4LDB_WAIT=0 run late
+unchanged
+hasnt "$REC/leveldb-internal"
+has "owner $OLD is not an app uid of user 150"
+has "owner 1023 is not an app uid of user 10"
+
+CASE="late: waits for a user whose storage unlocks later"
+device
+mkdir -p "$R/data/media/11/AbCdEfGh0123" # locked: encrypted names only
+mkdir -p "$T/unlocked/.transforms/recovery"
+ldb "$T/unlocked/.transforms/recovery/leveldb-internal" 1023
+label "$R/data/media/11/.transforms/recovery/leveldb-internal" "$CTX_NEW"
+(sleep 2; mv "$T/unlocked/.transforms" "$R/data/media/11/.transforms") &
+start=$(date +%s)
+K4LDB_WAIT=10 run late
+wait
+took=$(($(date +%s) - start))
+has "left alone $R/data/media/11/.transforms/recovery/leveldb-internal: owner 1023 is not an app uid of user 11"
+[ $took -ge 2 ] && [ $took -le 6 ] && ok || bad "late run took $took s (expected 2-6: stop once nobody is locked)"
+
+CASE="late: gives up after the wait"
+device
+mkdir -p "$R/data/media/11/AbCdEfGh0123"
+start=$(date +%s)
+K4LDB_WAIT=3 run late
+took=$(($(date +%s) - start))
+unchanged
+quiet
+[ $took -ge 3 ] && [ $took -le 5 ] && ok || bad "late run took $took s (expected 3-5)"
+
+CASE="late: nothing locked, no wait"
+device
+start=$(date +%s)
+run late
+took=$(($(date +%s) - start))
+[ $took -le 1 ] && ok || bad "late run took $took s with nobody locked"
+quiet
+
 echo "k4-leveldb-stale host test ($SH): $PASS passed, $FAIL failed"
 [ $FAIL = 0 ]

@@ -1,10 +1,12 @@
 #!/system/bin/sh
 # k4-leveldb-stale - remove MediaProvider backup dirs that an older MediaProvider uid left behind.
-# Installed by target/a52sxq/patches/mediaprovider_leveldb_stale, started by init (service k4_leveldb_stale) when user
-# 0's credential-encrypted storage unlocks (sys.user.0.ce_available=true, before StorageManager mounts emulated;0 and
-# MediaProvider's FuseDaemon opens its backup) and again at sys.boot_completed=1 (other users whose storage is
-# unlocked by then; MediaProvider picks those up at its next start). Idempotent and cheap: a clean run is one grep
-# and one stat per backup dir, and it logs nothing.
+# Installed by target/a52sxq/patches/mediaprovider_leveldb_stale. init starts it twice per boot: "ce" for user 0 when
+# its credential-encrypted storage unlocks (sys.user.0.ce_available=true; StorageManager mounts emulated;0 and
+# MediaProvider's FuseDaemon opens its backup ~1.5 s later on the test phone, so the stale dirs are normally gone
+# before that), "late" at sys.boot_completed=1 for every other user (Secure Folder, ...), waiting up to 2 min for a
+# user whose storage is still locked; MediaProvider of such a user may already have tried its backup, it picks the
+# dirs up at its next start at the latest. Idempotent and cheap: a clean run is one grep and one stat per backup
+# dir, and it logs nothing.
 #
 # MediaProvider keeps a LevelDB backup of its database in /data/media/<user>/.transforms/recovery/leveldb-<name>
 # (internal, external_primary, ownership, deleted-files-external_primary, <volume id>), mode 2750, owned by
@@ -30,12 +32,17 @@
 # media_rw_data_file is an mlstrustedobject, so the categories do not stop MediaProvider (it writes into the
 # c37-labelled recovery dir on these phones too). Users whose storage is still locked have encrypted names here, so
 # there is no .transforms dir to look at. The SELinux domain k4leveldb (sepolicy.cil) may unlink files and rmdir dirs
-# of type media_rw_data_file only, never write, create or rename anything, and init gives the process
+# of type media_rw_data_file only (no create, rename, setattr or file write), and init gives the process
 # CAP_DAC_OVERRIDE only.
 #
 # Host tests (test/run.sh): K4LDB_ROOT (path prefix), K4LDB_LOG (log file instead of /dev/kmsg), K4LDB_LABELS (file
-# of "<path> <context>" lines instead of the real SELinux contexts). init starts the service with a clean
-# environment, so none of them is set on a phone.
+# of "<path> <context>" lines instead of the real SELinux contexts), K4LDB_WAIT (the late wait in s). init starts the
+# services with a clean environment, so none of them is set on a phone.
+# $1 = ce: user 0 only (its storage has just been unlocked). late: every other user; one whose storage is still
+# locked (no .transforms name visible yet - Secure Folder is unlocked some seconds after boot completed) is looked at
+# again every second for up to $WAIT s. No argument: every user, once (manual run).
+MODE="${1:-all}"
+WAIT="${K4LDB_WAIT:-120}"
 R="${K4LDB_ROOT:-}"
 LOGF="${K4LDB_LOG:-/dev/kmsg}"
 LABELS="${K4LDB_LABELS:-}"
@@ -118,14 +125,14 @@ remove_dir() {
     return $rc
 }
 
-for udir in "$R"/data/media/*; do
-    u="${udir##*/}"
-    case "$u" in '' | *[!0-9]*) continue ;; esac
-    [ ${#u} -le 6 ] || continue
+# do_user <user>: check the backup dirs of one user
+do_user() {
+    u="$1"
+    udir="$R/data/media/$u"
     rec="$udir/.transforms/recovery"
-    [ -L "$udir" ] || [ -L "$udir/.transforms" ] || [ -L "$rec" ] && { log "left alone user $u: symlink in $rec"; continue; }
-    [ -d "$rec" ] || continue
-    [ "$(cd "$rec" 2> /dev/null && pwd -P)" = "$rec" ] || { log "left alone user $u: $rec is not where it should be"; continue; }
+    [ -L "$udir" ] || [ -L "$udir/.transforms" ] || [ -L "$rec" ] && { log "left alone user $u: symlink in $rec"; return; }
+    [ -d "$rec" ] || return
+    [ "$(cd "$rec" 2> /dev/null && pwd -P)" = "$rec" ] || { log "left alone user $u: $rec is not where it should be"; return; }
     want=$((u * 100000 + APPID))
     lo=$((u * 100000 + 10000))
     hi=$((u * 100000 + 19999))
@@ -159,5 +166,37 @@ for udir in "$R"/data/media/*; do
             [ $rc = 6 ] || log "could not remove $d (owner $own, step $rc)"
         fi
     done
+}
+
+pending=""
+for udir in "$R"/data/media/*; do
+    u="${udir##*/}"
+    case "$u" in '' | *[!0-9]*) continue ;; esac
+    [ ${#u} -le 6 ] || continue
+    case "$MODE" in
+        ce) [ "$u" = 0 ] || continue ;;
+        late)
+            [ "$u" = 0 ] && continue
+            if [ ! -e "$udir/.transforms" ] && [ ! -L "$udir/.transforms" ]; then
+                pending="$pending $u"
+                continue
+            fi
+            ;;
+    esac
+    do_user "$u"
+done
+t=0
+while [ -n "$pending" ] && [ $t -lt "$WAIT" ]; do
+    sleep 1
+    t=$((t + 1))
+    left=""
+    for u in $pending; do
+        if [ -e "$R/data/media/$u/.transforms" ] || [ -L "$R/data/media/$u/.transforms" ]; then
+            do_user "$u"
+        else
+            left="$left $u"
+        fi
+    done
+    pending="$left"
 done
 exit 0

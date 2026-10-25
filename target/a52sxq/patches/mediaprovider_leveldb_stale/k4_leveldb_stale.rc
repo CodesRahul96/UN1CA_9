@@ -1,7 +1,7 @@
 # Stale MediaProvider backup dirs (target/a52sxq/patches/mediaprovider_leveldb_stale, see k4-leveldb-stale).
 # Root with CAP_DAC_OVERRIDE only (to unlink files inside a dir owned by another uid); media_rw for /data/media,
 # package_info for packages.list. Confined to the k4leveldb domain.
-service k4_leveldb_stale /system/bin/sh /system/bin/k4-leveldb-stale
+service k4_leveldb_stale /system/bin/sh /system/bin/k4-leveldb-stale ce
     user root
     group root media_rw package_info
     capabilities DAC_OVERRIDE
@@ -9,12 +9,20 @@ service k4_leveldb_stale /system/bin/sh /system/bin/k4-leveldb-stale
     oneshot
     disabled
 
-# vold has just unlocked user 0's CE storage; StorageManager mounts emulated;0 and MediaProvider's FuseDaemon opens
-# its backup afterwards (~1.3 s later on the test phone), so the stale dirs are normally gone before that.
+service k4_leveldb_stale_late /system/bin/sh /system/bin/k4-leveldb-stale late
+    user root
+    group root media_rw package_info
+    capabilities DAC_OVERRIDE
+    seclabel u:r:k4leveldb:s0
+    oneshot
+    disabled
+
+# vold has just unlocked user 0's CE storage (every boot, and only after the PIN when user 0 has one); StorageManager
+# mounts emulated;0 and MediaProvider's FuseDaemon opens its backup afterwards (~1.5 s later on the test phone).
 on property:sys.user.0.ce_available=true
     start k4_leveldb_stale
 
-# Again once boot is complete, for other users (Secure Folder, ...) whose storage is unlocked by then; MediaProvider
-# picks those dirs up at its next start. Nothing to do on a clean phone.
+# Every other user (Secure Folder, ...): sys.user.N.ce_available is only set for user 0, and Secure Folder is
+# unlocked ~8 s after boot completed on the test phone, so this one waits up to 2 min for a locked user.
 on property:sys.boot_completed=1
-    start k4_leveldb_stale
+    start k4_leveldb_stale_late
