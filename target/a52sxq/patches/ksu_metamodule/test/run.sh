@@ -24,6 +24,8 @@ yes_() { [ -e "$2" ] || [ -L "$2" ] && ok || bad "$1: $2 missing"; }
 no_() { [ -e "$2" ] || [ -L "$2" ] && bad "$1: $2 exists" || ok; }
 prop() { awk -v k="$1" 'index($0, k "=") == 1 { v = substr($0, length(k) + 2) } END { print v }' "$T/props"; }
 calls() { [ -f "$T/ksud.calls" ] && wc -l < "$T/ksud.calls" | tr -d ' ' || echo 0; }
+umountadds() { [ -f "$T/umountadd.calls" ] && wc -l < "$T/umountadd.calls" | tr -d ' ' || echo 0; }
+notifies() { [ -f "$T/notify.calls" ] && wc -l < "$T/notify.calls" | tr -d ' ' || echo 0; }
 
 # fake ksud: `module install <zip>` like ksud 4.2 (install_module_to_system). FAKE_KSUD_FAIL=1: dies after the
 # extraction, before module.prop / the link (an installer script that aborted).
@@ -49,9 +51,21 @@ echo "- Module installed successfully!"
 EOF
 chmod 755 "$T/ksud"
 
+# recorders for register_module_umounts' two kernel actions (K4KSU_UMOUNT_ADD / K4KSU_NOTIFY_MOUNTED): each appends,
+# so the test can see which mount points went on the per-app umount list and that the kernel was notified
+cat > "$T/umountadd-rec" << 'EOF'
+#!/usr/bin/env bash
+echo "$*" >> "$KT/umountadd.calls"
+EOF
+cat > "$T/notify-rec" << 'EOF'
+#!/usr/bin/env bash
+echo notified >> "$KT/notify.calls"
+EOF
+chmod 755 "$T/umountadd-rec" "$T/notify-rec"
+
 # a fresh device: KernelSU (ksud), no modules, no metamodule
 device() {
-    rm -rf "$T/root" "$T/props" "$T/ksud.calls" "$T/kmsg"
+    rm -rf "$T/root" "$T/props" "$T/ksud.calls" "$T/kmsg" "$T/mountinfo"
     R="$T/root"
     ADB="$R/data/adb"
     mkdir -p "$ADB/modules" "$ADB/modules_update" "$ADB/ksu/bin"
@@ -94,9 +108,13 @@ next_boot() {
 
 run() {
     : > "$T/kmsg"
+    rm -f "$T/umountadd.calls" "$T/notify.calls"
+    [ -f "$T/mountinfo" ] || : > "$T/mountinfo"
     env K4KSU_ROOT="$R" K4KSU_PROPFILE="$T/props" K4KSU_KMSG="$T/kmsg" K4KSU_ZIP="${ZIP:-$REALZIP}" \
         K4KSU_NOMAGISK="${NOMAGISK-1}" K4KSU_BUSYBOX="${BBOX-}" K4KSU_FAKEIMG=1 \
         K4KSU_GPU_DRIVER="${GPU:-$T/none/k4-gpu-driver}" KT="$T" PATH="${XPATH:-$PATH}" \
+        K4KSU_UMOUNT_ADD="$T/umountadd-rec" K4KSU_NOTIFY_MOUNTED="$T/notify-rec" \
+        K4KSU_MOUNTINFO="$T/mountinfo" \
         "$SH" "$SCRIPT" "$@"
     local rc=$?
     if $VERBOSE; then sed "s/^/    [$CASE] /" "$T/kmsg"; fi
@@ -583,6 +601,67 @@ for fn in copy_selinux_contexts k4_dir_labels; do
     b="$(sed -n "/^$fn() {/,/^}/p" "$HERE/../meta-overlayfs-k4/metainstall.sh")"
     [ -n "$a" ] && [ "$a" = "$b" ] && ok || bad "$fn differs from metainstall.sh"
 done
+
+# --- hide the module mounts from apps (register_module_umounts, runs at the end of every apply) -------------------
+CASE="hide: image mount + live KSU overlays go on the per-app umount list, kernel notified, after the import"
+device
+meta_with_image
+module modules plain_mod
+cat > "$T/mountinfo" << 'EOF'
+38 37 253:0 / / ro,relatime shared:1 - erofs /dev/block/dm-0 ro,seclabel
+287 38 0:38 / /system rw,relatime shared:48 - overlay KSU ro,seclabel,lowerdir=/data/adb/modules/meta-overlayfs/mnt/plain_mod/system:/system
+290 38 0:40 / /vendor rw,relatime shared:49 - overlay KSU ro,seclabel,lowerdir=/data/adb/modules/meta-overlayfs/mnt/plain_mod/vendor:/vendor
+301 38 0:41 / /data/x rw,relatime shared:50 - overlay other ro,seclabel,lowerdir=/foo
+EOF
+run apply
+eq status "$(prop sys.k4.ksu_meta)" active
+eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+# the image mount and both KSU overlays, not the non-KSU overlay
+eq "image + 2 overlays added" "$(umountadds)" 3
+grep -q -x -F "$ADB/modules/meta-overlayfs/mnt" "$T/umountadd.calls" && ok || bad "image mount not added: $(cat "$T/umountadd.calls" 2> /dev/null)"
+grep -q -x -F /system "$T/umountadd.calls" && ok || bad "/system not added"
+grep -q -x -F /vendor "$T/umountadd.calls" && ok || bad "/vendor not added"
+grep -q -x -F /data/x "$T/umountadd.calls" && bad "non-KSU overlay added" || ok
+eq "kernel notified once" "$(notifies)" 1
+grep -q "registered 3 module mount point" "$ADB/.k4_metamodule.log" && ok || bad "no register log line"
+# the import must have run before the register (one superblock: the image is loop-mounted only once a boot)
+awk '/import: plain_mod/ { i = NR } /registered 3 module mount point/ { d = NR } END { exit !(i && d && i < d) }' \
+    "$ADB/.k4_metamodule.log" && ok || bad "register ran before the import"
+
+CASE="hide: nothing registered when our image is not mounted"
+device
+meta_installed 13101
+printf '287 38 0:38 / /system rw,relatime shared:48 - overlay KSU ro,seclabel,lowerdir=/x:/system\n' > "$T/mountinfo"
+run apply
+eq status "$(prop sys.k4.ksu_meta)" active
+eq "no umount-add" "$(umountadds)" 0
+eq "no notify" "$(notifies)" 0
+
+CASE="hide: image mounted but no overlays yet - only the image is registered, kernel still notified"
+device
+meta_with_image
+run apply
+eq "only the image" "$(umountadds)" 1
+grep -q -x -F "$ADB/modules/meta-overlayfs/mnt" "$T/umountadd.calls" && ok || bad "image mount not added"
+eq "kernel notified" "$(notifies)" 1
+
+CASE="hide: another metamodule (Mountify) - we register nothing (our image is not mounted)"
+device
+module modules mountify 1
+ln -s "$ADB/modules/mountify" "$ADB/metamodule"
+run apply
+eq status "$(prop sys.k4.ksu_meta)" other:mountify
+eq "no umount-add" "$(umountadds)" 0
+eq "no notify" "$(notifies)" 0
+
+CASE="hide: also with persist.sys.k4.ksu_metamodule=0 (the module still mounts itself, so still hidden)"
+device
+meta_with_image
+echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
+run apply
+eq status "$(prop sys.k4.ksu_meta)" off
+eq "image still registered" "$(umountadds)" 1
+eq "kernel still notified" "$(notifies)" 1
 
 # --- GPU driver guard script in ksud's post-fs-data.d -------------------------------------------------------------
 GSH() { echo "$ADB/post-fs-data.d/k4_gpu_driver_guard.sh"; }
