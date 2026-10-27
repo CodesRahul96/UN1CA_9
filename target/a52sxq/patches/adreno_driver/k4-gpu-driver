@@ -60,7 +60,9 @@
 # Output: /data/k4gpu/drivers (one line per user driver: slot, kind, flags, label, module id; read by Settings),
 # sys.k4.gpu_scan=1 when this ran to the end, sys.k4.gpu_user_active, sys.k4.gpu_external, sys.k4.gpu_root,
 # sys.k4.gpu_vendor, sys.k4.gpu_missing, sys.k4.gpu_rejected; sys.k4.gpu_settle (the settle result, readable with
-# getprop); log in /data/k4gpu/boot.log (root:system 0660, settle appends to it) and the kernel log.
+# getprop); log in /data/k4gpu/boot.log (root:system 0660, settle appends to it) and the kernel log. The previous
+# boot's log is kept as boot.log.prev: when a trial failed, its settle line (or its absence) and the boot reason
+# logged at "start" (ro.boot.bootreason: how the previous boot ended) tell why.
 # Idempotent: a second run on the same boot does nothing (sys.k4.gpu_scan), a run on the next boot only redoes
 # what changed (imports are keyed by the size and mtime of the module's files).
 #
@@ -400,11 +402,12 @@ boot() {
         return
     fi
     mkdir -p "$STORE" "$IN" 2> /dev/null
+    [ -s "$LOGF" ] && mv -f "$LOGF" "$LOGF.prev" 2> /dev/null
     : > "$LOGF"
     # group system may append: settle runs as user system (k4_gpu_settle service). SELinux still limits writers of
     # k4_gpu_data_file to init and k4gpu (system_app may only read it), so this opens nothing to other system apps.
     chmod 660 "$LOGF" 2> /dev/null
-    log "start (stock $STOCK)"
+    log "start (stock $STOCK, boot reason $(gp ro.boot.bootreason))"
 
     sel="$(gp ${P}driver)"
     trial="$(gp ${P}trial)"
