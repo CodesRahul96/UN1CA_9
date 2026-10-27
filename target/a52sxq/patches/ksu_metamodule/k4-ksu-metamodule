@@ -59,6 +59,24 @@
 #       is not tried again until it is reinstalled (.k4_metamodule_import_failed). The image is the live overlay's
 #       lower layer, but a new mnt/<id> directory is not part of any mounted layer (metainstall.sh adds modules the
 #       same way at runtime). Mounted from the next boot on. Result: sys.k4.ksu_meta_import.
+#       Hide from ordinary apps (register_module_umounts, runs last): meta-overlayfs loop-mounts its ext4 modules.img
+#       on /data/adb/modules/meta-overlayfs/mnt and overlays /system /vendor ... from it. An app's /proc/<pid>/mountinfo
+#       then shows the /data/adb/.../mnt ext4 line ("Suspicious Mount") and, when a module overlays a partition, that
+#       partition's overlay line with lowerdir=/data/adb/modules/.../mnt/<id>/... ("KSU/AP modules.img"); the image
+#       also makes a /proc/fs/ext4/<loop> entry, which the image's post-mount.sh drops (ksud kernel nuke-ext4-sysfs).
+#       ReSukiSU already umounts module mounts per non-root app (ksu_uid_should_umount, default on) - which both hides
+#       those lines and gives the app the stock partition - but only for mount points on the kernel umount list and
+#       only after the kernel is told modules are mounted. On a metamodule ROM ksud mounts no module itself, so it
+#       never notifies the kernel (ksu_module_mounted stays false) and the list stays empty: the per-app umount was
+#       dead and every app saw everything. This hook, every boot, adds the image mount point and each live "KSU"
+#       overlay mount point (from mountinfo, so only partitions actually overlaid - umounting a non-overlaid partition
+#       would hide the real one) to the kernel umount list, then notifies the kernel. Non-root apps the user did not
+#       grant su then see the stock /system /vendor ... (no mount, no lowerdir=/data line); the shell and su-granted
+#       apps keep the modules. Not a detach (umount -l would hide it from root too, but a later module install
+#       re-mounts the image - a second ext4 superblock on one backing file while overlayfs pins the first, which can
+#       corrupt it). Kernel-side only (the manager's persistent umount config is the user's); no susfs on this kernel,
+#       so a su-granted app or an uncovered process still sees the mounts (generic KernelSU, not hideable here).
+#       Runs in every state where our image is mounted, including persist.sys.k4.ksu_metamodule=0.
 #       GPU driver guard: on a ROM with the GPU driver selector (/system/bin/k4-gpu-driver), writes
 #       /data/adb/post-fs-data.d/k4_gpu_driver_guard.sh (only when missing or different), which runs
 #       `k4-gpu-driver guard`: ksud executes post-fs-data.d scripts first thing in its post-fs-data, before it moves
@@ -72,7 +90,8 @@
 # Host tests: K4KSU_ROOT (path prefix), K4KSU_PROPFILE (properties in a file), K4KSU_KSUD (ksud to run),
 # K4KSU_ZIP / K4KSU_ZIP_SHA256 (the zip and its pin), K4KSU_KMSG (kernel log file), K4KSU_NOMAGISK (skip the
 # magisk-in-PATH check), K4KSU_BUSYBOX (busybox for the import, empty: the current shell's tools), K4KSU_FAKEIMG
-# (the image is a plain directory: mnt/ counts as mounted).
+# (the image is a plain directory: mnt/ counts as mounted), K4KSU_UMOUNT_ADD / K4KSU_NOTIFY_MOUNTED (the kernel
+# commands register_module_umounts runs, stubbed by recorders in the test), K4KSU_MOUNTINFO (the mount table it reads).
 
 R="${K4KSU_ROOT:-}"
 ADB="$R/data/adb"
@@ -96,6 +115,14 @@ GUARD_SH="$ADB/post-fs-data.d/k4_gpu_driver_guard.sh"
 BB="${K4KSU_BUSYBOX-$ADB/ksu/bin/busybox}"
 MAX_TRIES=3
 P=persist.sys.k4.ksu_metamodule
+# register_module_umounts' kernel actions, overridable for the host test (they touch the real kernel):
+#   UMOUNT_ADD <mnt> - add a mount point to ReSukiSU's live (this-boot) per-app umount list (ksud kernel umount)
+#   NOTIFY_MOUNTED   - tell the kernel modules are mounted, so the per-app umount runs (ksud never does this for a
+#                      metamodule: it mounts no module itself)
+# MOUNTINFO - the mount table register_module_umounts reads (a fixture in the test)
+UMOUNT_ADD="${K4KSU_UMOUNT_ADD:-$KSUD kernel umount add}"
+NOTIFY_MOUNTED="${K4KSU_NOTIFY_MOUNTED:-$KSUD kernel notify-module-mounted}"
+MOUNTINFO="${K4KSU_MOUNTINFO:-/proc/self/mountinfo}"
 
 log() {
     echo "k4-ksu-metamodule: $*" 2> /dev/null > "${K4KSU_KMSG:-/dev/kmsg}"
@@ -466,6 +493,47 @@ import_modules() {
     fi
 }
 
+# --- hide the module mounts from ordinary apps (see the header: "hide") --------------------------------------------
+
+# meta-overlayfs loop-mounts its ext4 modules.img on /data/adb/modules/$ID/mnt (metamount.sh, post-fs-data) and
+# overlays /system /vendor /product /odm with module partition dirs from it as lower layers. Two things then show in
+# an ordinary app's /proc/<pid>/mountinfo: the ext4 image mount (a /data/adb/modules/$ID/mnt line - "Suspicious
+# Mount" to Native Detector / banking apps) and, whenever a module overlays a partition, that partition's overlay line
+# with lowerdir=/data/adb/modules/$ID/mnt/<id>/... (the "KSU/AP modules.img" path). The ext4 image also registers a
+# /proc/fs/ext4/<loop> + /sys/fs/ext4/<loop> entry, which post-mount.sh in the image drops (ksud kernel
+# nuke-ext4-sysfs) right after the mount.
+#
+# ReSukiSU already hides module mounts from ordinary apps: for every non-root app the user did not grant su
+# (ksu_uid_should_umount, default on) it umounts the mount points on its umount list, which both removes those lines
+# and gives the app the stock partition. But the list is applied only after the kernel has been told modules are
+# mounted - and on a metamodule ROM ksud mounts no module itself, so it never tells the kernel (ksu_module_mounted
+# stays false) and the default list is empty: the per-app umount was dead and every app saw everything. We fix that
+# here, every boot: add the image mount point and each live "KSU" overlay mount point (read from mountinfo, so only
+# partitions actually overlaid are listed - umounting a partition that is NOT overlaid would hide the real one from
+# the app) to the kernel umount list, then notify the kernel. Non-root apps then see the stock /system /vendor ...
+# with no module store in sight; the shell and su-granted apps keep the modules.
+#
+# Why not detach the image mount instead (umount -l, so even root sees no mount): overlayfs would keep the superblock
+# alive, but a later `ksud module install` re-mounts the image (metainstall.sh's ensure_image_mounted finds it
+# unmounted) - a second ext4 superblock on the same backing file while overlayfs still pins the first, whose
+# writeback can corrupt the image. The per-app umount hides the mount from the apps that matter and keeps the image
+# mounted once, so installs stay safe. Kernel-side only (the manager's persistent umount config stays the user's),
+# redone every boot because both the list and the flag reset. This kernel has no susfs (CONFIG_KSU_SUSFS off), so for
+# a su-granted app or a process not covered by the per-app umount the mounts stay visible - a generic KernelSU trait,
+# not hideable here without kernel changes.
+register_module_umounts() {
+    mnt="$ADB/modules/$ID/mnt"
+    img_mounted "$mnt" || return 0   # only when our metamodule is the one mounted this boot
+    n=0
+    # the ext4 image mount, then each partition overlay (source "KSU") actually present
+    for mp in "$mnt" $(awk '/ - overlay KSU / { print $5 }' "$MOUNTINFO" 2> /dev/null | sort -u); do
+        case "$mp" in /?*) ;; *) continue ;; esac     # an absolute mount point only
+        $UMOUNT_ADD "$mp" > /dev/null 2>&1 && n=$((n + 1))
+    done
+    $NOTIFY_MOUNTED > /dev/null 2>&1
+    log "per-app umount: registered $n module mount point(s) (image + overlays) and notified the kernel (non-root apps get the stock partitions)"
+}
+
 # --- GPU driver guard script (see the header: "GPU driver guard") --------------------------------------------------
 
 guard_script_text() {
@@ -505,7 +573,7 @@ gpu_guard_script() {
     fi
 }
 
-apply() {
+apply_inner() {
     : > "$LOGF" 2> /dev/null
     mode="$(gp $P)"
     if [ ! -f "$KSUD" ]; then
@@ -590,6 +658,14 @@ apply() {
         cleanup_failed
         status failed "ksud module install failed (exit $rc), cleaned up, retried next boot"
     fi
+}
+
+# apply, then hide meta-overlayfs from ordinary apps. register_module_umounts runs last, after any import above, in
+# every state (a no-op unless our image is mounted): the metamodule mounts itself whatever the management state, so a
+# boot with persist.sys.k4.ksu_metamodule=0, or after an opt-out while the module is still installed, is hidden too.
+apply() {
+    apply_inner
+    register_module_umounts
 }
 
 MODE="$1"

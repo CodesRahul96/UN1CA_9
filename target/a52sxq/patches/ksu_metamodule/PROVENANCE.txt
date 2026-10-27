@@ -45,6 +45,23 @@ What it does on this phone (5.4 kernel, erofs system/vendor/product/odm):
   A module installed before the metamodule (none yet, or another one such as Mountify) is not in the image:
   k4-ksu-metamodule copies it in at boot_completed the way metainstall.sh would (same conditions, cp -af under
   ksud's busybox, metainstall.sh's own label functions), so it is mounted from the next boot on; no reinstall.
+  - hide from ordinary apps (k4-ksu-metamodule, boot_completed): the ext4 image mount on
+    /data/adb/modules/meta-overlayfs/mnt is a /data/adb line in every /proc/<pid>/mountinfo (what Native Detector /
+    banking apps flag, "Suspicious Mount"), and whenever a module overlays a partition that partition's overlay line
+    carries lowerdir=/data/adb/modules/.../mnt/<id>/... ("KSU/AP modules.img"); the image also makes a
+    /proc/fs/ext4/<loop> entry, which the image's post-mount.sh drops (ksud kernel nuke-ext4-sysfs). ReSukiSU already
+    umounts module mounts per non-root app (ksu_uid_should_umount, default on), which hides those lines and gives the
+    app the stock partition - but only for mount points on its umount list and only after the kernel is told modules
+    are mounted. On a metamodule ROM ksud mounts no module itself, so it never notifies (ksu_module_mounted stays
+    false) and the list stays empty: the per-app umount was dead and every app saw everything. The hook now, every
+    boot, adds the image mount point and each live "KSU" overlay mount point (read from mountinfo, so only partitions
+    actually overlaid) to the kernel umount list and notifies the kernel (ksud kernel umount add / notify-module-
+    mounted). Non-root apps then see the stock partitions; the shell and su-granted apps keep the modules. Not a
+    detach (umount -l would hide the image from root too, but a later module install re-mounts it - a second ext4
+    superblock on one backing file while overlayfs pins the first, which can corrupt the image). ROM-side (hook)
+    change only; the shipped zip is unchanged (still 1.3.1-k4.1, versionCode 13101), so there is no in-place
+    metamodule update. No susfs on this kernel (CONFIG_KSU_SUSFS off), so a su-granted app or a process not covered by
+    the per-app umount still sees the mounts - a generic KernelSU trait, not hideable here without kernel changes.
 
 Alternatives looked at (all metamodules in the official KernelSU-Modules-Repo org):
   - meta-mm (Magic Mount, 7a72) v1.0.1-sprout: GitHub repo is a placeholder, its sourceUrl
