@@ -215,7 +215,7 @@ PLAT_PC="$WORK_DIR/system/system/etc/selinux/plat_property_contexts"
 if ! grep -q -x -F "(type k4gpu)" "$PLAT_CIL"; then
     for t in init shell_exec toolbox_exec system_file kmsg_device system_data_root_file adb_data_file \
         same_process_hal_file vendor_file vendor_hal_file vendor_configs_file labeledfs \
-        property_socket default_prop system_prop safemode_prop boot_status_prop bootloader_boot_reason_prop system_app shell; do
+        property_socket default_prop system_prop safemode_prop boot_status_prop last_boot_reason_prop system_app shell; do
         grep -q -x -F "(type $t)" "$PLAT_CIL" || ABORT "adreno_driver: type $t not in plat_sepolicy.cil, review sepolicy.cil"
     done
     # the SQE label is the vendor's own type (Qualcomm vendor_sepolicy.cil), like the early-boot rule above uses it

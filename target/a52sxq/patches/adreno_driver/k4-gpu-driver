@@ -62,7 +62,10 @@
 # sys.k4.gpu_vendor, sys.k4.gpu_missing, sys.k4.gpu_rejected; sys.k4.gpu_settle (the settle result, readable with
 # getprop); log in /data/k4gpu/boot.log (root:system 0660, settle appends to it) and the kernel log. The previous
 # boot's log is kept as boot.log.prev: when a trial failed, its settle line (or its absence) and the boot reason
-# logged at "start" (ro.boot.bootreason: how the previous boot ended) tell why.
+# logged at "start" tell why. The reason is persist.sys.boot.reason, which the framework writes on a clean shutdown
+# or reboot (reboot,userrequested / rescueparty_warm_reboot / shell ...) and bootstat clears after this runs; the
+# bootloader passes none on this phone, so ro.boot.bootreason is still empty here. Empty = no clean shutdown (a
+# crash, kernel panic, hard reset or power loss).
 # Idempotent: a second run on the same boot does nothing (sys.k4.gpu_scan), a run on the next boot only redoes
 # what changed (imports are keyed by the size and mtime of the module's files).
 #
@@ -407,7 +410,8 @@ boot() {
     # group system may append: settle runs as user system (k4_gpu_settle service). SELinux still limits writers of
     # k4_gpu_data_file to init and k4gpu (system_app may only read it), so this opens nothing to other system apps.
     chmod 660 "$LOGF" 2> /dev/null
-    log "start (stock $STOCK, boot reason $(gp ro.boot.bootreason))"
+    why="$(gp persist.sys.boot.reason)"
+    log "start (stock $STOCK, previous boot ended: ${why:-no clean shutdown})"
 
     sel="$(gp ${P}driver)"
     trial="$(gp ${P}trial)"

@@ -653,13 +653,17 @@ CASE="diag: the previous boot's log is kept and the boot reason is logged"
 device; boot
 setp persist.sys.k4.gpu_driver 849; setp persist.sys.k4.gpu_trial testing
 echo "settle: 150s window for 849" >> "$R/data/k4gpu/boot.log"
-setp ro.boot.bootreason reboot,rescueparty_warm_reboot
+setp persist.sys.boot.reason reboot,rescueparty_warm_reboot
 boot
 has "previous log kept" "settle: 150s window for 849" "$R/data/k4gpu/boot.log.prev"
-has "boot reason at start" "start (stock V@0530.0, boot reason reboot,rescueparty_warm_reboot)" "$R/data/k4gpu/boot.log"
+has "boot reason at start" "start (stock V@0530.0, previous boot ended: reboot,rescueparty_warm_reboot)" "$R/data/k4gpu/boot.log"
 has "failed trial logged" "previous boot with 849 never settled" "$R/data/k4gpu/boot.log"
 hasnt "current log starts fresh" "settle: 150s window" "$R/data/k4gpu/boot.log"
 eq "prev log mode" "$(stat -c %a "$R/data/k4gpu/boot.log.prev")" 660
+
+CASE="diag: no clean shutdown recorded"
+device; boot
+has "empty reason" "start (stock V@0530.0, previous boot ended: no clean shutdown)" "$R/data/k4gpu/boot.log"
 
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]
