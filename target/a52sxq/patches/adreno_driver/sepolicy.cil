@@ -47,7 +47,7 @@
 (allow k4gpu system_prop (file (read getattr map open)))
 (allow k4gpu safemode_prop (file (read getattr map open)))
 (allow k4gpu boot_status_prop (file (read getattr map open)))
-(allow k4gpu bootloader_boot_reason_prop (file (read getattr map open)))
+(allow k4gpu last_boot_reason_prop (file (read getattr map open)))
 (allow k4gpu k4_gpu_reset_prop (property_service (set)))
 (allow k4gpu k4_gpu_reset_prop (file (read getattr map open)))
 (allow shell k4_gpu_reset_prop (property_service (set)))
