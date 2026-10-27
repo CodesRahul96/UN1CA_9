@@ -1,0 +1,37 @@
+From a25013c7438b0c3a8a77b1ffb3c37f5aea62656e Mon Sep 17 00:00:00 2001
+From: kusti420 <kristjan0@live.com>
+Date: Tue, 27 Oct 2026 17:37:44 +0200
+Subject: [PATCH] Report the Android 17 OS version in forged attestations
+
+KeyboxUtils.getOSVersion() maps SDK_INT 33-36 to the KeyMint osVersion
+(130000-160000) and falls back to 0 for anything else, so on One UI 9
+(SDK 37) every keybox-signed attestation carried osVersion 0, which a real
+Android 17 device never reports. Map SDK 37 to 170000.
+---
+ smali_classes6/io/mesalabs/unica/KeyboxUtils.smali | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/smali_classes6/io/mesalabs/unica/KeyboxUtils.smali b/smali_classes6/io/mesalabs/unica/KeyboxUtils.smali
+index c6bc67e..de41f03 100644
+--- a/smali_classes6/io/mesalabs/unica/KeyboxUtils.smali
++++ b/smali_classes6/io/mesalabs/unica/KeyboxUtils.smali
+@@ -1486,6 +1486,11 @@
+ 
+     return v0
+ 
++    :pswitch_4
++    const v0, 0x29810
++
++    return v0
++
+     :pswitch_0
+     const v0, 0x27100
+ 
+@@ -1514,6 +1519,7 @@
+         :pswitch_2
+         :pswitch_1
+         :pswitch_0
++        :pswitch_4
+     .end packed-switch
+ .end method
+ 
