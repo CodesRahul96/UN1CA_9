@@ -1,0 +1,4 @@
+id=a52sxq_bt_hal_pwr_srcs_stack
+name=Galaxy A52s 5G: Bluetooth HAL survives logging power sources
+author=kusti420
+description=android.hardware.bluetooth@1.0-impl-qti PowerManager::GetAndLogPwrRsrcStates() reads the btpower power source states (ioctl BT_CMD_GETVAL_POWER_SRCS 0xbfb1) into a 120-byte (30 int) stack buffer, but btpower.ko (stock 5.4.233 and bone-machine 5.4.302 alike) copies its whole 128-byte (32 int, BT_VDD_SMPS pair added) bt_power_src_status array. The extra 8 bytes land on the stack canary, so every SoC error/SSR path that logs power sources (vendor HW error event, ramdump start, SsrCleanup) aborts the HAL with "stack corruption detected (-fstack-protector)" and com.android.bluetooth dies with "The Bluetooth HAL died". Move the canary 0x20 bytes up into the unused padding slot of the same frame, so the kernel's 128 bytes fit and the stack protector stays active.
