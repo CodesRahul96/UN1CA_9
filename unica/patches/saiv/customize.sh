@@ -421,21 +421,34 @@ PYEOF
     fi
 
     # libStride in Android 17 still names the target's TFLite models and searches
-    # this directory. Preserve the target set instead of replacing it, but add every
-    # portable model/charset/lexicon the source libStride names that the target set
-    # lacks (e.g. the TextBPN text detector and ViT recognizers of One UI 9), or OCR
-    # has no detector at all. NPU-specific .dla/.dlc/.nnc variants are not copied.
+    # this directory. Keep the target set instead of replacing the directory, but install
+    # every portable model/charset/lexicon the source libStride names from the source
+    # firmware (e.g. the TextBPN text detector and ViT recognizers of One UI 9, or OCR has
+    # no detector at all). NPU-specific .dla/.dlc/.nnc variants are not copied.
+    # A same-named target file is replaced too: the source lib hard-codes graph details
+    # of its own models, so an older target model with the same name breaks it. One UI 9
+    # strideRecognitionCRNN::configure() writes the sequence length straight into tensor
+    # #72 of mSTR_Korean.tflite (the BiRNN reshape shape constant in the source model); in
+    # the older Korean model #72 is an unallocated activation, so every line the script
+    # detector calls Korean killed smartcapture:screenshotworker with a null write in
+    # StrideInference::Reshape(). The old mSTRTextDetection_DetectText.tflite fails tensor
+    # allocation in the source lib (no screenshot toolbar text detection), and the old
+    # mSTRScriptDetection.tflite misreports scripts (Korean text came back as Latin).
     STRIDE_LIB="$WORK_DIR/system/system/lib64/libStride.camera.samsung.so"
     STRIDE_DIR="system/saiv/textrecognition/stride"
     STRIDE_NEEDED=""
     if [ -f "$STRIDE_LIB" ]; then
-        STRIDE_NEEDED="$(grep -aoE "mSTR_[A-Za-z0-9_]+\.(tflite|charset|bin)" "$STRIDE_LIB" | sort -u)"
+        STRIDE_NEEDED="$(grep -aoE "mSTR[A-Za-z0-9_]+\.(tflite|charset|bin)" "$STRIDE_LIB" | sort -u)"
     fi
     for MODEL_FILE in $STRIDE_NEEDED; do
-        if [ ! -e "$WORK_DIR/system/$STRIDE_DIR/$MODEL_FILE" ] && \
-                [ -s "$SOURCE_FIRMWARE_ROOT/system/$STRIDE_DIR/$MODEL_FILE" ]; then
+        if [ -s "$SOURCE_FIRMWARE_ROOT/system/$STRIDE_DIR/$MODEL_FILE" ] && \
+                ! cmp -s "$SOURCE_FIRMWARE_ROOT/system/$STRIDE_DIR/$MODEL_FILE" \
+                    "$WORK_DIR/system/$STRIDE_DIR/$MODEL_FILE"; then
             ADD_TO_WORK_DIR "$SOURCE_FIRMWARE" "system" "$STRIDE_DIR/$MODEL_FILE" \
                 0 0 644 "u:object_r:system_file:s0"
+            cmp -s "$SOURCE_FIRMWARE_ROOT/system/$STRIDE_DIR/$MODEL_FILE" \
+                "$WORK_DIR/system/$STRIDE_DIR/$MODEL_FILE" || \
+                ABORT "Failed to install the One UI 9 text recognition model $MODEL_FILE"
         fi
     done
     for MODEL_FILE in mSTR_Arabic.tflite mSTR_Latin.tflite mSTR_CraftBPN_Refiner.tflite; do
