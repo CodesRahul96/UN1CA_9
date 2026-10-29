@@ -1,0 +1,123 @@
+#!/system/bin/sh
+# Wi-Fi data-path watchdog (target/a52sxq/patches/wifi_watchdog, see module.prop).
+#
+# The WLAN firmware can be left in power save toward the AP (see wifi_runtime_pm): the link stays "connected", beacons
+# and scans arrive, but no data frame does. Android never recovers on its own: the gateway was never NUD_REACHABLE in
+# that IpClient session, and NetworkStack (Android 16+) unconditionally ignores NUD failures of never-reachable
+# neighbours, so no "lost provisioning", no reconnect, and the network keeps looking validated. Samsung's own monitor
+# (WifiConnectivityMonitor) is disabled on this port.
+#
+# Every 5 s while the default route is on wlan0 (so not while Wi-Fi is off, not the default, or still in DHCP):
+#   dead = the gateway's neighbour entry is FAILED/INCOMPLETE/missing AND tx packets grew AND rx packets did not.
+# Four dead samples in a row (20 s; the first 30 s after the route appears are ignored) -> un-wedge:
+#   1. cmd connectivity reevaluate (so the network loses "validated" and cellular takes over at once) and restart Wi-Fi
+#      (svc wifi disable/enable: a new association; on R5CTA0ESFTF the dead ones were the 2.4 GHz BSS of a dual-band
+#      router and the restart usually lands on the healthy 5 GHz BSS; it also clears the framework's 10-minute
+#      "repeated NUD failures" lockout of the network)
+#   2. if still dead 20 s later: one more restart
+#   3. if still dead: give up for 10 minutes (log), then start over.
+# Opt-out: setprop persist.sys.k4.wifiwatch 0 (adb shell). Status: sys.k4.wifiwatch, kernel log "k4-wifiwatch:".
+# Runs as root in the shell domain (like init's console service): needs ip/netlink, /proc/net, binder to cmd.
+
+P=persist.sys.k4.wifiwatch
+NEED=4        # consecutive dead samples
+TICK=5
+GRACE=30      # seconds after the wlan0 default route appears
+COOLDOWN=600  # seconds to stay quiet after both actions failed
+
+log() {
+    echo "k4-wifiwatch: $*" > /dev/kmsg 2> /dev/null
+}
+
+status() {
+    setprop sys.k4.wifiwatch "$1"
+}
+
+gw_ip() {
+    ip -4 route show table all 2> /dev/null | awk '/^default via [0-9.]+ dev wlan0/ { print $3; exit }'
+}
+
+gw_state() {
+    s="$(ip -4 neigh show dev wlan0 2> /dev/null | awk -v g="$1" '$1 == g { print $NF; exit }')"
+    echo "${s:-MISSING}"
+}
+
+counters() {
+    # rx packets, tx packets of wlan0
+    awk '/wlan0:/ { sub(/.*wlan0:/, ""); print $2, $10; exit }' /proc/net/dev 2> /dev/null
+}
+
+alive() {
+    # one quick check after an action: gateway resolvable and rx moving
+    ip neigh flush dev wlan0 2> /dev/null
+    r0="$(counters | cut -d ' ' -f 1)"
+    ping -c 2 -W 1 "$1" > /dev/null 2>&1
+    sleep 1
+    r1="$(counters | cut -d ' ' -f 1)"
+    case "$(gw_state "$1")" in REACHABLE | STALE | DELAY | PROBE) [ "${r1:-0}" -gt "${r0:-0}" ] && return 0 ;; esac
+    return 1
+}
+
+# once per device: let a validated cellular network take over while Wi-Fi has no internet (Samsung's CSC default is
+# "never avoid bad Wi-Fi"); a user who sets it back keeps that
+if [ "$(getprop persist.sys.k4.wifiwatch_defaults)" != 1 ]; then
+    settings put global network_avoid_bad_wifi 1 > /dev/null 2>&1 && setprop persist.sys.k4.wifiwatch_defaults 1 && \
+        log "default applied: avoid bad Wi-Fi"
+fi
+dead=0
+since=0
+prev_rx=0
+prev_tx=0
+actions=0
+quiet_until=0
+status idle
+log "started"
+while true; do
+    sleep $TICK
+    now=$(cut -d . -f 1 /proc/uptime)
+    if [ "$(getprop $P)" = 0 ]; then
+        status off
+        sleep 55
+        continue
+    fi
+    gw="$(gw_ip)"
+    if [ -z "$gw" ]; then
+        dead=0; since=0; actions=0
+        status idle
+        continue
+    fi
+    [ "$since" = 0 ] && since=$now
+    set -- $(counters)
+    rx=${1:-0}; tx=${2:-0}
+    drx=$((rx - prev_rx)); dtx=$((tx - prev_tx))
+    prev_rx=$rx; prev_tx=$tx
+    if [ $((now - since)) -lt $GRACE ] || [ "$now" -lt "$quiet_until" ]; then
+        dead=0
+        continue
+    fi
+    st="$(gw_state "$gw")"
+    case "$st" in
+        FAILED | INCOMPLETE | MISSING)
+            if [ "$dtx" -gt 0 ] && [ "$drx" -le 0 ]; then dead=$((dead + 1)); else dead=0; fi ;;
+        *) dead=0; actions=0; status ok ;;
+    esac
+    [ "$dead" -ge $NEED ] || continue
+
+    dead=0
+    actions=$((actions + 1))
+    if [ "$actions" -le 2 ]; then
+        log "gateway $gw $st, tx moving and no rx for $((NEED * TICK)) s: restarting Wi-Fi (try $actions)"
+        status "unwedge:wifi$actions"
+        cmd connectivity reevaluate > /dev/null 2>&1
+        svc wifi disable; sleep 3; svc wifi enable
+        since=0
+        sleep 15
+        gw="$(gw_ip)"
+        if [ -n "$gw" ] && alive "$gw"; then log "recovered by the Wi-Fi restart"; status "recovered:wifi"; actions=0; fi
+    else
+        log "still dead after both actions: giving up for $COOLDOWN s"
+        status "failed"
+        quiet_until=$((now + COOLDOWN))
+        actions=0
+    fi
+done
