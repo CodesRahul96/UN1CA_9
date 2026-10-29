@@ -1,4 +1,4 @@
-# Settings > UN1CA > UI settings: "Home screen depth clock" switch + "Clock position" / "Clock colour" (see module.prop),
+# Settings > UN1CA > UI settings: "Home screen depth clock" switch + "Clock position" / "Clock color" (see module.prop),
 # replaced by "Clock style" (opens Wallpaper & style) once the editor saved a home clock (HomeDepthClockChoiceController).
 # Sourced from target/a52sxq/post_mods.sh: unica_ui_settings.xml only exists once unica/mods/settings has run, and the
 # target patches run before the mods. Controllers: settings/smali (generated from settings/src by settings/build.sh).
@@ -16,17 +16,17 @@ PARENTS = {SWITCH: "Lcom/android/settings/core/TogglePreferenceController;",
 
 STRINGS = (
     ("k4_home_depth_clock_title", "Home screen depth clock"),
-    ("k4_home_depth_clock_summary", "Big clock behind the person or object of a wallpaper made with the Gallery wallpaper editor. Home screen only, also when the wallpaper is on both screens"),
+    ("k4_home_depth_clock_summary", "Big clock behind the person or object in a wallpaper made with the Gallery wallpaper editor. Shown on the Home screen only, also when the wallpaper is set for both screens"),
     ("k4_home_depth_clock_position_title", "Clock position"),
-    ("k4_home_depth_clock_color_title", "Clock colour"),
+    ("k4_home_depth_clock_color_title", "Clock color"),
     ("k4_home_depth_clock_style_title", "Clock style"),
-    ("k4_home_depth_clock_style_summary", "Edit in Wallpaper and style: Gallery, a picture, Set as wallpaper, Home screen"),
+    ("k4_home_depth_clock_style_summary", "Change it in Wallpaper and style > Gallery: pick the picture, then Set as wallpaper > Home screen"),
 )
 # values are what the property gets; the first one is the default (property unset)
 ARRAYS = (
     ("k4_home_depth_clock_position_entries", ["Automatic (behind the subject)", "Top", "Middle"]),
     ("k4_home_depth_clock_position_values", ["auto", "20", "50"]),
-    ("k4_home_depth_clock_color_entries", ["White", "Theme colour"]),
+    ("k4_home_depth_clock_color_entries", ["White", "Theme color"]),
     ("k4_home_depth_clock_color_values", ["white", "accent"]),
 )
 
@@ -139,7 +139,7 @@ else:
     ) % (sw, ch, ch)
     open(xf, "w").write(x.replace("</PreferenceScreen>", rows + "</PreferenceScreen>"))
     print("  - 3 rows at the end of unica_ui_settings.xml")
-# "Clock style" (shown instead of Clock position / Clock colour once Wallpaper & style saved a home clock)
+# "Clock style" (shown instead of Clock position / Clock color once Wallpaper & style saved a home clock)
 x = open(xf).read()
 if 'android:key="k4_home_depth_clock_style"' not in x:
     ch = CHOICE[1:-1].replace("/", ".")

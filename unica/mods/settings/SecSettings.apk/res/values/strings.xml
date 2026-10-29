@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="keywords_unica_settings">K4_UN1CA Settings</string>
+    <string name="keywords_unica_settings">K4_UN1CA, UN1CA, K4, ROM, Custom ROM</string>
     <string name="keywords_unica_screen_resolution">Screen resolution, Resolution, FHD, HD, 1080p, 720p, 540p</string>
     <string name="menu_key_unica_top_settings">top_level_unica</string>
     <string name="unica_allow_downgrade_title">Allow application downgrade</string>
-    <string name="unica_allow_sdkbypass_title">Disable low target SDK block</string>
+    <string name="unica_allow_sdkbypass_title">Allow apps made for old Android versions</string>
     <string name="unica_asks_title">Disable ASKS</string>
-    <string name="unica_boot_sound_title">Play boot sound effect</string>
+    <string name="unica_boot_sound_title">Boot sound</string>
     <string name="unica_device_name_title">Device name</string>
-    <string name="unica_dialog_reboot_msg">To apply the changes, a restart is required.</string>
+    <string name="unica_dialog_reboot_msg">Restart your phone to apply the changes.</string>
     <string name="unica_dialog_reboot_negative">Not now</string>
     <string name="unica_dialog_reboot_positive">Restart</string>
     <string name="unica_dialog_reboot_title">Restart required</string>
@@ -39,7 +39,7 @@
     <string name="unica_menu_item_reboot_recovery_title">Reboot to Recovery</string>
     <string name="unica_menu_item_reboot_title">Reboot</string>
     <string name="unica_menu_reboot_title">Reboot options</string>
-    <string name="unica_native_blur_title">Enable live blur effect</string>
+    <string name="unica_native_blur_title">Live blur</string>
     <string name="unica_pif_custom_title">Import custom PIF props from file</string>
     <string name="unica_pif_summary">Spoof your device to pass Google Play attestation.</string>
     <string name="unica_pif_title">Play Integrity Fix</string>
@@ -62,14 +62,14 @@
     <string name="unica_screen_resolution_revert">Revert</string>
     <string name="unica_screen_resolution_title">Screen resolution</string>
     <string name="unica_screen_resolution_zoom_unavailable">Screen zoom is not available at 540p. Switch the screen resolution to HD+ or Native to change it.</string>
-    <string name="unica_secure_ss_title">Allow secure screenshot</string>
+    <string name="unica_secure_ss_title">Allow screenshots in protected apps</string>
     <string name="unica_settings_title">K4_UN1CA Settings</string>
     <string name="unica_ss_detection_title">Disable screen capture detection</string>
     <string name="unica_spoof_settings_title">Spoof settings</string>
     <string name="unica_ui_settings_title">UI settings</string>
     <string name="unica_updates_title">K4_UN1CA Updates</string>
-    <string name="unica_vulkan_summary">This is unstable and might cause issues!</string>
-    <string name="unica_vulkan_title">Enable Vulkan renderer</string>
+    <string name="unica_vulkan_summary">Experimental. Some apps may show glitches or crash.</string>
+    <string name="unica_vulkan_title">Vulkan renderer</string>
     <string name="k4_gpu_driver_active_title">GPU driver in use</string>
     <string name="k4_gpu_driver_title">GPU driver</string>
     <string name="k4_gpu_driver_selected_active">%1$s (active)</string>
@@ -89,8 +89,8 @@
     <string name="k4_gpu_driver_missing_title">GPU driver not available</string>
     <string name="k4_gpu_driver_missing_summary">%1$s is missing or damaged, so %2$s is used.</string>
     <string name="k4_gpu_driver_rejected_title">GPU driver not installed</string>
-    <string name="k4_gpu_driver_add_title">Add driver…</string>
-    <string name="k4_gpu_driver_add_summary">Install an Adreno driver from a zip file (driver module or the plain libraries)</string>
+    <string name="k4_gpu_driver_add_title">Add a driver…</string>
+    <string name="k4_gpu_driver_add_summary">Install an Adreno driver from a zip file (a driver module or the plain libraries)</string>
     <string name="k4_gpu_driver_add_checking">Checking the driver…</string>
     <string name="k4_gpu_driver_add_done_title">%1$s added</string>
     <string name="k4_gpu_driver_add_done_msg">Use it as the GPU driver? It is installed at the next restart. If the phone does not finish starting with it, the restart after that goes back to %1$s.</string>
