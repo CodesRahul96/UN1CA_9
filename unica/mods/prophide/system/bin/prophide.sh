@@ -4,10 +4,15 @@
 rezetprop -n ro.boot.flash.locked "1"
 rezetprop -n ro.boot.vbmeta.avb_version "1.3"
 rezetprop -n ro.boot.vbmeta.device_state "locked"
-rezetprop -n ro.boot.vbmeta.digest "$(dd if=/dev/block/by-name/vbmeta bs=1 count=VB_SIZE 2> /dev/null | sha256sum -b)"
+# The vbmeta digests are only filled in when nothing set them: a keystore attestation module (TEESimulator, Tricky Store)
+# writes the values it attests here earlier in boot, and overwriting them made the prop disagree with the attested
+# RootOfTrust (this runs at bootanim exit, after them).
+[ -n "$(getprop ro.boot.vbmeta.digest)" ] || \
+    rezetprop -n ro.boot.vbmeta.digest "$(dd if=/dev/block/by-name/vbmeta bs=1 count=VB_SIZE 2> /dev/null | sha256sum -b)"
 rezetprop -n ro.boot.vbmeta.hash_alg "sha256"
 rezetprop -n ro.boot.vbmeta.invalidate_on_error "yes"
-rezetprop -n ro.boot.vbmeta.public_key_digest "$(dd if=/dev/block/by-name/vbmeta bs=1 skip=PK_OFFSET count=PK_SIZE 2> /dev/null | sha256sum -b)"
+[ -n "$(getprop ro.boot.vbmeta.public_key_digest)" ] || \
+    rezetprop -n ro.boot.vbmeta.public_key_digest "$(dd if=/dev/block/by-name/vbmeta bs=1 skip=PK_OFFSET count=PK_SIZE 2> /dev/null | sha256sum -b)"
 rezetprop -n ro.boot.vbmeta.size "VB_SIZE"
 rezetprop -n ro.boot.warranty_bit "0"
 rezetprop -n ro.boot.verifiedbootstate "green"
