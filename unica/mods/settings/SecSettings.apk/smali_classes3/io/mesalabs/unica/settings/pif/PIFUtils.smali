@@ -91,21 +91,17 @@
 .end method
 
 .method public static isPIFInstallable()Z
-    .locals 1
+    .locals 2
 
-    :try_start_0
-    const-string v0, "io.mesalabs.unica.PlayIntegrityHooks"
+    new-instance v0, Ljava/io/File;
 
-    invoke-static {v0}, Ljava/lang/Class;->forName(Ljava/lang/String;)Ljava/lang/Class;
-    :try_end_0
-    .catch Ljava/lang/ClassNotFoundException; {:try_start_0 .. :try_end_0} :catch_0
+    const-string v1, "/system/bin/k4-gmscompat"
 
-    const/4 v0, 0x1
+    invoke-direct {v0, v1}, Ljava/io/File;-><init>(Ljava/lang/String;)V
 
-    return v0
+    invoke-virtual {v0}, Ljava/io/File;->exists()Z
 
-    :catch_0
-    const/4 v0, 0x0
+    move-result v0
 
     return v0
 .end method

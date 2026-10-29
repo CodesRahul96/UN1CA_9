@@ -65,31 +65,8 @@
 .method public getAvailabilityStatus()I
     .locals 0
 
-    invoke-static {}, Lio/mesalabs/unica/settings/pif/PIFUtils;->isPIFInstallable()Z
-
-    move-result p0
-
-    if-eqz p0, :cond_0
-
-    invoke-static {}, Lio/mesalabs/unica/settings/pif/PIFUtils;->isPIFEnabled()Z
-
-    move-result p0
-
-    if-eqz p0, :cond_1
-
-    const/4 p0, 0x0
-
-    goto :goto_0
-
-    :cond_0
     const/4 p0, 0x3
 
-    goto :goto_0
-
-    :cond_1
-    const/4 p0, 0x2
-
-    :goto_0
     return p0
 .end method
 

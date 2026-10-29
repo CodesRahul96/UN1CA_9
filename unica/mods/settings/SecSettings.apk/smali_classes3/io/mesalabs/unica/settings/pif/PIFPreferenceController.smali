@@ -137,19 +137,6 @@
 .method public getSummary()Ljava/lang/CharSequence;
     .locals 2
 
-    invoke-static {}, Lio/mesalabs/unica/settings/pif/PIFUtils;->isPIFEnabled()Z
-
-    move-result v0
-
-    if-eqz v0, :cond_0
-
-    invoke-static {}, Lio/mesalabs/unica/settings/pif/PIFUtils;->getFormattedPIFVersion()Ljava/lang/CharSequence;
-
-    move-result-object p0
-
-    goto :goto_0
-
-    :cond_0
     const-string v0, "string"
 
     const-string v1, "unica_pif_summary"
@@ -164,7 +151,6 @@
 
     move-result-object p0
 
-    :goto_0
     return-object p0
 .end method
 
@@ -262,14 +248,18 @@
 
     if-eqz v0, :cond_1
 
-    invoke-virtual {v0, p1}, Landroidx/preference/Preference;->setVisible(Z)V
+    const/4 v1, 0x0
+
+    invoke-virtual {v0, v1}, Landroidx/preference/Preference;->setVisible(Z)V
 
     :cond_1
     iget-object v0, p0, Lio/mesalabs/unica/settings/pif/PIFPreferenceController;->mCustomPreference:Landroidx/preference/SecPreference;
 
     if-eqz v0, :cond_2
 
-    invoke-virtual {v0, p1}, Landroidx/preference/Preference;->setVisible(Z)V
+    const/4 v1, 0x0
+
+    invoke-virtual {v0, v1}, Landroidx/preference/Preference;->setVisible(Z)V
 
     :cond_2
     const/4 p0, 0x1
