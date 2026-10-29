@@ -43,9 +43,9 @@ What it does on this phone (5.4 kernel, erofs system/vendor/product/odm):
     dir on a writable fs, which it does not use here unless /data/adb/modules/.rw exists).
   - post-mount.sh: ksud kernel nuke-ext4-sysfs (supported by this ksud).
   A module installed before the metamodule (none yet, or another one such as Mountify) is not in the image:
-  k4-ksu-metamodule copies it in at boot_completed the way metainstall.sh would (same conditions, cp -af under
+  k4-metamodule copies it in at boot_completed the way metainstall.sh would (same conditions, cp -af under
   ksud's busybox, metainstall.sh's own label functions), so it is mounted from the next boot on; no reinstall.
-  - hide from ordinary apps (k4-ksu-metamodule, boot_completed): the ext4 image mount on
+  - hide from ordinary apps (k4-metamodule, boot_completed): the ext4 image mount on
     /data/adb/modules/meta-overlayfs/mnt is a /data/adb line in every /proc/<pid>/mountinfo (what Native Detector /
     banking apps flag, "Suspicious Mount"), and whenever a module overlays a partition that partition's overlay line
     carries lowerdir=/data/adb/modules/.../mnt/<id>/... ("KSU/AP modules.img"); the image also makes a
@@ -93,6 +93,6 @@ K4 changes (meta-overlayfs-k4/K4_CHANGES.txt; each changed script says what chan
      vendor_hal_file one, /vendor/etc the vendor_configs_file one). Files keep the module's labels.
   4. metamount.sh: the image copy of an uninstalled module is removed (metauninstall.sh runs before the image is
      mounted and skips it; a reinstall of the same id then also mounted the old version's leftover files).
-  k4-ksu-metamodule updates an installed meta-overlayfs with a lower versionCode (the unmodified 13100, installed
+  k4-metamodule updates an installed meta-overlayfs with a lower versionCode (the unmodified 13100, installed
   by 9.3.81) to this build in place, and completes a fresh install at once (no pending state: ksud blocks every
   module install while a metamodule is pending, "Installation Blocked ... Reboot to apply changes first").
