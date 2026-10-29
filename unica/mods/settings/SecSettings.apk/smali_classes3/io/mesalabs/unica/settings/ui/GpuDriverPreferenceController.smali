@@ -1206,6 +1206,99 @@
     return p0
 .end method
 
+.method public getBackgroundWorkerClass()Ljava/lang/Class;
+    .registers 1
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "()",
+            "Ljava/lang/Class<",
+            "*>;"
+        }
+    .end annotation
+
+    const/4 p0, 0x0
+
+    return-object p0
+.end method
+
+.method public getIntentFilter()Landroid/content/IntentFilter;
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return-object p0
+.end method
+
+.method public getLaunchIntent()Landroid/content/Intent;
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return-object p0
+.end method
+
+.method public getSliceHighlightMenuRes()I
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return p0
+.end method
+
+.method public getStatusText()Ljava/lang/String;
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return-object p0
+.end method
+
+.method public getValue()Lcom/samsung/android/settings/cube/ControlValue;
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return-object p0
+.end method
+
+.method public hasAsyncUpdate()Z
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return p0
+.end method
+
+.method public ignoreUserInteraction()V
+    .registers 1
+
+    return-void
+.end method
+
+.method public isControllable()Z
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return p0
+.end method
+
+.method public isPublicSlice()Z
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return p0
+.end method
+
+.method public isSliceable()Z
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return p0
+.end method
+
 .method synthetic lambda$displayPreference$0$io-mesalabs-unica-settings-ui-GpuDriverPreferenceController(Landroid/view/View;)V
     .registers 2
 
@@ -1213,6 +1306,15 @@
     invoke-direct {p0}, Lio/mesalabs/unica/settings/ui/GpuDriverPreferenceController;->onBannerButton()V
 
     return-void
+.end method
+
+.method public needUserInteraction(Ljava/lang/Object;)Lcom/samsung/android/settings/cube/Controllable$ControllableType;
+    .registers 2
+
+    .line 262
+    sget-object p0, Lcom/samsung/android/settings/cube/Controllable$ControllableType;->NO_INTERACTION:Lcom/samsung/android/settings/cube/Controllable$ControllableType;
+
+    return-object p0
 .end method
 
 .method public onPreferenceChange(Landroidx/preference/Preference;Ljava/lang/Object;)Z
@@ -1279,6 +1381,22 @@
     return p2
 .end method
 
+.method public runDefaultAction()Z
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return p0
+.end method
+
+.method public setValue(Lcom/samsung/android/settings/cube/ControlValue;)Lcom/samsung/android/settings/cube/ControlResult;
+    .registers 2
+
+    const/4 p0, 0x0
+
+    return-object p0
+.end method
+
 .method public updateState(Landroidx/preference/Preference;)V
     .registers 2
 
@@ -1289,4 +1407,12 @@
     invoke-direct {p0}, Lio/mesalabs/unica/settings/ui/GpuDriverPreferenceController;->refresh()V
 
     return-void
+.end method
+
+.method public useDynamicSliceSummary()Z
+    .registers 1
+
+    const/4 p0, 0x0
+
+    return p0
 .end method
