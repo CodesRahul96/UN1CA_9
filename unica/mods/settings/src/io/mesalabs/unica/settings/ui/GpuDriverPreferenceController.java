@@ -241,4 +241,29 @@ public class GpuDriverPreferenceController extends BasePreferenceController
     private static String string(Context context, String name, Object... args) {
         return context.getString(Utils.getResourceId("string", name), args);
     }
+
+    // SecSettings is built with interface default methods desugared, so on device BasePreferenceController's
+    // Controllable/Sliceable methods are abstract and every subclass carries its own copy (One UI's controllers all
+    // have these as bridge methods). Missing them = AbstractMethodError when the Settings command/search indexer
+    // (ActionDataConverter.buildActionData) calls isControllable(), which kills Settings. Values match the stock
+    // defaults.
+    public Class<?> getBackgroundWorkerClass() { return null; }
+    public android.content.IntentFilter getIntentFilter() { return null; }
+    public android.content.Intent getLaunchIntent() { return null; }
+    public int getSliceHighlightMenuRes() { return 0; }
+    public String getStatusText() { return null; }
+    public com.samsung.android.settings.cube.ControlValue getValue() { return null; }
+    public boolean hasAsyncUpdate() { return false; }
+    public void ignoreUserInteraction() {}
+    public boolean isControllable() { return false; }
+    public boolean isPublicSlice() { return false; }
+    public boolean isSliceable() { return false; }
+    public com.samsung.android.settings.cube.Controllable.ControllableType needUserInteraction(Object value) {
+        return com.samsung.android.settings.cube.Controllable.ControllableType.NO_INTERACTION;
+    }
+    public boolean runDefaultAction() { return false; }
+    public com.samsung.android.settings.cube.ControlResult setValue(com.samsung.android.settings.cube.ControlValue value) {
+        return null;
+    }
+    public boolean useDynamicSliceSummary() { return false; }
 }
