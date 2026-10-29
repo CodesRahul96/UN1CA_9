@@ -33,7 +33,7 @@
 #     "on post-fs-data ... ksud post-fs-data" to that file when init reads it, so this action runs right before
 #     ksud's; it needs no file on /data, so it also covers the first boot after KernelSU was set up) and from
 #     /data/adb/post-fs-data.d/k4_gpu_driver_guard.sh, which ksud runs first thing in its post-fs-data (before it
-#     moves updated modules in, before every metamodule script) and which k4-ksu-metamodule writes on boot_completed:
+#     moves updated modules in, before every metamodule script) and which k4-metamodule writes on boot_completed:
 #     the second still covers every later boot if a KernelSU build ever put its init.rc part first.
 #   - Settings > K4_UN1CA > UI > GPU driver > Add driver: Settings validates the zip and stages the set in
 #     /data/k4gpu/incoming/u_<id>/ (+ "ready"); it is validated again and moved to /data/k4gpu/store/u_<id> here.

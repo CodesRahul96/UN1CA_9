@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds meta-overlayfs-13101-1.3.1-k4.1.zip (the K4 build of meta-overlayfs, see K4_CHANGES.txt) from the
 # official v1.3.1 release zip and the changed files in this directory. Reproducible: fixed order, times and modes,
-# so the result always has the sha256 pinned in ../customize.sh and ../k4-ksu-metamodule.
+# so the result always has the sha256 pinned in ../customize.sh and ../k4-metamodule.
 # Usage: make_zip.sh <meta-overlayfs-13100-1.3.1.zip (official release asset)> <output zip>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

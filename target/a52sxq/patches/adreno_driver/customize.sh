@@ -170,9 +170,9 @@ SET_METADATA "system" "system/etc/init/k4_gpu_driver.rc" 0 0 644 "u:object_r:sys
 # init.rc when init reads it (at EOF: kernel/runtime/ksud_integration.c read_proxy), and init runs the actions of one
 # trigger in the order it parsed them: init.rc first (its own post-fs-data block with installkey /data comes earlier
 # in the file), then its imports and /system/etc/init. So an action at the end of init.rc is the last one before
-# ksud's. It runs in KernelSU's own domain, like ksud's line right after it (and like the k4_ksu_meta service): without
+# ksud's. It runs in KernelSU's own domain, like ksud's line right after it (and like the k4_metamod service): without
 # KernelSU that domain does not exist, the exec's child cannot set it and exits, init logs it and goes on.
-# k4-ksu-metamodule also writes the same guard into ksud's post-fs-data.d (covers later boots if a KernelSU build ever
+# k4-metamodule also writes the same guard into ksud's post-fs-data.d (covers later boots if a KernelSU build ever
 # put its part first). Bounded: the guard only looks at module directories.
 INIT_RC="$WORK_DIR/system/system/etc/init/hw/init.rc"
 [ -f "$INIT_RC" ] || ABORT "adreno_driver: no /system/etc/init/hw/init.rc"

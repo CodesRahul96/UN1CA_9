@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Host test of k4-ksu-metamodule (the KernelSU metamodule boot hook): every scenario runs the real script against a
+# Host test of k4-metamodule (the KernelSU metamodule boot hook): every scenario runs the real script against a
 # fake root (K4KSU_ROOT: /data/adb), properties in a file (K4KSU_PROPFILE) and a fake ksud that behaves like ksud
 # 4.2's `module install` (modules_update/<id>, modules/<id>/module.prop + update, /data/adb/metamodule link for a
 # metamodule) or fails half-way. Nothing here is shipped.
@@ -7,7 +7,7 @@
 # shell (the phone runs /system/bin/sh = mksh).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SCRIPT="$HERE/../k4-ksu-metamodule"
+SCRIPT="$HERE/../k4-metamodule"
 REALZIP="$HERE/../meta-overlayfs-13101-1.3.1-k4.1.zip"
 SH="${K4KSU_TEST_SH:-bash}"
 VERBOSE=false
@@ -127,26 +127,26 @@ tree_sum() { (cd "$1" && find . -type f -exec sha1sum {} + | LC_ALL=C sort | sha
 CASE="gate: KernelSU"
 device
 run gate
-eq gate "$(prop sys.k4.ksu_meta_gate)" ksu
+eq gate "$(prop sys.k4.metamod_gate)" ksu
 
 CASE="gate: no ksud (Magisk / stock)"
 device
 rm -f "$ADB/ksud"
 run gate
-eq gate "$(prop sys.k4.ksu_meta_gate)" none
+eq gate "$(prop sys.k4.metamod_gate)" none
 
 CASE="gate: turned off (apply still runs: the metamodule part is off, the GPU driver guard script is not)"
 device
-echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
+echo "persist.sys.k4.metamodule=0" >> "$T/props"
 run gate
-eq gate "$(prop sys.k4.ksu_meta_gate)" ksu
+eq gate "$(prop sys.k4.metamod_gate)" ksu
 
 CASE="fresh KernelSU: installs, mounted from the next boot"
 device
 module modules plain_mod
 before="$(tree_sum "$ADB/modules/plain_mod")"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" installed
+eq status "$(prop sys.k4.metamod)" installed
 eq "ksud calls" "$(calls)" 1
 eq "ksud args" "$(cat "$T/ksud.calls")" "module install $REALZIP"
 yes_ link "$ADB/metamodule"
@@ -162,36 +162,36 @@ eq "other module untouched" "$(tree_sum "$ADB/modules/plain_mod")" "$before"
 grep -q "installed" "$ADB/.k4_metamodule.log" && ok || bad "log"
 # same boot again (property retrigger): nothing new
 run apply
-eq "status again" "$(prop sys.k4.ksu_meta)" active
+eq "status again" "$(prop sys.k4.metamod)" active
 eq "no second install" "$(calls)" 1
 next_boot
 run apply
-eq "next boot" "$(prop sys.k4.ksu_meta)" active
+eq "next boot" "$(prop sys.k4.metamod)" active
 eq "still one install" "$(calls)" 1
 yes_ moved "$ADB/modules/meta-overlayfs/metamount.sh"
 
 CASE="user uninstalls our metamodule: opt-out, never again"
 touch "$ADB/modules/meta-overlayfs/remove"
 run apply
-eq "pending removal still counts" "$(prop sys.k4.ksu_meta)" active
+eq "pending removal still counts" "$(prop sys.k4.metamod)" active
 next_boot
 no_ gone "$ADB/modules/meta-overlayfs"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" optout
+eq status "$(prop sys.k4.metamod)" optout
 yes_ optout "$ADB/.k4_metamodule_optout"
 eq "optout reason" "$(cat "$ADB/.k4_metamodule_optout")" "removed meta-overlayfs"
 eq "no reinstall" "$(calls)" 1
 next_boot
 run apply
-eq "later boot" "$(prop sys.k4.ksu_meta)" optout
+eq "later boot" "$(prop sys.k4.metamod)" optout
 eq "still no reinstall" "$(calls)" 1
 
-CASE="re-arm with persist.sys.k4.ksu_metamodule=1"
-echo "persist.sys.k4.ksu_metamodule=1" >> "$T/props"
+CASE="re-arm with persist.sys.k4.metamodule=1"
+echo "persist.sys.k4.metamodule=1" >> "$T/props"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" installed
+eq status "$(prop sys.k4.metamod)" installed
 eq "installed again" "$(calls)" 2
-eq "prop back to automatic" "$(prop persist.sys.k4.ksu_metamodule)" ""
+eq "prop back to automatic" "$(prop persist.sys.k4.metamodule)" ""
 no_ optout "$ADB/.k4_metamodule_optout"
 
 CASE="user's own metamodule (link): never touched"
@@ -200,7 +200,7 @@ module modules mountify 1
 ln -s "$ADB/modules/mountify" "$ADB/metamodule"
 before="$(tree_sum "$ADB/modules/mountify")"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" other:mountify
+eq status "$(prop sys.k4.metamod)" other:mountify
 eq "no install" "$(calls)" 0
 eq seen "$(cat "$ADB/.k4_metamodule_seen")" mountify
 eq "untouched" "$(tree_sum "$ADB/modules/mountify")" "$before"
@@ -210,21 +210,21 @@ CASE="switching metamodules: the boot in between stands down"
 touch "$ADB/modules/mountify/remove"
 next_boot
 run apply
-eq status "$(prop sys.k4.ksu_meta)" optout
+eq status "$(prop sys.k4.metamod)" optout
 eq "optout reason" "$(cat "$ADB/.k4_metamodule_optout")" "removed mountify"
 eq "no install" "$(calls)" 0
 module modules_update meta-hybrid 1
 ln -s "$ADB/modules/meta-hybrid" "$ADB/metamodule"
 mkdir -p "$ADB/modules/meta-hybrid" && cp "$ADB/modules_update/meta-hybrid/module.prop" "$ADB/modules/meta-hybrid/"
 run apply
-eq "new one" "$(prop sys.k4.ksu_meta)" other:meta-hybrid
+eq "new one" "$(prop sys.k4.metamod)" other:meta-hybrid
 eq "no install" "$(calls)" 0
 
 CASE="metamodule without the link (metamodule=TRUE in modules_update)"
 device
 module modules_update meta-x " TRUE"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" other:meta-x
+eq status "$(prop sys.k4.metamod)" other:meta-x
 eq "no install" "$(calls)" 0
 
 CASE="disabled metamodule still counts"
@@ -232,35 +232,35 @@ device
 module modules meta-mm 1
 touch "$ADB/modules/meta-mm/disable"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" other:meta-mm
+eq status "$(prop sys.k4.metamod)" other:meta-mm
 eq "no install" "$(calls)" 0
 
 CASE="metamodule=0 is a regular module"
 device
 module modules notmeta 0
 run apply
-eq status "$(prop sys.k4.ksu_meta)" installed
+eq status "$(prop sys.k4.metamod)" installed
 eq "installed" "$(calls)" 1
 
 CASE="dangling /data/adb/metamodule link (like ksud: no metamodule)"
 device
 ln -s "$ADB/modules/vanished" "$ADB/metamodule"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" installed
+eq status "$(prop sys.k4.metamod)" installed
 eq "link replaced by ksud" "$(readlink "$ADB/metamodule")" "$ADB/modules/meta-overlayfs"
 
 CASE="plain directory at /data/adb/metamodule"
 device
 mkdir -p "$ADB/metamodule"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" other:metamodule
+eq status "$(prop sys.k4.metamod)" other:metamodule
 eq "no install" "$(calls)" 0
 
 CASE="turned off"
 device
-echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
+echo "persist.sys.k4.metamodule=0" >> "$T/props"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" off
+eq status "$(prop sys.k4.metamod)" off
 eq "no install" "$(calls)" 0
 no_ seen "$ADB/.k4_metamodule_seen"
 
@@ -268,7 +268,7 @@ CASE="no KernelSU"
 device
 rm -f "$ADB/ksud"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" none
+eq status "$(prop sys.k4.metamod)" none
 eq "no install" "$(calls)" 0
 
 CASE="unmodified meta-overlayfs 1.3.1 installed: updated in place to the K4 build, nothing pending"
@@ -280,7 +280,7 @@ echo oldbin > "$m/meta-overlayfs"; chmod 755 "$m/meta-overlayfs" "$m/metamount.s
 module modules plain_mod
 before="$(tree_sum "$ADB/modules/plain_mod")"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" updated
+eq status "$(prop sys.k4.metamod)" updated
 eq "no ksud install" "$(calls)" 0
 for f in metainstall.sh metamount.sh module.prop K4_CHANGES.txt metauninstall.sh post-mount.sh uninstall.sh; do
     unzip -p "$REALZIP" "$f" | cmp -s - "$m/$f" && ok || bad "$f is not the zip's"
@@ -299,10 +299,10 @@ eq "link kept" "$(readlink "$ADB/metamodule")" "$m"
 eq "other module untouched" "$(tree_sum "$ADB/modules/plain_mod")" "$before"
 grep -q "updated from 13100 to 13101 in place" "$ADB/.k4_metamodule.log" && ok || bad "log"
 run apply
-eq "same boot again" "$(prop sys.k4.ksu_meta)" active
+eq "same boot again" "$(prop sys.k4.metamod)" active
 next_boot
 run apply
-eq "next boot" "$(prop sys.k4.ksu_meta)" active
+eq "next boot" "$(prop sys.k4.metamod)" active
 eq "K4 build in place" "$(sed -n 's/^versionCode=//p' "$ADB/modules/meta-overlayfs/module.prop")" 13101
 eq "never a ksud install" "$(calls)" 0
 
@@ -310,7 +310,7 @@ CASE="newer meta-overlayfs (the user's own update): left alone"
 device
 meta_installed 13200
 run apply
-eq status "$(prop sys.k4.ksu_meta)" active
+eq status "$(prop sys.k4.metamod)" active
 eq "no install" "$(calls)" 0
 
 CASE="old meta-overlayfs disabled / marked for removal / update pending: not updated"
@@ -319,7 +319,7 @@ for mark in disable remove pending; do
     meta_installed 13100
     if [ $mark = pending ]; then mkdir -p "$ADB/modules_update/meta-overlayfs"; else touch "$ADB/modules/meta-overlayfs/$mark"; fi
     run apply
-    eq "$mark status" "$(prop sys.k4.ksu_meta)" active
+    eq "$mark status" "$(prop sys.k4.metamod)" active
     eq "$mark no install" "$(calls)" 0
 done
 
@@ -330,14 +330,14 @@ chmod 555 "$ADB/modules/meta-overlayfs"
 before="$(tree_sum "$ADB/modules/meta-overlayfs")"
 for i in 1 2 3; do
     run apply
-    eq "status $i" "$(prop sys.k4.ksu_meta)" active
+    eq "status $i" "$(prop sys.k4.metamod)" active
     eq "tries $i" "$(cat "$ADB/.k4_metamodule_tries")" "$i"
     eq "installed untouched $i" "$(tree_sum "$ADB/modules/meta-overlayfs")" "$before"
     no_ "no temp $i" "$ADB/.k4_metamodule.tmp"
     next_boot
 done
 run apply
-eq "4th boot" "$(prop sys.k4.ksu_meta)" active
+eq "4th boot" "$(prop sys.k4.metamod)" active
 grep -q "failed 3 times" "$ADB/.k4_metamodule.log" && ok || bad "not tried a 4th time"
 chmod 755 "$ADB/modules/meta-overlayfs"
 
@@ -346,38 +346,38 @@ device
 meta_installed 13100
 cp "$REALZIP" "$T/other.zip" && printf 'x' >> "$T/other.zip"
 ZIP="$T/other.zip" run apply
-eq status "$(prop sys.k4.ksu_meta)" active
+eq status "$(prop sys.k4.metamod)" active
 eq "no install" "$(calls)" 0
 
 CASE="Magisk in PATH"
 device
 mkdir -p "$T/mbin" && printf '#!/bin/sh\n' > "$T/mbin/magisk" && chmod 755 "$T/mbin/magisk"
 NOMAGISK="" XPATH="$T/mbin:$PATH" run apply
-eq status "$(prop sys.k4.ksu_meta)" magisk
+eq status "$(prop sys.k4.metamod)" magisk
 eq "no install" "$(calls)" 0
 
 CASE="safe mode"
 device
 echo "persist.sys.safemode=1" >> "$T/props"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" safemode
+eq status "$(prop sys.k4.metamod)" safemode
 eq "no install" "$(calls)" 0
 
 CASE="zip not the pinned build"
 device
 cp "$REALZIP" "$T/other.zip" && printf 'x' >> "$T/other.zip"
 ZIP="$T/other.zip" run apply
-eq status "$(prop sys.k4.ksu_meta)" failed
+eq status "$(prop sys.k4.metamod)" failed
 eq "no install" "$(calls)" 0
 ZIP="$T/missing.zip" run apply
-eq "missing zip" "$(prop sys.k4.ksu_meta)" failed
+eq "missing zip" "$(prop sys.k4.metamod)" failed
 eq "no install" "$(calls)" 0
 
 CASE="a non-metamodule module named meta-overlayfs"
 device
 module modules meta-overlayfs
 run apply
-eq status "$(prop sys.k4.ksu_meta)" conflict
+eq status "$(prop sys.k4.metamod)" conflict
 eq "no install" "$(calls)" 0
 
 CASE="ksud install fails: cleaned up, at most 3 tries"
@@ -386,7 +386,7 @@ module modules plain_mod
 before="$(tree_sum "$ADB/modules")"
 for i in 1 2 3; do
     FAKE_KSUD_FAIL=1 run apply
-    eq "status $i" "$(prop sys.k4.ksu_meta)" failed
+    eq "status $i" "$(prop sys.k4.metamod)" failed
     eq "calls $i" "$(calls)" "$i"
     no_ "staged $i" "$ADB/modules_update/meta-overlayfs"
     no_ "link $i" "$ADB/metamodule"
@@ -395,11 +395,11 @@ for i in 1 2 3; do
 done
 eq "modules untouched" "$(tree_sum "$ADB/modules")" "$before"
 FAKE_KSUD_FAIL=1 run apply
-eq "4th boot" "$(prop sys.k4.ksu_meta)" failed
+eq "4th boot" "$(prop sys.k4.metamod)" failed
 eq "not tried a 4th time" "$(calls)" 3
-echo "persist.sys.k4.ksu_metamodule=1" >> "$T/props"
+echo "persist.sys.k4.metamodule=1" >> "$T/props"
 run apply
-eq "re-armed retry" "$(prop sys.k4.ksu_meta)" installed
+eq "re-armed retry" "$(prop sys.k4.metamod)" installed
 eq "retried" "$(calls)" 4
 no_ tries "$ADB/.k4_metamodule_tries"
 
@@ -435,8 +435,8 @@ ln -s ../vendor "$ADB/modules/plain_mod/system/vendor"
 echo "#!/system/bin/sh" > "$ADB/modules/plain_mod/service.sh"
 before="$(tree_sum "$ADB/modules/plain_mod")"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" active
-eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+eq status "$(prop sys.k4.metamod)" active
+eq import "$(prop sys.k4.metamod_import)" plain_mod
 eq "system copied" "$(cat "$MNT/plain_mod/system/etc/plain_mod.txt")" "file of plain_mod"
 eq "vendor copied" "$(cat "$MNT/plain_mod/vendor/etc/v.conf")" v
 eq "product copied" "$(cat "$MNT/plain_mod/product/app/p.apk")" p
@@ -449,11 +449,11 @@ eq "no ksud call" "$(calls)" 0
 grep -q "import: plain_mod (installed before the metamodule) copied" "$ADB/.k4_metamodule.log" && ok || bad "log"
 img="$(tree_sum "$MNT")"
 run apply
-eq "idempotent: nothing more" "$(prop sys.k4.ksu_meta_import)" none
+eq "idempotent: nothing more" "$(prop sys.k4.metamod_import)" none
 eq "idempotent: image unchanged" "$(tree_sum "$MNT")" "$img"
 next_boot
 run apply
-eq "next boot: nothing more" "$(prop sys.k4.ksu_meta_import)" none
+eq "next boot: nothing more" "$(prop sys.k4.metamod_import)" none
 
 CASE="import: a module already in the image is never touched"
 device
@@ -461,7 +461,7 @@ meta_with_image
 module modules plain_mod
 mkdir -p "$MNT/plain_mod/system/etc" && echo "metainstall copy" > "$MNT/plain_mod/system/etc/plain_mod.txt"
 run apply
-eq import "$(prop sys.k4.ksu_meta_import)" none
+eq import "$(prop sys.k4.metamod_import)" none
 eq "copy untouched" "$(cat "$MNT/plain_mod/system/etc/plain_mod.txt")" "metainstall copy"
 
 CASE="import: modules metainstall.sh would not copy are skipped"
@@ -477,7 +477,7 @@ gpu_mod gpu64 vendor/lib64
 gpu_mod gpu32sys system/vendor/lib
 module modules keep
 run apply
-eq "only the plain one" "$(prop sys.k4.ksu_meta_import)" keep
+eq "only the plain one" "$(prop sys.k4.metamod_import)" keep
 for x in m_disabled m_removed m_skipmount m_pending nosys _bad noprop gpu64 gpu32sys meta-overlayfs; do
     no_ "$x not imported" "$MNT/$x"
 done
@@ -485,7 +485,7 @@ yes_ "keep imported" "$MNT/keep/system/etc/keep.txt"
 # enabled later: imported on that boot, mounted from the next
 rm -f "$ADB/modules/m_disabled/disable"
 run apply
-eq "re-enabled module" "$(prop sys.k4.ksu_meta_import)" m_disabled
+eq "re-enabled module" "$(prop sys.k4.metamod_import)" m_disabled
 
 CASE="import: system/vendor left inside system/ (Mountify / Magic Mount layout) is moved out like KernelSU's installer"
 device
@@ -499,7 +499,7 @@ echo x > "$ADB/modules/mfy_mod/system/vendor/etc/x.conf"
 echo y > "$ADB/modules/mfy_mod/system/system_ext/etc/y.conf"
 before="$(tree_sum "$ADB/modules/mfy_mod")"
 run apply
-eq import "$(prop sys.k4.ksu_meta_import)" mfy_mod
+eq import "$(prop sys.k4.metamod_import)" mfy_mod
 eq "moved to vendor/" "$(cat "$MNT/mfy_mod/vendor/etc/x.conf")" x
 eq "link left in system/" "$(readlink "$MNT/mfy_mod/system/vendor")" ../vendor
 [ -d "$MNT/mfy_mod/vendor" ] && [ ! -L "$MNT/mfy_mod/vendor" ] && ok || bad "Mountify's vendor link not replaced by the directory"
@@ -514,21 +514,21 @@ module modules both_mod
 mkdir -p "$ADB/modules/both_mod/system/vendor/etc" "$ADB/modules/both_mod/vendor/etc"
 module modules ok_mod
 run apply
-eq import "$(prop sys.k4.ksu_meta_import)" "ok_mod; failed: both_mod"
+eq import "$(prop sys.k4.metamod_import)" "ok_mod; failed: both_mod"
 no_ "not imported" "$MNT/both_mod"
 no_ "no temp" "$MNT/.k4import.both_mod"
 yes_ "the other one is" "$MNT/ok_mod/system"
 run apply
-eq "not retried" "$(prop sys.k4.ksu_meta_import)" "failed: both_mod"
+eq "not retried" "$(prop sys.k4.metamod_import)" "failed: both_mod"
 grep -c "both_mod" "$ADB/.k4_metamodule_import_failed" | grep -q -x 1 && ok || bad "recorded once"
 rm -rf "$ADB/modules/both_mod/vendor"
 cp -a "$ADB/modules/both_mod" "$ADB/modules/both_mod.new" && rm -rf "$ADB/modules/both_mod" && mv "$ADB/modules/both_mod.new" "$ADB/modules/both_mod"
 run apply
-eq "reinstalled: retried" "$(prop sys.k4.ksu_meta_import)" both_mod
+eq "reinstalled: retried" "$(prop sys.k4.metamod_import)" both_mod
 if [ "$(id -u)" != 0 ]; then
     module modules unreadable && chmod 000 "$ADB/modules/unreadable/system/etc/unreadable.txt"
     run apply 2> /dev/null
-    eq "unreadable file" "$(prop sys.k4.ksu_meta_import)" "failed: unreadable"
+    eq "unreadable file" "$(prop sys.k4.metamod_import)" "failed: unreadable"
     no_ "no temp" "$MNT/.k4import.unreadable"
     no_ "not imported" "$MNT/unreadable"
     chmod 644 "$ADB/modules/unreadable/system/etc/unreadable.txt"
@@ -540,7 +540,7 @@ meta_with_image
 module modules plain_mod
 mkdir -p "$MNT/.k4import.plain_mod/system" && echo half > "$MNT/.k4import.plain_mod/system/half"
 run apply
-eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+eq import "$(prop sys.k4.metamod_import)" plain_mod
 no_ "temp gone" "$MNT/.k4import.plain_mod"
 no_ "half file not in the copy" "$MNT/plain_mod/system/half"
 
@@ -564,15 +564,15 @@ module modules mountify 1
 ln -s "$ADB/modules/mountify" "$ADB/metamodule"
 module modules plain_mod
 run apply
-eq status "$(prop sys.k4.ksu_meta)" other:mountify
-eq import "$(prop sys.k4.ksu_meta_import)" ""
+eq status "$(prop sys.k4.metamod)" other:mountify
+eq import "$(prop sys.k4.metamod_import)" ""
 
 CASE="import: right after a fresh install of the metamodule (mounted from the next boot, its first)"
 device
 module modules plain_mod
 FAKE_KSUD_IMG=1 run apply
-eq status "$(prop sys.k4.ksu_meta)" installed
-eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+eq status "$(prop sys.k4.metamod)" installed
+eq import "$(prop sys.k4.metamod_import)" plain_mod
 yes_ "in the new image" "$ADB/modules/meta-overlayfs/mnt/plain_mod/system/etc/plain_mod.txt"
 
 CASE="import: after the in-place update of the unmodified 1.3.1"
@@ -581,8 +581,8 @@ meta_with_image 13100
 echo "old metamount" > "$ADB/modules/meta-overlayfs/metamount.sh"
 module modules plain_mod
 run apply
-eq status "$(prop sys.k4.ksu_meta)" updated
-eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+eq status "$(prop sys.k4.metamod)" updated
+eq import "$(prop sys.k4.metamod_import)" plain_mod
 
 CASE="import: runs under ksud's busybox when there is one"
 device
@@ -591,7 +591,7 @@ module modules plain_mod
 printf '#!/usr/bin/env bash\necho "$*" >> "%s/bb.calls"\n[ "$1" = sh ] && shift\nexec bash "$@"\n' "$T" > "$T/busybox"
 chmod 755 "$T/busybox"
 BBOX="$T/busybox" run apply
-eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+eq import "$(prop sys.k4.metamod_import)" plain_mod
 grep -q -x "sh $SCRIPT import" "$T/bb.calls" && ok || bad "busybox not used: $(cat "$T/bb.calls" 2> /dev/null)"
 rm -f "$T/bb.calls"
 
@@ -614,8 +614,8 @@ cat > "$T/mountinfo" << 'EOF'
 301 38 0:41 / /data/x rw,relatime shared:50 - overlay other ro,seclabel,lowerdir=/foo
 EOF
 run apply
-eq status "$(prop sys.k4.ksu_meta)" active
-eq import "$(prop sys.k4.ksu_meta_import)" plain_mod
+eq status "$(prop sys.k4.metamod)" active
+eq import "$(prop sys.k4.metamod_import)" plain_mod
 # the image mount and both KSU overlays, not the non-KSU overlay
 eq "image + 2 overlays added" "$(umountadds)" 3
 grep -q -x -F "$ADB/modules/meta-overlayfs/mnt" "$T/umountadd.calls" && ok || bad "image mount not added: $(cat "$T/umountadd.calls" 2> /dev/null)"
@@ -633,7 +633,7 @@ device
 meta_installed 13101
 printf '287 38 0:38 / /system rw,relatime shared:48 - overlay KSU ro,seclabel,lowerdir=/x:/system\n' > "$T/mountinfo"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" active
+eq status "$(prop sys.k4.metamod)" active
 eq "no umount-add" "$(umountadds)" 0
 eq "no notify" "$(notifies)" 0
 
@@ -650,16 +650,16 @@ device
 module modules mountify 1
 ln -s "$ADB/modules/mountify" "$ADB/metamodule"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" other:mountify
+eq status "$(prop sys.k4.metamod)" other:mountify
 eq "no umount-add" "$(umountadds)" 0
 eq "no notify" "$(notifies)" 0
 
-CASE="hide: also with persist.sys.k4.ksu_metamodule=0 (the module still mounts itself, so still hidden)"
+CASE="hide: also with persist.sys.k4.metamodule=0 (the module still mounts itself, so still hidden)"
 device
 meta_with_image
-echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
+echo "persist.sys.k4.metamodule=0" >> "$T/props"
 run apply
-eq status "$(prop sys.k4.ksu_meta)" off
+eq status "$(prop sys.k4.metamod)" off
 eq "image still registered" "$(umountadds)" 1
 eq "kernel still notified" "$(notifies)" 1
 
@@ -670,7 +670,7 @@ GSH() { echo "$ADB/post-fs-data.d/k4_gpu_driver_guard.sh"; }
 CASE="guard script: written on a ROM with the GPU driver selector, runs its guard"
 device
 GPU="$T/k4-gpu-driver" run apply
-eq status "$(prop sys.k4.ksu_meta)" installed
+eq status "$(prop sys.k4.metamod)" installed
 yes_ "written" "$(GSH)"
 eq "mode" "$(stat -c %a "$(GSH)")" 755
 eq "dir mode" "$(stat -c %a "$ADB/post-fs-data.d")" 755
@@ -707,17 +707,17 @@ rm -f "$ADB/post-fs-data.d" && mkdir -p "$ADB/post-fs-data.d" && ln -s "$T/elsew
 GPU="$T/k4-gpu-driver" run apply
 no_ "link target not created" "$T/elsewhere/x"
 
-CASE="guard script: also with persist.sys.k4.ksu_metamodule=0 (metamodule part off) and an opt-out"
+CASE="guard script: also with persist.sys.k4.metamodule=0 (metamodule part off) and an opt-out"
 device
-echo "persist.sys.k4.ksu_metamodule=0" >> "$T/props"
+echo "persist.sys.k4.metamodule=0" >> "$T/props"
 GPU="$T/k4-gpu-driver" run apply
-eq status "$(prop sys.k4.ksu_meta)" off
+eq status "$(prop sys.k4.metamod)" off
 yes_ "written" "$(GSH)"
 eq "no install" "$(calls)" 0
 device
 echo "removed meta-overlayfs" > "$ADB/.k4_metamodule_optout"
 GPU="$T/k4-gpu-driver" run apply
-eq status "$(prop sys.k4.ksu_meta)" optout
+eq status "$(prop sys.k4.metamod)" optout
 yes_ "written" "$(GSH)"
 
 CASE="guard script: not without the selector, KernelSU, in safe mode or with Magisk"
@@ -740,5 +740,5 @@ device
 run bogus 2> /dev/null
 eq "exit" "$?" 2
 
-echo "k4-ksu-metamodule host test ($SH): $PASS passed, $FAIL failed"
+echo "k4-metamodule host test ($SH): $PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]
