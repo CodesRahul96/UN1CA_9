@@ -1,4 +1,4 @@
 id=a52sxq_sec_backup_label
 name=Galaxy A52s 5G: vold may write its metadata key backup
-author=kusti420
+author=CodesRahul96
 description=One UI 9 vold keeps a backup of the metadata encryption key in /metadata/sec_backup/metadata_encryption/key (init.rc "Samsung ODE" mkdir). That directory falls under the generic "/metadata(/.*)? metadata_file" label, and vold only has read/search on metadata_file: the S26U vendor policy grants it write access (vendor_sepolicy.cil:18515-6), the A14 A52s vendor policy does not, so every boot logged "Cannot create directories ... Permission denied" / "FsyncDirectory failed" and the backup never existed. Label the directory vold_metadata_file (the type of /metadata/vold, on which vold already has full rights) instead of widening vold's access to all of /metadata. init.rc already runs "restorecon_recursive /metadata" before the mkdir, so existing installs are relabelled on the next boot.

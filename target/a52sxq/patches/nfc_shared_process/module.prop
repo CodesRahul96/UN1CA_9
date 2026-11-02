@@ -1,4 +1,4 @@
 id=a52sxq_nfc_shared_process
 name=Galaxy A52s 5G: SecNfc never crash-loops the shared NFC process
-author=kusti420
+author=CodesRahul96
 description=com.android.nfc (NfcNciApex) and com.samsung.android.nfc (SecNfc) share one persistent process ("com.android.nfc", android.uid.nfc). When AMS binds that process for SecNfc instead of com.android.nfc, SecNfcApplication.onCreate() runs before NfcService registered "nfc", NfcAdapter.getNfcAdapter() throws UnsupportedOperationException and the persistent process restarts and crashes again without pause (tester 9.3.85: 277 crashes in 25 s every boot, NFC dead, PackageWatchdog/RescueParty escalate to a warm reboot and then settings resets). SecNfcApplication now defers SamsungExtension until "nfc" exists and sends a no-op explicit broadcast to com.android.nfc/.NfcTagAllowNotificationReceiver so AMS loads com.android.nfc into the process (NfcApplication -> NfcService -> "nfc" -> OEM_EXTENSION_INIT); SecBootCompleteReceiver runs the deferred init on OEM_EXTENSION_INIT. The init catches UnsupportedOperationException, so a missing NFC stack leaves NFC off instead of crash-looping. Normal start order is unchanged.

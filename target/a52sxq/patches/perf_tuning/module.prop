@@ -1,4 +1,4 @@
 id=a52sxq_perf_tuning
 name=Galaxy A52s 5G ART/dexopt tuning
-author=kusti420
+author=CodesRahul96
 description=Dexopt policy for a build whose system apps lose their build-time odex: compile apps that ship a profile (Samsung's, regenerated, plus the target's own text profiles) with speed-profile at the first boot after a flash instead of leaving them verify-only until background dexopt; disable the userfaultfd GC flag the 5.4 kernel cannot honour (odrefresh re-checks it on every run); lower the CPU cap of the "Light" performance profile (Device care > Performance profile: vendor hyper hints LOW_HEAT_MODE_HINT and APP_START_LOW_HEAT in /vendor/etc/hyper/config_vendor.json) from CPUMaxFreq "90#", which HYPER-HAL turns into 2208000 kHz, barely below Standard, to the prime step 2035200 kHz (~2.0 GHz); GPU and DDR caps unchanged.

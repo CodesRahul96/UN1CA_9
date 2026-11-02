@@ -1,4 +1,4 @@
 id=a52sxq_sepolicy_tighten
 name=Galaxy A52s 5G: SELinux tightening (hardening part 4)
-author=kusti420
+author=CodesRahul96
 description=Audit 2026-10-21 (every added or kept rule diffed against stock A52s A14 and stock S26U, checked against the built policy's neverallows). Removes two stock A14 vendor rules that Android 17 forbids and the S26U vendor does not carry: platform apps executing files in /data/local/tmp (shell_data_file execute/execute_no_trans) and reading Samsung debugfs nodes (sec_debugfs). Deletes the A14 odm precompiled_sepolicy (+ its .sha256 files): its hashes can never match this ROM's platform policy, so init always compiled the split policy anyway; without it a future hash match can never load a stale policy that lacks every ROM patch.

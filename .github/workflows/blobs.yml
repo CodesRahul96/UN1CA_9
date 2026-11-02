@@ -1,8 +1,7 @@
 name: Update prebuilt blobs
 
 on:
-  # k4_un1ca: manual only. Upstream refreshes the prebuilt blobs of every UN1CA device daily; this fork only builds
-  # a52sxq and has no business re-downloading firmware for the other devices (the scheduled runs just fail).
+  # UN1CA_9: manual only. This repository focuses on a52sxq.
   workflow_dispatch:
 
 concurrency:

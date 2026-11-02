@@ -1,4 +1,4 @@
 id=a52sxq_launcher_porterduff_gate
 name=Galaxy A52s 5G: no per-frame failed reflection in One UI Home edit mode
-author=kusti420
+author=CodesRahul96
 description=One UI Home's setBackground overrides (WorkspaceCellLayoutContainer, MinusOneEditContent, HomeSearchBar) and the ce.d blur helper call setPorterDuffMode(OVERLAY) on the new background through ReflectionUtilsKt.invokeReflection (kotlin-reflect KClass.getMembers + an error log on a miss). The method only exists on BackgroundBlurDrawable. With "Reduce transparency and blur" on (the ROM default since first_boot_defaults) CellLayoutBlurUpdater.updateBlur sets a new GradientDrawable on every page container every frame of the edit-mode transition, so every frame paid a full member scan of GradientDrawable plus "E HoneySpace.ReflectionUtils: error on invoking setPorterDuffMode" (about 250 lines per edit-mode enter/exit, 360/s, field log 2026-10-24). The call now runs only when the drawable is a BackgroundBlurDrawable, so the blur path is unchanged.

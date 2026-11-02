@@ -1,4 +1,4 @@
-# Copyright (c) 2026 kusti420
+# Copyright (c) 2026 CodesRahul96
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Debloat list for Galaxy A52s 5G (a52sxq)

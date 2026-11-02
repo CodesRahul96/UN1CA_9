@@ -1,4 +1,4 @@
 id=a52sxq_nfc_settings_no_adapter
 name=Galaxy A52s 5G: Settings without an NFC adapter
-author=kusti420
+author=CodesRahul96
 description=Settings > Connections > NFC crashed with NullPointerException "NfcAdapter is null" (CardEmulation.getInstance in the PaymentDropDownPreference constructor) whenever the "nfc" service is not running, and the NFC page has more unguarded NfcAdapter calls behind it. Without an adapter: PaymentDropDownPreference keeps CardEmulation null (initSubscriptionDetails() and the SIM list click return early), the NFC preference controllers that hold the adapter report UNSUPPORTED_ON_DEVICE (so the Connections > NFC entry is hidden), and NfcSettings closes itself instead of crashing in onActivityCreated()/onResume()/updatePaymentSim(). With a working NFC stack nothing changes.
