@@ -152,7 +152,7 @@ for i in "${FIRMWARES[@]}"; do
     [ -f "$ODIN_DIR/${MODEL}_${CSC}/.downloaded" ] && rm -rf "$ODIN_DIR/${MODEL}_${CSC}"
     mkdir -p "$ODIN_DIR/${MODEL}_${CSC}"
 
-    local DIRECT_URL=""
+    DIRECT_URL=""
     if [[ "$MODEL" == "SM-S948B"* ]] && [ -n "${SOURCE_FW_URL:-}" ]; then
         DIRECT_URL="$SOURCE_FW_URL"
     elif [[ "$MODEL" == "SM-A528B"* ]] && [ -n "${TARGET_FW_URL:-}" ]; then
