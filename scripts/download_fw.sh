@@ -151,32 +151,15 @@ for i in "${FIRMWARES[@]}"; do
     LOG "- Downloading firmware..."
     [ -f "$ODIN_DIR/${MODEL}_${CSC}/.downloaded" ] && rm -rf "$ODIN_DIR/${MODEL}_${CSC}"
     mkdir -p "$ODIN_DIR/${MODEL}_${CSC}"
-
-    DIRECT_URL=""
-    if [[ "$MODEL" == "SM-S948B"* ]] && [ -n "${SOURCE_FW_URL:-}" ]; then
-        DIRECT_URL="$SOURCE_FW_URL"
-    elif [[ "$MODEL" == "SM-A528B"* ]] && [ -n "${TARGET_FW_URL:-}" ]; then
-        DIRECT_URL="$TARGET_FW_URL"
-    fi
-
-    if [ -n "$DIRECT_URL" ]; then
-        LOG "- Downloading firmware from direct URL: $DIRECT_URL"
-        curl -L --fail --retry 3 -o "$ODIN_DIR/${MODEL}_${CSC}/firmware.zip" "$DIRECT_URL" || exit 1
-    elif [[ "$MODEL" == "SM-S948B"* ]]; then
-        LOG "\033[0;31m! SM-S948B (Galaxy S26 Ultra) is an unreleased internal test firmware and cannot be downloaded via Samsung public FUS servers.\033[0m"
-        LOG "\033[0;31m! Please set SOURCE_FW_URL (direct download link) or run locally with pre-extracted firmware.\033[0m"
-        exit 1
-    else
-        # Anan's samloader stores its logs in the current working directory, let's move into OUT_DIR just for this time
-        (
-        cd "$OUT_DIR" || exit 1
-        samloader -m "$MODEL" -r "$CSC" -i "$IMEI" -s "$SERIAL_NO" download -O "$ODIN_DIR/${MODEL}_${CSC}" || exit 1
-        )
-    fi
+    # Anan's samloader stores its logs in the current working directory, let's move into OUT_DIR just for this time
+    (
+    cd "$OUT_DIR" || exit 1
+    samloader -m "$MODEL" -r "$CSC" -i "$IMEI" -s "$SERIAL_NO" download -O "$ODIN_DIR/${MODEL}_${CSC}" 1> /dev/null || exit 1
+    )
 
     ZIP_FILE="$(find "$ODIN_DIR/${MODEL}_${CSC}" -name "*.zip" | sort -r | head -n 1)"
     if [ ! "$ZIP_FILE" ] || [ ! -f "$ZIP_FILE" ]; then
-        LOG "\033[0;31m! Download failed for $MODEL. If $MODEL is an unreleased device, Samsung FUS rejects public downloads. Please provide pre-extracted firmware or set SOURCE_FW_URL.\033[0m"
+        LOG "\033[0;31m! Download failed\033[0m"
         exit 1
     fi
 

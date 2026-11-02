@@ -2,21 +2,6 @@ name: CI
 
 on:
   workflow_dispatch:
-    inputs:
-      target:
-        description: 'Target device to build'
-        required: true
-        default: 'a52sxq'
-      source_fw_url:
-        description: 'Direct download URL for source firmware (SM-S948B_EUX zip or tar)'
-        required: false
-        type: string
-        default: ''
-      target_fw_url:
-        description: 'Direct download URL for target firmware (SM-A528B_BTU zip or tar)'
-        required: false
-        type: string
-        default: ''
   pull_request:
   push:
     branches:
@@ -31,7 +16,6 @@ jobs:
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-24.04
-    continue-on-error: true
 
     steps:
       - name: Checkout repo
@@ -50,6 +34,9 @@ jobs:
 
   generate-matrix:
     name: Generate matrix
+    needs: shellcheck
+    # UN1CA 9: the fork's a52sxq build needs locally fetched firmware and prebuilts; only shellcheck runs on GitHub
+    if: github.repository != 'CodesRahul96/UN1CA_9' && github.repository != 'kusti420/k4_un1ca'
     runs-on: ubuntu-24.04
 
     outputs:
@@ -62,22 +49,16 @@ jobs:
       - name: Generate CI matrix
         id: generate-matrix
         run: |
-          if [ -n "${{ github.event.inputs.target }}" ]; then
-            matrix="[\"${{ github.event.inputs.target }}\"]"
-          elif [[ "${{ github.ref }}" == *"seventeen"* ]]; then
-            matrix='["a52sxq"]'
-          else
-            matrix="$(find target -mindepth 1 -maxdepth 1 -type d -printf '%f\n' \
-              | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')"
-          fi
+          matrix="$(find target -mindepth 1 -maxdepth 1 -type d -printf '%f\n' \
+            | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')"
           echo "$matrix"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build
-    needs: generate-matrix
+    needs: [shellcheck, generate-matrix]
+    if: github.repository != 'CodesRahul96/UN1CA_9' && github.repository != 'kusti420/k4_un1ca'
     runs-on: ubuntu-24.04
-    if: github.event_name == 'workflow_dispatch'
 
     strategy:
       fail-fast: false
@@ -112,7 +93,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
             attr ccache clang ffmpeg libbrotli-dev libbz2-dev \
             libgtest-dev libprotobuf-dev libunwind-dev libpcre2-dev \
-            libzstd-dev lld protobuf-compiler webp libxml-parser-perl
+            libzstd-dev lld protobuf-compiler webp
           DEBIAN_FRONTEND=noninteractive sudo apt install -yq linux-modules-extra-azure || true
           sudo modprobe erofs 2>/dev/null || true
           sudo modprobe f2fs 2>/dev/null || true
@@ -152,9 +133,6 @@ jobs:
 
       - name: Download stock firmwares
         uses: nick-fields/retry@v4
-        env:
-          SOURCE_FW_URL: ${{ inputs.source_fw_url || secrets.SOURCE_FW_URL }}
-          TARGET_FW_URL: ${{ inputs.target_fw_url || secrets.TARGET_FW_URL }}
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -164,12 +142,5 @@ jobs:
       - name: Extract stock firmwares
         run: ./scripts/extract_fw.sh
 
-      - name: Build ROM and flashable ZIP
-        run: ./scripts/make_rom.sh -z
-
-      - name: Upload flashable ZIP
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: UN1CA_9_${{ matrix.target }}
-          path: out/*.zip
+      - name: Build ROM
+        run: ./scripts/make_rom.sh
