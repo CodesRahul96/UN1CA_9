@@ -18,5 +18,3 @@ spoofSignature=false
 spoofVendingBuild=true
 spoofVendingSdk=false
 DEBUG=false
-init.svc.adbd=stopped
-sys.usb.state=mtp
