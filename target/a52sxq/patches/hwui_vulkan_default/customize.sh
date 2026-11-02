@@ -16,9 +16,8 @@
 # in builds up to 9.3.30. The default comes from persist.sys.unica.vulkan (false since 2026-10-21) + the rc below
 # (debug.hwui.renderer overrides ro.hwui.use_vulkan in libhwui and is set from the persistent prop before apps start).
 sed -i "/^ro\.hwui\.use_vulkan=/d" "$WORK_DIR/vendor/build.prop"
-# 2026-10-21 (owner): default back to OpenGL (skiagl) together with the stock V@0530 driver, as testers asked; the
-# toggle (and the GPU driver selector) let users switch. Known: the GL path showed green tiles in Instagram/Facebook video.
-SET_PROP "system" "persist.sys.unica.vulkan" "false"
+# UI renderer defaults to Vulkan (skiavk) to eliminate green block artifacts in video decoding
+SET_PROP "system" "persist.sys.unica.vulkan" "true"
 RC="$WORK_DIR/system/system/etc/init/a52sxq_hwui_renderer.rc"
 cat > "$RC" << 'RCEOF'
 # UN1CA "Vulkan renderer" toggle for the a52sxq port (OpenGL is the default). See patches/hwui_vulkan_default.
