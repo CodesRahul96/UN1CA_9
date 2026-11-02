@@ -168,27 +168,27 @@ index 00000000..dc87c586
 +
 +.field private static final blacklist PACKAGE_GMS:Ljava/lang/String; = "com.google.android.gms"
 +
-+.field private static final blacklist PIF_BRAND:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_BRAND:Ljava/lang/String; = "google"
 +
-+.field private static final blacklist PIF_DEVICE:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_DEVICE:Ljava/lang/String; = "redfin"
 +
-+.field private static final blacklist PIF_DEVICE_INITIAL_SDK_INT:Ljava/lang/String; = "32"
++.field private static final blacklist PIF_DEVICE_INITIAL_SDK_INT:Ljava/lang/String; = "30"
 +
-+.field private static final blacklist PIF_FINGERPRINT:Ljava/lang/String; = "google/bluejay_beta/bluejay:CANARY/ZP11.260918.007/16484274:user/release-keys"
++.field private static final blacklist PIF_FINGERPRINT:Ljava/lang/String; = "google/redfin/redfin:14/UP1A.231105.001.B2/11259187:user/release-keys"
 +
-+.field private static final blacklist PIF_ID:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_ID:Ljava/lang/String; = "UP1A.231105.001.B2"
 +
-+.field private static final blacklist PIF_INCREMENTAL:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_INCREMENTAL:Ljava/lang/String; = "11259187"
 +
-+.field private static final blacklist PIF_MANUFACTURER:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_MANUFACTURER:Ljava/lang/String; = "Google"
 +
-+.field private static final blacklist PIF_MODEL:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_MODEL:Ljava/lang/String; = "Pixel 5"
 +
-+.field private static final blacklist PIF_PRODUCT:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_PRODUCT:Ljava/lang/String; = "redfin"
 +
-+.field private static final blacklist PIF_RELEASE:Ljava/lang/String; = "null"
++.field private static final blacklist PIF_RELEASE:Ljava/lang/String; = "14"
 +
-+.field private static final blacklist PIF_SECURITY_PATCH:Ljava/lang/String; = "2026-10-05"
++.field private static final blacklist PIF_SECURITY_PATCH:Ljava/lang/String; = "2023-11-05"
 +
 +.field private static final blacklist PIF_VERSION:Ljava/lang/String; = "20261016"
 +
@@ -1173,7 +1173,7 @@ index 00000000..dc87c586
 +    :cond_7
 +    const-string v0, "persist.sys.pif.fingerprint"
 +
-+    const-string v2, "google/bluejay_beta/bluejay:CANARY/ZP11.260918.007/16484274:user/release-keys"
++    const-string v2, "google/redfin/redfin:14/UP1A.231105.001.B2/11259187:user/release-keys"
 +
 +    invoke-static {v0, v2}, Landroid/os/SemSystemProperties;->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 +
@@ -1208,7 +1208,7 @@ index 00000000..dc87c586
 +    :cond_8
 +    const-string v0, "persist.sys.pif.security_patch"
 +
-+    const-string v2, "2026-10-05"
++    const-string v2, "2023-11-05"
 +
 +    invoke-static {v0, v2}, Landroid/os/SemSystemProperties;->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 +
@@ -1243,7 +1243,7 @@ index 00000000..dc87c586
 +    :cond_9
 +    const-string v0, "persist.sys.pif.first_api_level"
 +
-+    const-string v2, "32"
++    const-string v2, "30"
 +
 +    invoke-static {v0, v2}, Landroid/os/SemSystemProperties;->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 +

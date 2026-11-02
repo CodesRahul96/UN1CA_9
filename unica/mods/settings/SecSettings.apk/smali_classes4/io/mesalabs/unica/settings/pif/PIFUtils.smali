@@ -626,7 +626,7 @@
 
     const-string v0, "PRODUCT"
 
-    const-string v1, "null"
+    const-string v1, "redfin"
 
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
@@ -638,6 +638,8 @@
 
     const-string v0, "DEVICE"
 
+    const-string v1, "redfin"
+
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
@@ -647,6 +649,8 @@
     invoke-static {v2, v0}, Landroid/os/SemSystemProperties;->set(Ljava/lang/String;Ljava/lang/String;)V
 
     const-string v0, "MANUFACTURER"
+
+    const-string v1, "Google"
 
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
@@ -658,6 +662,8 @@
 
     const-string v0, "BRAND"
 
+    const-string v1, "google"
+
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
@@ -667,6 +673,8 @@
     invoke-static {v2, v0}, Landroid/os/SemSystemProperties;->set(Ljava/lang/String;Ljava/lang/String;)V
 
     const-string v0, "MODEL"
+
+    const-string v1, "Pixel 5"
 
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
@@ -678,6 +686,8 @@
 
     const-string v0, "RELEASE"
 
+    const-string v1, "14"
+
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
@@ -687,6 +697,8 @@
     invoke-static {v2, v0}, Landroid/os/SemSystemProperties;->set(Ljava/lang/String;Ljava/lang/String;)V
 
     const-string v0, "INCREMENTAL"
+
+    const-string v1, "11259187"
 
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
@@ -698,6 +710,8 @@
 
     const-string v0, "ID"
 
+    const-string v1, "UP1A.231105.001.B2"
+
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
@@ -708,6 +722,8 @@
 
     const-string v0, "SECURITY_PATCH"
 
+    const-string v1, "2023-11-05"
+
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v0
@@ -717,6 +733,8 @@
     invoke-static {v2, v0}, Landroid/os/SemSystemProperties;->set(Ljava/lang/String;Ljava/lang/String;)V
 
     const-string v0, "DEVICE_INITIAL_SDK_INT"
+
+    const-string v1, "30"
 
     invoke-virtual {p0, v0, v1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
