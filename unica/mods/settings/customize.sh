@@ -1,6 +1,96 @@
-if [ ! "$(GET_PROP "system" "ro.unica.version")" ]; then
-    SET_PROP "system" "ro.unica.version" "$ROM_VERSION"
+SETTINGS_INJECT()
+{
+    "${BASH_SOURCE[0]%/*}/../../../scripts/run_xml_perl.sh" - "$@" <<'PERL'
+use strict;
+use warnings;
+use File::Find;
+use File::Path qw(make_path);
+use File::Basename qw(dirname basename);
+use File::Temp qw(tempfile tempdir);
+use XML::Parser;
+sub need($$) { die "UN1CA: $_[1]\n" unless $_[0] }
+sub raw { open my $f,'<:raw',$_[0] or die "$_[0]: $!\n"; local $/; return <$f>//'' }
+sub put {
+    my($path,$data)=@_; return if -f $path && raw($path) eq $data;
+    make_path(dirname($path)); my($f,$name)=tempfile('.unica-native-XXXXXX',DIR=>dirname($path),UNLINK=>0);
+    binmode $f; print $f $data or die "write $path: $!"; close $f or die "close $path: $!";
+    chmod((-e $path ? (stat($path))[2]&0777 : 0644),$name) or die "chmod $name: $!";
+    rename($name,$path) or die "rename $path: $!";
+}
+sub walk { my($root)=@_; my @paths; find({no_chdir=>1,wanted=>sub {push @paths,$File::Find::name if -f $_||-l $_}},$root) if -d $root; return sort @paths }
+sub rel { my($path,$root)=@_; $path =~ s/^\Q$root\E\/// or die "Outside $root: $path"; return $path }
+sub tag_end {
+    my($data,$start)=@_; my $quote=''; for(my $i=$start;$i<length($data);$i++) {my $c=substr($data,$i,1);
+        if(length $quote) {$quote='' if $c eq $quote} elsif($c eq chr(34)||$c eq chr(39)) {$quote=$c} elsif($c eq '>') {return $i+1} }
+    die "Unterminated XML tag at byte $start of ".length($data).": ".substr($data,$start,80);
+}
+sub xml {
+    my($data,$namespaces)=@_; my($root,@stack);
+    if($namespaces) {XML::Parser->new(Namespaces=>1,Handlers=>{Doctype=>sub {die 'DOCTYPE is not allowed'},ExternEnt=>sub {die 'External entities are not allowed'}})->parse($data)}
+    XML::Parser->new(Handlers=>{
+        Doctype=>sub {die 'DOCTYPE is not allowed'},ExternEnt=>sub {die 'External entities are not allowed'},
+        Start=>sub {my($p,$tag,%attrs)=@_; my $n={tag=>$tag,attrs=>\%attrs,start=>$p->current_byte,open=>tag_end($data,$p->current_byte),children=>[],text=>''};
+            if(@stack) {push @{$stack[-1]{children}},$n} else {$root=$n} push @stack,$n},
+        End=>sub {my($p)=@_; my $n=pop @stack; my $empty=substr($data,$n->{open}-2,2) eq '/>';
+            $n->{close}=$empty?$n->{open}:$p->current_byte; $n->{end}=$empty?$n->{open}:tag_end($data,$p->current_byte)},
+        Char=>sub {my($p,$text)=@_; $stack[-1]{text}.=$text if @stack},
+    })->parse($data); need($root,'Missing XML root'); return {data=>$data,root=>$root};
+}
+sub node_raw { my($doc,$node)=@_; return substr($doc->{data},$node->{start},$node->{end}-$node->{start}) }
+sub edit_xml { my($doc,$edits)=@_; my $data=$doc->{data}; for my $e(sort {$b->[0]<=>$a->[0]} @$edits) {substr($data,$e->[0],$e->[1]-$e->[0])=$e->[2]} xml($data,0); return $data }
+sub append_xml {
+    my($doc,$parent,$content)=@_; my $tag=$parent->{tag}; utf8::encode($tag) if utf8::is_utf8($tag);
+    return edit_xml($doc,[[substr($doc->{data},$parent->{open}-2,2) eq '/>' ?
+        ($parent->{open}-2,$parent->{open},">\n$content\n</$tag>") : ($parent->{close},$parent->{close},"$content\n")]]);
+}
+my($decoded,$overlay)=@ARGV; need(-d $decoded && -f "$decoded/AndroidManifest.xml","Missing decoded Settings manifest");
+my @sources=walk($overlay); need(scalar(@sources),"Missing/empty Settings payload overlay"); my(%writes,%resources);
+sub document {my($p)=@_; return xml(exists $writes{$p}?$writes{$p}:raw($p),0)}
+sub resource_key {my($n)=@_; my $kind=$n->{tag} eq "item"?$n->{attrs}{type}:$n->{tag}; my $name=$n->{attrs}{name}; need(defined($kind) && defined($name) && length($name) && $kind ne "public","Expected named non-public payload resource"); return "$kind\0$name"}
+for my $source(@sources) {
+    my $relative=rel($source,$overlay); my $target="$decoded/$relative"; my $data=raw($source);
+    if($source !~ /\.xml$/) {$writes{$target}=$data; next}
+    if($relative =~ m{^res/(values(?:-[^/]+)?)/[^/]+$}) {my $q=$1; my $payload=xml($data,0); need($payload->{root}{tag} eq "resources","Expected resources root: $relative");
+        for my $n(@{$payload->{root}{children}}) {my $key=resource_key($n); need(!exists $resources{$q}{$key},"Duplicate payload resource $relative"); $resources{$q}{$key}=[$target,node_raw($payload,$n)]} next}
+    if($data =~ /^\s*</) {xml($data,0); $writes{$target}=$data; next}
+    my($directive,$content)=split /\n/,$data,2;
+    need(defined($content) && -f $target && (($relative eq "AndroidManifest.xml" && $directive eq "/application>/i") ||
+        ($relative eq "res/xml/sec_top_level_settings.xml" && ($directive eq "/TopLevelAdvancedFeatures/a" || $directive eq "/sec_ic_settings_user_manual/i"))),"Unsupported/missing Settings injection target: $relative");
+    my $payload=xml("<payload>$content</payload>",0); my $doc=document($target); my $manifest=$relative eq "AndroidManifest.xml";
+    my $parent=$manifest?(grep {$_->{tag} eq "application"} @{$doc->{root}{children}})[0]:$doc->{root}; need($parent,"Missing manifest application");
+    my $attr=$manifest?"android:name":"android:key"; my(%owned,@edits,@pending);
+    for my $node(@{$payload->{root}{children}}) {my $identity=$node->{attrs}{$attr}; need(defined($identity) && length($identity) && !$owned{$identity}++,"Missing/duplicate injected identity: $relative");
+        my @matches=grep {($_->{attrs}{$attr}//"") eq $identity} @{$parent->{children}}; my $raw=node_raw($payload,$node);
+        if(@matches) {for my $i(0..$#matches) {push @edits,[$matches[$i]{start},$matches[$i]{end},$i==0?$raw:""]}} else {push @pending,$raw}}
+    $writes{$target}=edit_xml($doc,\@edits);
+    if(@pending) {$doc=document($target);
+        if($manifest) {$parent=(grep {$_->{tag} eq "application"} @{$doc->{root}{children}})[0]; $writes{$target}=append_xml($doc,$parent,join("\n",@pending))}
+        else {my $after=$directive =~ m{/a$}; my $marker=$after?"TopLevelAdvancedFeatures":"sec_ic_settings_user_manual";
+            my @matches=grep {my $n=$_; scalar grep {index($_,$marker)>=0} values %{$n->{attrs}}} @{$doc->{root}{children}};
+            need(@matches==1,"Expected one Settings anchor $marker, got ".scalar(@matches)); my $off=$after?$matches[0]{end}:$matches[0]{start};
+            $writes{$target}=edit_xml($doc,[[$off,$off,"\n".join("\n",@pending)."\n"]])}
+    }
+}
+for my $q(sort keys %resources) {
+    my %docs=map {$_=>document($_)} grep {/\.xml$/} walk("$decoded/res/$q"); my %matches;
+    for my $path(sort keys %docs) {my $doc=$docs{$path}; need($doc->{root}{tag} eq "resources","Expected resources root: $path");
+        for my $node(@{$doc->{root}{children}}) {next unless defined $node->{attrs}{name}; my $kind=$node->{tag} eq "item"?$node->{attrs}{type}:$node->{tag}; push @{$matches{"$kind\0$node->{attrs}{name}"}},[$path,$node]}}
+    my(%edits,%adds);
+    for my $key(sort keys %{$resources{$q}}) {my($target,$raw)=@{$resources{$q}{$key}}; my @found=@{$matches{$key}//[]};
+        if(@found) {for my $i(0..$#found) {my($path,$node)=@{$found[$i]}; push @{$edits{$path}},[$node->{start},$node->{end},$i==0?$raw:""]}} else {push @{$adds{$target}},$raw}}
+    for my $path(keys %edits) {$writes{$path}=edit_xml($docs{$path},$edits{$path})}
+    for my $path(keys %adds) {my $doc=exists($writes{$path}) || -f $path?document($path):xml("<resources/>",0); $writes{$path}=append_xml($doc,$doc->{root},join("\n",@{$adds{$path}}))}
+}
+for my $path(keys %writes) {xml($writes{$path},1) if $path =~ /\.xml$/}
+put($_,$writes{$_}) for sort keys %writes;
+PERL
+}
+if [[ "${BASH_SOURCE[0]}" == "$0" && "${1:-}" == "--inject" ]]; then
+    shift; SETTINGS_INJECT "$@"; exit $?
 fi
+
+# Refuse a missing/corrupt host parser before any Settings mutations.
+"${BASH_SOURCE[0]%/*}/../../../scripts/run_xml_perl.sh" --check || return 1
 
 # Show battery regulatory info in Settings
 # Requires SEM_BATTERY_PROPERTY_IC_AUTHENTICATION_RESULT support
@@ -24,341 +114,43 @@ SMALI_PATCH "system" "system/framework/framework.jar" \
 
 DECODE_APK "system" "system/priv-app/SecSettings/SecSettings.apk"
 
-# Add backend hooks for Settings toggles that live outside SecSettings.
-DECODE_APK "system" "system/framework/framework.jar"
-EVAL "mkdir -p \"$APKTOOL_DIR/system/framework/framework.jar/smali_classes6/io/mesalabs/unica\""
-EVAL "cp -f \"$MODPATH/framework.jar/FloatingFeatureHooks.smali\" \"$APKTOOL_DIR/system/framework/framework.jar/smali_classes6/io/mesalabs/unica/FloatingFeatureHooks.smali\""
-
-SMALI_PATCH "system" "system/framework/framework.jar" \
-    "smali_classes6/com/samsung/android/feature/SemFloatingFeature.smali" "replace" \
-    'getBoolean(Ljava/lang/String;)Z' \
-    '.locals 1' \
-    '.locals 2'
-SMALI_PATCH "system" "system/framework/framework.jar" \
-    "smali_classes6/com/samsung/android/feature/SemFloatingFeature.smali" "replace" \
-    'getBoolean(Ljava/lang/String;)Z' \
-    'iget-object p0, p0, Lcom/samsung/android/feature/SemFloatingFeature;->mFeatureList:Ljava/util/Hashtable;' \
-    'invoke-static {p1}, Lio/mesalabs/unica/FloatingFeatureHooks;->onGetBoolean(Ljava/lang/String;)Ljava/lang/Boolean;\n\n    move-result-object v1\n\n    if-eqz v1, :unica_ff_bool\n\n    invoke-virtual {v1}, Ljava/lang/Boolean;->booleanValue()Z\n\n    move-result p0\n\n    return p0\n\n    :unica_ff_bool\n    iget-object p0, p0, Lcom/samsung/android/feature/SemFloatingFeature;->mFeatureList:Ljava/util/Hashtable;'
-SMALI_PATCH "system" "system/framework/framework.jar" \
-    "smali_classes6/com/samsung/android/feature/SemFloatingFeature.smali" "replace" \
-    'getInt(Ljava/lang/String;)I' \
-    '.locals 1' \
-    '.locals 2'
-SMALI_PATCH "system" "system/framework/framework.jar" \
-    "smali_classes6/com/samsung/android/feature/SemFloatingFeature.smali" "replace" \
-    'getInt(Ljava/lang/String;)I' \
-    'iget-object p0, p0, Lcom/samsung/android/feature/SemFloatingFeature;->mFeatureList:Ljava/util/Hashtable;' \
-    'invoke-static {p1}, Lio/mesalabs/unica/FloatingFeatureHooks;->onGetInt(Ljava/lang/String;)Ljava/lang/Integer;\n\n    move-result-object v1\n\n    if-eqz v1, :unica_ff_int\n\n    invoke-virtual {v1}, Ljava/lang/Integer;->intValue()I\n\n    move-result p0\n\n    return p0\n\n    :unica_ff_int\n    iget-object p0, p0, Lcom/samsung/android/feature/SemFloatingFeature;->mFeatureList:Ljava/util/Hashtable;'
-SMALI_PATCH "system" "system/framework/framework.jar" \
-    "smali_classes6/com/samsung/android/feature/SemFloatingFeature.smali" "replace" \
-    'getString(Ljava/lang/String;)Ljava/lang/String;' \
-    '.locals 1' \
-    '.locals 2'
-SMALI_PATCH "system" "system/framework/framework.jar" \
-    "smali_classes6/com/samsung/android/feature/SemFloatingFeature.smali" "replace" \
-    'getString(Ljava/lang/String;)Ljava/lang/String;' \
-    'iget-object p0, p0, Lcom/samsung/android/feature/SemFloatingFeature;->mFeatureList:Ljava/util/Hashtable;' \
-    'invoke-static {p1}, Lio/mesalabs/unica/FloatingFeatureHooks;->onGetString(Ljava/lang/String;)Ljava/lang/String;\n\n    move-result-object v1\n\n    if-eqz v1, :unica_ff_string\n\n    move-object p0, v1\n\n    return-object p0\n\n    :unica_ff_string\n    iget-object p0, p0, Lcom/samsung/android/feature/SemFloatingFeature;->mFeatureList:Ljava/util/Hashtable;'
-
-SMALI_PATCH "system" "system/framework/services.jar" \
-    'smali_classes2/com/android/server/wm/WindowManagerService$SettingsObserver.smali' "replace" \
-    '<init>(Lcom/android/server/wm/WindowManagerService;)V' \
-    'disable_secure_windows' \
-    'unica_secure_ss'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    'smali_classes2/com/android/server/wm/WindowManagerService$SettingsObserver.smali' "replace" \
-    '<init>(Lcom/android/server/wm/WindowManagerService;)V' \
-    'invoke-static {v9}, Landroid/provider/Settings$Secure;->getUriFor(Ljava/lang/String;)Landroid/net/Uri;' \
-    'invoke-static {v9}, Landroid/provider/Settings$System;->getUriFor(Ljava/lang/String;)Landroid/net/Uri;'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    'smali_classes2/com/android/server/wm/WindowManagerService$SettingsObserver.smali' "replace" \
-    'updateDisableSecureWindows()V' \
-    'if-nez v0, :cond_0' \
-    'goto :cond_0'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    'smali_classes2/com/android/server/wm/WindowManagerService$SettingsObserver.smali' "replace" \
-    'updateDisableSecureWindows()V' \
-    'disable_secure_windows' \
-    'unica_secure_ss'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    'smali_classes2/com/android/server/wm/WindowManagerService$SettingsObserver.smali' "replace" \
-    'updateDisableSecureWindows()V' \
-    'invoke-static {v0, v2, v1}, Landroid/provider/Settings$Secure;->getIntForUser(Landroid/content/ContentResolver;Ljava/lang/String;I)I' \
-    'invoke-static {v0, v2, v1}, Landroid/provider/Settings$System;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I'
-
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali_classes2/com/android/server/wm/ScreenRecordingCallbackController.smali" "replace" \
-    'dispatchCallbacks(Landroid/util/ArraySet;Z)V' \
-    '.locals 5' \
-    '.locals 8'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali_classes2/com/android/server/wm/ScreenRecordingCallbackController.smali" "replace" \
-    'dispatchCallbacks(Landroid/util/ArraySet;Z)V' \
-    'invoke-virtual {p1}, Landroid/util/ArraySet;->isEmpty()Z' \
-    'iget-object v5, p0, Lcom/android/server/wm/ScreenRecordingCallbackController;->mWms:Lcom/android/server/wm/WindowManagerService;\n\n    iget-object v5, v5, Lcom/android/server/wm/WindowManagerService;->mContext:Landroid/content/Context;\n\n    invoke-virtual {v5}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;\n\n    move-result-object v5\n\n    const-string v6, "unica_ss_detection"\n\n    const/4 v7, 0x0\n\n    invoke-static {v5, v6, v7}, Landroid/provider/Settings$System;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I\n\n    move-result v5\n\n    if-eqz v5, :unica_ss_detection_callbacks\n\n    const/4 p2, 0x0\n\n    :unica_ss_detection_callbacks\n    invoke-virtual {p1}, Landroid/util/ArraySet;->isEmpty()Z'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali_classes2/com/android/server/wm/WindowManagerService.smali" "replace" \
-    'notifyScreenshotListeners(I)Ljava/util/List;' \
-    '.locals 4' \
-    '.locals 7'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali_classes2/com/android/server/wm/WindowManagerService.smali" "replace" \
-    'notifyScreenshotListeners(I)Ljava/util/List;' \
-    'iget-object v0, p0, Lcom/android/server/wm/WindowManagerService;->mGlobalLock:Lcom/android/server/wm/WindowManagerGlobalLock;' \
-    'iget-object v4, p0, Lcom/android/server/wm/WindowManagerService;->mContext:Landroid/content/Context;\n\n    invoke-virtual {v4}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;\n\n    move-result-object v4\n\n    const-string v5, "unica_ss_detection"\n\n    const/4 v6, 0x0\n\n    invoke-static {v4, v5, v6}, Landroid/provider/Settings$System;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I\n\n    move-result v4\n\n    if-eqz v4, :unica_ss_detection_notify\n\n    invoke-static {}, Ljava/util/Collections;->emptyList()Ljava/util/List;\n\n    move-result-object p0\n\n    return-object p0\n\n    :unica_ss_detection_notify\n    const/4 v2, 0x1\n\n    iget-object v0, p0, Lcom/android/server/wm/WindowManagerService;->mGlobalLock:Lcom/android/server/wm/WindowManagerGlobalLock;'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali_classes2/com/android/server/wm/WindowManagerService.smali" "replace" \
-    'registerScreenRecordingCallback(Landroid/window/IScreenRecordingCallback;)Z' \
-    '.locals 8' \
-    '.locals 11'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali_classes2/com/android/server/wm/WindowManagerService.smali" "replace" \
-    'registerScreenRecordingCallback(Landroid/window/IScreenRecordingCallback;)Z' \
-    'iget-object p0, p0, Lcom/android/server/wm/WindowManagerService;->mScreenRecordingCallbackController:Lcom/android/server/wm/ScreenRecordingCallbackController;' \
-    'iget-object v8, p0, Lcom/android/server/wm/WindowManagerService;->mContext:Landroid/content/Context;\n\n    invoke-virtual {v8}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;\n\n    move-result-object v8\n\n    const-string v9, "unica_ss_detection"\n\n    const/4 v10, 0x0\n\n    invoke-static {v8, v9, v10}, Landroid/provider/Settings$System;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I\n\n    move-result v8\n\n    if-eqz v8, :unica_ss_detection_register\n\n    return v10\n\n    :unica_ss_detection_register\n    iget-object p0, p0, Lcom/android/server/wm/WindowManagerService;->mScreenRecordingCallbackController:Lcom/android/server/wm/ScreenRecordingCallbackController;'
-
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali_classes2/com/android/server/pm/PackageManagerService.smali" "replace" \
-    'verifyReplacingVersionCode(Landroid/content/pm/PackageInfoLite;JI)Landroid/util/Pair;' \
-    'invoke-virtual {v2}, Ljava/lang/Object;->getClass()Ljava/lang/Class;' \
-    'invoke-virtual {v2}, Ljava/lang/Object;->getClass()Ljava/lang/Class;\n\n    iget-object v12, v2, Lcom/android/server/pm/InstallPackageHelper;->mContext:Landroid/content/Context;\n\n    invoke-virtual {v12}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;\n\n    move-result-object v12\n\n    const-string v13, "unica_allow_downgrade"\n\n    const/4 v14, 0x0\n\n    invoke-static {v12, v13, v14}, Landroid/provider/Settings$System;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I\n\n    move-result v12\n\n    if-eqz v12, :unica_allow_downgrade\n\n    const v12, 0x100080\n\n    or-int/2addr v3, v12\n\n    :unica_allow_downgrade'
-# Allow installing apps below MIN_INSTALLABLE_TARGET_SDK unless "unica_allow_sdkbypass" is set to 0 (on by default,
-# so users can install old apps out of the box; the UN1CA Settings switch reads the same default).
-# Registers/labels differ per source build: anchor on the MIN_INSTALLABLE_TARGET_SDK check,
-# append three registers past .locals and resolve the low register holding "this".
-INSTALL_HELPER_SMALI="$(cd "$APKTOOL_DIR/system/framework/services.jar" && \
-    find . -path "./smali*/com/android/server/pm/InstallPackageHelper.smali" | sed "s|^\./||")"
-if [ ! "$INSTALL_HELPER_SMALI" ] || ! python3 - "$APKTOOL_DIR/system/framework/services.jar/$INSTALL_HELPER_SMALI" <<'PYEOF'
-import re, sys
-path = sys.argv[1]
-src = open(path).read()
-sig = ".method public final preparePackage(Lcom/android/server/pm/InstallRequest;)V\n"
-start = src.find(sig)
-end = src.find("\n.end method", start)
-if start < 0 or end < 0 or src.count(sig) != 1:
-    sys.exit("preparePackage(InstallRequest) not found")
-body = src[start:end]
-if "unica_allow_sdkbypass" in body:
-    sys.exit(0)
-locals_m = re.search(r"\n    \.locals (\d+)\n", body)
-this_m = re.search(r"\n    move-object(?:/from16)? (v\d+), p0\n", body)
-gate = re.compile(
-    r"\n    if-nez (v\d+), (:cond_\w+)\n"
-    r"(?=\n    invoke-interface \{v\d+\}, Lcom/android/internal/pm/parsing/pkg/ParsedPackage;->getTargetSdkVersion\(\)I\n"
-    r"\n    move-result \1\n"
-    r"\n    sget v\d+, Lcom/android/server/pm/PackageManagerService;->MIN_INSTALLABLE_TARGET_SDK:I\n)")
-hits = gate.findall(body)
-if not locals_m or not this_m or len(hits) != 1:
-    sys.exit("unexpected preparePackage shape (locals=%s this=%s gates=%d)" % (bool(locals_m), bool(this_m), len(hits)))
-n = int(locals_m.group(1))
-flag, label = hits[0]
-this = this_m.group(1)
-if int(flag[1:]) > 15 or int(this[1:]) > 15:
-    sys.exit("preparePackage registers out of iget-object range")
-r0, r1, r2 = "v%d" % n, "v%d" % (n + 1), "v%d" % (n + 2)
-hook = (
-    "\n    if-nez %(flag)s, %(label)s\n"
-    "\n    iget-object %(flag)s, %(this)s, Lcom/android/server/pm/InstallPackageHelper;->mContext:Landroid/content/Context;\n"
-    "\n    invoke-virtual {%(flag)s}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;\n"
-    "\n    move-result-object %(r0)s\n"
-    "\n    const-string %(r1)s, \"unica_allow_sdkbypass\"\n"
-    "\n    const/16 %(r2)s, 0x1\n"
-    "\n    invoke-static/range {%(r0)s .. %(r2)s}, Landroid/provider/Settings$System;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I\n"
-    "\n    move-result %(r0)s\n"
-    "\n    if-nez %(r0)s, %(label)s\n"
-) % dict(flag=flag, label=label, this=this, r0=r0, r1=r1, r2=r2)
-body = gate.sub(lambda m: hook, body, count=1)
-body = body.replace("\n    .locals %d\n" % n, "\n    .locals %d\n" % (n + 3), 1)
-open(path, "w").write(src[:start] + body + src[end:])
-print("    - Patched SDK bypass in preparePackage (.locals %d -> %d, gate %s/%s)" % (n, n + 3, flag, label))
-PYEOF
-then
-    ABORT "Failed to patch InstallPackageHelper.preparePackage SDK bypass"
+# Disable stock OTA references
+if [ ! -f "$WORK_DIR/system/system/priv-app/ChoiDujour/ChoiDujour.apk" ]; then
+    APPLY_PATCH "system" "system/priv-app/SecSettings/SecSettings.apk" \
+        "$MODPATH/ota/SecSettings.apk/0001-Hide-unsupported-stock-OTA.patch"
 fi
-unset INSTALL_HELPER_SMALI
-
-ASKS_SMALI="$APKTOOL_DIR/system/framework/services.jar/smali/com/android/server/asks/ASKSManagerService.smali"
-ASKS_POLICY_METHOD='getUnknownAppsDataFromXML(ILjava/util/ArrayList;Ljava/util/HashMap;Z)V'
-if ! sed -n '/^\.method.*getUnknownAppsDataFromXML(/,/^\.end method/p' "$ASKS_SMALI" | \
-        grep -q 'ro.build.official.release'; then
-    ASKS_POLICY_METHOD='getPolicyFilePath(IZ)Ljava/lang/String;'
-fi
-# Some One UI 9 builds (e.g. S25) moved the body of refreshInstalledUnknownList_NEW()
-# into a locked refreshInstalledUnknownList_NEWInner() helper
-ASKS_REFRESH_METHOD='refreshInstalledUnknownList_NEW()V'
-if ! sed -n '/^\.method.* refreshInstalledUnknownList_NEW()V/,/^\.end method/p' "$ASKS_SMALI" | \
-        grep -q 'ro.build.official.release'; then
-    ASKS_REFRESH_METHOD='refreshInstalledUnknownList_NEWInner()V'
-fi
-
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali/com/android/server/asks/ASKSManagerService.smali" "replace" \
-    "$ASKS_POLICY_METHOD" \
-    'ro.build.official.release' \
-    'persist.sys.unica.asks'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali/com/android/server/asks/ASKSManagerService.smali" "replace" \
-    "$ASKS_POLICY_METHOD" \
-    'false' \
-    'true'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali/com/android/server/asks/ASKSManagerService.smali" "replace" \
-    "$ASKS_REFRESH_METHOD" \
-    'ro.build.official.release' \
-    'persist.sys.unica.asks'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali/com/android/server/asks/ASKSManagerService.smali" "replace" \
-    "$ASKS_REFRESH_METHOD" \
-    'false' \
-    'true'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali/com/android/server/asks/ASKSManagerService.smali" "replace" \
-    'verifyASKStokenForPackage(Ljava/lang/String;Ljava/lang/String;J[Landroid/content/pm/Signature;Ljava/lang/String;Ljava/lang/String;Z)I' \
-    'ro.build.official.release' \
-    'persist.sys.unica.asks'
-SMALI_PATCH "system" "system/framework/services.jar" \
-    "smali/com/android/server/asks/ASKSManagerService.smali" "replace" \
-    'verifyASKStokenForPackage(Ljava/lang/String;Ljava/lang/String;J[Landroid/content/pm/Signature;Ljava/lang/String;Ljava/lang/String;Z)I' \
-    'invoke-static {v6}, Landroid/os/SystemProperties;->get(Ljava/lang/String;)Ljava/lang/String;' \
-    'const-string/jumbo v10, "true"\n\n    invoke-static {v6, v10}, Landroid/os/SystemProperties;->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;'
-unset ASKS_SMALI ASKS_POLICY_METHOD ASKS_REFRESH_METHOD
 
 LOG_STEP_IN "- Adding UN1CA Settings"
 
-# Dynamically patch SecSettings
-# - Add missing/non-xml files in place
-# - Patch existing files
-#   - Use the first line of the file to tell sed how to apply the rest of the content
-#   - Exception made for files under *res/values* where the "resources" tag gets nuked
-while IFS= read -r f; do
-    f="${f//$MODPATH\/SecSettings.apk\//}"
+# Payload text is never embedded in shell/sed commands. The local injector
+# validates literal XML and handles the historical first-line directives.
+SETTINGS_INJECT "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk" "$MODPATH/SecSettings.apk" || return 1
 
-    if [ ! -f "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk/$f" ] || \
-            [[ "$f" != *".xml" ]]; then
-        LOG "- Adding \"$f\" to /system/system/priv-app/SecSettings.apk"
-        EVAL "mkdir -p \"$(dirname "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk/$f")\""
-        EVAL "cp -a \"$MODPATH/SecSettings.apk/${f//\$/\\$}\" \"$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk/${f//\$/\\$}\""
-    else
-        LOG "- Patching \"$f\" in /system/system/priv-app/SecSettings.apk"
-        if [[ "$f" == *"res/values"* ]]; then
-            PATCH_INST="/<\/resources>/i"
-            CONTENT="$(sed -e "/?xml/d" -e "/resources>/d" "$MODPATH/SecSettings.apk/$f")"
-        else
-            PATCH_INST="$(head -n 1 "$MODPATH/SecSettings.apk/$f")"
-            CONTENT="$(tail -n +2 "$MODPATH/SecSettings.apk/$f")"
-        fi
-        CONTENT="$(sed -e "s/\"/\\\\\"/g" -e "s/\\$/\\\\$/g" -e "s/ /\\\ /g" -e "s/\\\\n/\\\\\\\\\n/g" <<< "$CONTENT")"
-        CONTENT="$(sed -E ':a;N;$!ba;s/\r{0,1}\n/\\n/g' <<< "$CONTENT")"
-        EVAL "sed -i \"$PATCH_INST $CONTENT\" \"$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk/$f\""
-    fi
-done < <(find "$MODPATH/SecSettings.apk" -type f)
-
-# The hand-written controllers (src/, compiled by src/build.sh against stubs of this SecSettings build) call methods of
-# a minified app: if a source firmware renames one, Settings would crash when the page opens. Check every reference now.
-python3 - "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk" "$MODPATH/SecSettings.apk" \
-    $(find "$MODPATH/SecSettings.apk" -path "*io/mesalabs/unica/settings/ui/GpuDriver*.smali") << 'PYEOF' \
-    || ABORT "SecSettings: a UN1CA controller references a method this SecSettings build does not have"
-import glob, os, re, sys
-apk, mod, files = sys.argv[1], sys.argv[2], sys.argv[3:]
-idx = {}
-for root in (apk, mod):
-    for p in glob.glob(root + "/smali*/**/*.smali", recursive=True):
-        cls = p.split("/smali", 1)[1].split("/", 1)[1][:-6]
-        idx.setdefault(cls, p)
-def info(cls):
-    s = open(idx[cls]).read()
-    sup = re.search(r"^\.super L([^;]+);", s, re.M)
-    meths = set(m.group(1) + m.group(2) for m in re.finditer(r"^\.method [^\n]*? ([^ (]+)(\([^\n]*)$", s, re.M))
-    fields = set(m.group(1) for m in re.finditer(r"^\.field [^\n]*? ([^ :]+):", s, re.M))
-    return (sup.group(1) if sup else None), meths, fields
-bad = 0
-refs = set()
-for f in files:
-    refs |= set(re.findall(r"L([^;\s]+);->([^\s]+)", open(f).read()))
-for cls, mem in sorted(refs):
-    if cls.startswith(("android/", "java/", "dalvik/")) or cls.startswith("io/mesalabs/unica/settings/ui/GpuDriver"):
-        continue
-    c, ok, chain = cls, False, []
-    while c and c in idx:
-        sup, meths, fields = info(c)
-        if ("(" in mem and mem in meths) or ("(" not in mem and mem.split(":")[0] in fields):
-            ok = True; break
-        chain.append(c); c = sup
-    fw = c and not c in idx  # walked into a framework superclass
-    print(("OK   " if ok else ("FW?  " if fw else "MISS ")) + cls + "->" + mem + ("" if ok else "  (chain: %s -> %s)" % (" > ".join(chain), c)))
-    bad += 0 if ok or fw else 1
-sys.exit(1 if bad else 0)
-PYEOF
-
-# The SecDisplayUtils refresh-rate helpers take a Context on some One UI 9 builds (Fold8)
-# but not on others (S25): match the ForceMaxRefreshRate controller calls to the source.
-SEC_DISPLAY_UTILS="$(cd "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk" && \
-    find . -path "./smali*/com/samsung/android/settings/display/SecDisplayUtils.smali" | sed "s|^\./||")"
-FORCE_MAX_RR="$(cd "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk" && \
-    find . -path "./smali*/io/mesalabs/unica/settings/ui/ForceMaxRefreshRatePreferenceController.smali" | sed "s|^\./||")"
-if [ "$SEC_DISPLAY_UTILS" ] && [ "$FORCE_MAX_RR" ]; then
-    SEC_DISPLAY_UTILS="$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk/$SEC_DISPLAY_UTILS"
-    FORCE_MAX_RR="$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk/$FORCE_MAX_RR"
-    if ! grep -q "^\.method.* getHighRefreshRateSeamlessType(Landroid/content/Context;I)I" "$SEC_DISPLAY_UTILS" && \
-            grep -q "^\.method.* getHighRefreshRateSeamlessType(I)I" "$SEC_DISPLAY_UTILS"; then
-        LOG "- Using getHighRefreshRateSeamlessType(I)I in ForceMaxRefreshRatePreferenceController"
-        EVAL "sed -i 's|invoke-static {p2, p1}, Lcom/samsung/android/settings/display/SecDisplayUtils;->getHighRefreshRateSeamlessType(Landroid/content/Context;I)I|invoke-static {p1}, Lcom/samsung/android/settings/display/SecDisplayUtils;->getHighRefreshRateSeamlessType(I)I|' \"$FORCE_MAX_RR\""
-    fi
-    if ! grep -q "^\.method.* getHighRefreshRateMaxValue(Landroid/content/Context;)I" "$SEC_DISPLAY_UTILS" && \
-            grep -q "^\.method.* getHighRefreshRateMaxValue()I" "$SEC_DISPLAY_UTILS"; then
-        LOG "- Using getHighRefreshRateMaxValue()I in ForceMaxRefreshRatePreferenceController"
-        EVAL "sed -i 's|invoke-static {p2}, Lcom/samsung/android/settings/display/SecDisplayUtils;->getHighRefreshRateMaxValue(Landroid/content/Context;)I|invoke-static {}, Lcom/samsung/android/settings/display/SecDisplayUtils;->getHighRefreshRateMaxValue()I|' \"$FORCE_MAX_RR\""
-    fi
-    for SDU_CALL in $(grep -o "SecDisplayUtils;->[A-Za-z0-9_]*([^)]*)[^ ]*" "$FORCE_MAX_RR" | sed "s/SecDisplayUtils;->//" | sort -u); do
-        grep -q -F -- " $SDU_CALL" <(grep "^\.method" "$SEC_DISPLAY_UTILS") || \
-            ABORT "SecDisplayUtils;->$SDU_CALL used by ForceMaxRefreshRatePreferenceController is missing in the source SecSettings"
+# Keep the Android 17 search registry and native Settings-owned switch layout.
+for SETTINGS_ARCHIVE in SecSettings SecSettingsIntelligence; do
+    for SETTINGS_PATCH in "$MODPATH/patches/$SETTINGS_ARCHIVE.apk/"*.patch; do
+        APPLY_PATCH "system" "system/priv-app/$SETTINGS_ARCHIVE/$SETTINGS_ARCHIVE.apk" "$SETTINGS_PATCH"
     done
-fi
-unset SEC_DISPLAY_UTILS FORCE_MAX_RR SDU_CALL
-
-# Settings > Display > Screen resolution (io.mesalabs.unica.settings.display): Samsung's Screen zoom only has
-# WQHD/FHD/HD density ladders, so at 540p it would offer the HD+ densities (UI 4/3 too big). Swallow the
-# Screen zoom click there with a toast; at Native/HD+ its ladders match our width-scaled densities.
-if ! grep -q -r "ScreenResolutionUtils;->blockScreenZoomClick" \
-        "$APKTOOL_DIR/system/priv-app/SecSettings/SecSettings.apk/"smali*/com/samsung/android/settings/display/controller/SecScreenSizePreferenceController.smali; then
-    SMALI_PATCH "system" "system/priv-app/SecSettings/SecSettings.apk" \
-        "smali_classes3/com/samsung/android/settings/display/controller/SecScreenSizePreferenceController.smali" "replace" \
-        'handlePreferenceTreeClick(Landroidx/preference/Preference;)Z' \
-        'invoke-virtual {p0}, Lcom/android/settings/core/BasePreferenceController;->getPreferenceKey()Ljava/lang/String;' \
-        '    invoke-static {p0, p1}, Lio/mesalabs/unica/settings/display/ScreenResolutionUtils;->blockScreenZoomClick(Lcom/android/settings/core/BasePreferenceController;Landroidx/preference/Preference;)Z\n\n    move-result v0\n\n    if-eqz v0, :unica_screen_zoom_allowed\n\n    const/4 p0, 0x1\n\n    return p0\n\n    :unica_screen_zoom_allowed\n    invoke-virtual {p0}, Lcom/android/settings/core/BasePreferenceController;->getPreferenceKey()Ljava/lang/String;' \
-        > /dev/null
-fi
-
-# Add UN1CA Settings SearchIndexableData registrations
-LOG "- Patching \"smali_classes2/com/android/settings/search/SearchFeatureProviderImpl\$\$ExternalSyntheticLambda0.smali\" in /system/system/priv-app/SecSettings.apk"
-SMALI_PATCH "system" "system/priv-app/SecSettings/SecSettings.apk" \
-    "smali_classes2/com/android/settings/search/SearchFeatureProviderImpl\$\$ExternalSyntheticLambda0.smali" "replace" \
-    'invoke()Ljava/lang/Object;' \
-    'return-object p0' \
-    '    invoke-static {p0}, Lio/mesalabs/unica/search/UnicaSearchIndexableResources;->register(Lcom/android/settingslib/search/SearchIndexableResourcesBase;)V\n\n    return-object p0' \
-    > /dev/null
-
-DECODE_APK "system" "system/priv-app/SecSettingsIntelligence/SecSettingsIntelligence.apk"
-LOG "- Patching \"smali_classes2/com/samsung/android/settings/intelligence/search/categorizing/TopLevelKeysCollector.smali\" in /system/system/priv-app/SecSettingsIntelligence/SecSettingsIntelligence.apk"
-SMALI_PATCH "system" "system/priv-app/SecSettingsIntelligence/SecSettingsIntelligence.apk" \
-    "smali_classes2/com/samsung/android/settings/intelligence/search/categorizing/TopLevelKeysCollector.smali" "replace" \
-    '<init>(Landroid/content/Context;)V' \
-    '.locals 37' \
-    '.locals 38' \
-    > /dev/null
-SMALI_PATCH "system" "system/priv-app/SecSettingsIntelligence/SecSettingsIntelligence.apk" \
-    "smali_classes2/com/samsung/android/settings/intelligence/search/categorizing/TopLevelKeysCollector.smali" "replace" \
-    '<init>(Landroid/content/Context;)V' \
-    'filled-new-array/range {v1 .. v36}, [Ljava/lang/String;' \
-    '    const-string v37, "top_level_unica"\n\n    filled-new-array/range {v1 .. v37}, [Ljava/lang/String;' \
-    > /dev/null
+done
 
 # Show Vulkan renderer toggle if required
-# (a target may already have chosen the default, e.g. a52sxq/patches/hwui_vulkan_default sets it to true)
-if [[ "$(GET_PROP "vendor" "ro.hwui.use_vulkan")" != "true" ]] && [[ -z "$(GET_PROP "system" "persist.sys.unica.vulkan")" ]]; then
+if [[ "$(GET_PROP "ro.hwui.use_vulkan")" != "true" ]]; then
     SET_PROP "system" "persist.sys.unica.vulkan" "false"
 fi
 
-unset PATCH_INST CONTENT
+# Apply these before the safety overlay, preserving the existing build order.
+# The module runner will discover smali/ automatically after customize.sh, so
+# these explicitly ordered patches remain under patches/ instead.
+for SETTINGS_ARCHIVE in "system/framework/framework.jar" "system/framework/services.jar" \
+        "system/priv-app/MultiSoundSetting/MultiSoundSetting.apk"; do
+    APPLY_SMALI_PATCHES "$MODPATH/patches/smali" "$SETTINGS_ARCHIVE"
+done
+
+(
+    MODPATH="$MODPATH/safety_center"
+    source "$MODPATH/customize.sh"
+) || return 1
+
+unset SETTINGS_ARCHIVE SETTINGS_PATCH
 
 LOG_STEP_OUT

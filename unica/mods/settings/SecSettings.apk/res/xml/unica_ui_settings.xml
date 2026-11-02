@@ -2,18 +2,9 @@
 <PreferenceScreen android:title="@string/unica_ui_settings_title" settings:hierarchicalParentFragment="io.mesalabs.unica.settings.UnicaSettingsFragment" settings:topLevelPreferenceKey="unica_ui_settings"
   xmlns:android="http://schemas.android.com/apk/res/android" xmlns:settings="http://schemas.android.com/apk/res-auto">
     <SecSwitchPreference android:title="@string/unica_native_blur_title" android:key="unica_native_blur" settings:controller="io.mesalabs.unica.settings.ui.LiveBlurPreferenceController" />
+    <SecDropDownPreference android:title="@string/unica_launcher_anim_type_title" android:key="unica_launcher_anim_type" android:summary="%s" settings:controller="io.mesalabs.unica.settings.ui.LauncherAnimationTypePreferenceController" />
     <com.samsung.android.settings.widget.SecInsetCategoryPreference />
     <SecSwitchPreference android:title="@string/unica_vulkan_title" android:key="unica_vulkan" android:summary="@string/unica_vulkan_summary" settings:controller="io.mesalabs.unica.settings.ui.VulkanPreferenceController" />
-    <com.samsung.android.settings.widget.SecInsetCategoryPreference />
-    <SecPreference android:title="@string/k4_gpu_driver_active_title" android:key="k4_gpu_driver_active" android:selectable="false" />
-    <SecDropDownPreference android:title="@string/k4_gpu_driver_title" android:key="k4_gpu_driver" android:entries="@array/k4_gpu_driver_entries" android:entryValues="@array/k4_gpu_driver_values" android:persistent="false" settings:controller="io.mesalabs.unica.settings.ui.GpuDriverPreferenceController" />
-    <com.android.settingslib.widget.BannerMessagePreference android:title="@string/k4_gpu_driver_restart_title" android:key="k4_gpu_driver_restart" settings:isPreferenceVisible="false" />
-    <SecPreference android:title="@string/k4_gpu_driver_add_title" android:key="k4_gpu_driver_add" android:summary="@string/k4_gpu_driver_add_summary" android:persistent="false">
-        <intent android:action="io.mesalabs.unica.action.GPU_DRIVER_ADD" android:targetPackage="com.android.settings" android:targetClass="io.mesalabs.unica.settings.ui.GpuDriverActivity" />
-    </SecPreference>
-    <SecPreference android:title="@string/k4_gpu_driver_remove_pref_title" android:key="k4_gpu_driver_remove" android:persistent="false" settings:isPreferenceVisible="false">
-        <intent android:action="io.mesalabs.unica.action.GPU_DRIVER_REMOVE" android:targetPackage="com.android.settings" android:targetClass="io.mesalabs.unica.settings.ui.GpuDriverActivity" />
-    </SecPreference>
     <com.samsung.android.settings.widget.SecInsetCategoryPreference />
     <SecSwitchPreference android:title="@string/unica_max_refresh_rate_title" android:key="unica_max_refresh_rate" settings:controller="io.mesalabs.unica.settings.ui.ForceMaxRefreshRatePreferenceController" />
     <com.samsung.android.settings.widget.SecInsetCategoryPreference />
