@@ -98,13 +98,16 @@ jobs:
           DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
             attr ccache clang ffmpeg libbrotli-dev libbz2-dev \
             libgtest-dev libprotobuf-dev libunwind-dev libpcre2-dev \
-            libzstd-dev linux-modules-extra-$(uname -r) lld protobuf-compiler webp \
-            libxml-parser-perl
-          sudo modprobe erofs f2fs
+            libzstd-dev lld protobuf-compiler webp libxml-parser-perl
+          DEBIAN_FRONTEND=noninteractive sudo apt install -yq linux-modules-extra-azure || true
+          sudo modprobe erofs 2>/dev/null || true
+          sudo modprobe f2fs 2>/dev/null || true
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          echo -n "${{ secrets.PLATFORM_KEY_PK8 }}" | base64 --decode > security/unica_platform.pk8
-          echo -n "${{ secrets.PLATFORM_KEY_PEM }}" | base64 --decode > security/unica_platform.x509.pem
+          if [ -n "${{ secrets.PLATFORM_KEY_PK8 }}" ]; then
+            echo -n "${{ secrets.PLATFORM_KEY_PK8 }}" | base64 --decode > security/unica_platform.pk8
+            echo -n "${{ secrets.PLATFORM_KEY_PEM }}" | base64 --decode > security/unica_platform.x509.pem
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
