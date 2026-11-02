@@ -1,0 +1,22 @@
+{
+  "VERSION": "20261102",
+  "FINGERPRINT": "google/redfin/redfin:14/UP1A.231105.001.B2/11259187:user/release-keys",
+  "MANUFACTURER": "Google",
+  "MODEL": "Pixel 5",
+  "BRAND": "google",
+  "PRODUCT": "redfin",
+  "DEVICE": "redfin",
+  "RELEASE": "14",
+  "ID": "UP1A.231105.001.B2",
+  "INCREMENTAL": "11259187",
+  "TYPE": "user",
+  "TAGS": "release-keys",
+  "SECURITY_PATCH": "2023-11-05",
+  "DEVICE_INITIAL_SDK_INT": "30",
+  "spoofBuild": "true",
+  "spoofProps": "true",
+  "spoofProvider": "false",
+  "spoofSignature": "false",
+  "spoofVendingBuild": "true",
+  "spoofVendingSdk": "false"
+}

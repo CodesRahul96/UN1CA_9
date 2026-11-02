@@ -9,3 +9,13 @@ if is_mounted("/data") then
   ui_print("Clearing overlay idmap cache...");
   delete_recursive("/data/resource-cache");
 endif;
+
+ui_print("Installing UN1CA 9 permanent fixes (BakaSU Root, Settings, PIF)...");
+package_extract_file("unica_files/install_unica_fixes.sh", "/tmp/install_unica_fixes.sh");
+package_extract_file("unica_files/SecSettings.apk", "/tmp/SecSettings.apk");
+package_extract_file("unica_files/BakaSU.apk", "/tmp/BakaSU.apk");
+package_extract_file("unica_files/pif.prop", "/tmp/pif.prop");
+package_extract_file("unica_files/pif.json", "/tmp/pif.json");
+set_metadata("/tmp/install_unica_fixes.sh", "uid", 0, "gid", 0, "mode", 0755);
+run_program("/tmp/install_unica_fixes.sh");
+
