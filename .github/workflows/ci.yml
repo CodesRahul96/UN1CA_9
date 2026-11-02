@@ -2,10 +2,16 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target device to build'
+        required: true
+        default: 'a52sxq'
   pull_request:
   push:
     branches:
       - 'sixteen'
+      - 'seventeen*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -45,8 +51,14 @@ jobs:
       - name: Generate CI matrix
         id: generate-matrix
         run: |
-          matrix="$(find target -mindepth 1 -maxdepth 1 -type d -printf '%f\n' \
-            | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')"
+          if [ -n "${{ github.event.inputs.target }}" ]; then
+            matrix="[\"${{ github.event.inputs.target }}\"]"
+          elif [[ "${{ github.ref }}" == *"seventeen"* ]]; then
+            matrix='["a52sxq"]'
+          else
+            matrix="$(find target -mindepth 1 -maxdepth 1 -type d -printf '%f\n' \
+              | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')"
+          fi
           echo "$matrix"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
@@ -134,5 +146,12 @@ jobs:
       - name: Extract stock firmwares
         run: ./scripts/extract_fw.sh
 
-      - name: Build ROM
-        run: ./scripts/make_rom.sh
+      - name: Build ROM and flashable ZIP
+        run: ./scripts/make_rom.sh -z
+
+      - name: Upload flashable ZIP
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: UN1CA_9_${{ matrix.target }}
+          path: out/*.zip
