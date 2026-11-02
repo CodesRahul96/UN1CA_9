@@ -162,6 +162,10 @@ for i in "${FIRMWARES[@]}"; do
     if [ -n "$DIRECT_URL" ]; then
         LOG "- Downloading firmware from direct URL: $DIRECT_URL"
         curl -L --fail --retry 3 -o "$ODIN_DIR/${MODEL}_${CSC}/firmware.zip" "$DIRECT_URL" || exit 1
+    elif [[ "$MODEL" == "SM-S948B"* ]]; then
+        LOG "\033[0;31m! SM-S948B (Galaxy S26 Ultra) is an unreleased internal test firmware and cannot be downloaded via Samsung public FUS servers.\033[0m"
+        LOG "\033[0;31m! Please set SOURCE_FW_URL (direct download link) or run locally with pre-extracted firmware.\033[0m"
+        exit 1
     else
         # Anan's samloader stores its logs in the current working directory, let's move into OUT_DIR just for this time
         (
