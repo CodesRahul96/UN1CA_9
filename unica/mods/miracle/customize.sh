@@ -1,8 +1,5 @@
 if [ ! "$(GET_PROP "system" "ro.unica.codename")" ]; then
-    # Match latest Samsung's flagship device codename
-    ROM_CODENAME="$(basename "$MODPATH")"
-    SET_PROP "system" "ro.unica.codename" "${ROM_CODENAME^}"
-    unset ROM_CODENAME
+    SET_PROP "system" "ro.unica.codename" "9"
 fi
 
 LOG_STEP_IN "- Enabling portable Miracle floating features"

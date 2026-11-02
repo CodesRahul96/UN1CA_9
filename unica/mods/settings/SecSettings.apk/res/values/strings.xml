@@ -52,11 +52,11 @@
     <string name="unica_rom_version_summary">UN1CA 9</string>
     <string name="unica_rom_version_title">UN1CA version</string>
     <string name="unica_secure_ss_title">Allow secure screenshot</string>
-    <string name="unica_settings_title">UN1CA 9 Settings</string>
+    <string name="unica_settings_title">UN1CA Settings</string>
     <string name="unica_ss_detection_title">Disable screen capture detection</string>
     <string name="unica_spoof_settings_title">Spoof settings</string>
     <string name="unica_ui_settings_title">UI settings</string>
-    <string name="unica_updates_title">UN1CA 9 Updates</string>
+    <string name="unica_updates_title">UN1CA Updates</string>
     <string name="unica_vulkan_summary">This is unstable and might cause issues!</string>
     <string name="unica_vulkan_title">Enable Vulkan renderer</string>
 </resources>
