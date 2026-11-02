@@ -177,10 +177,10 @@ PRINT_HEADER()
     echo    'ui_print(" ");'
     PRINT_SEPARATOR
     echo -n 'ui_print("'
-    echo -n "K4_UN1CA $ROM_VERSION for $TARGET_NAME"
+    echo -n "UN1CA 9 $ROM_VERSION for $TARGET_NAME"
     echo    '");'
-    echo    'ui_print("K4 fork by kusti420 - based on UN1CA");'
-    echo    'ui_print("UN1CA coded by salvo_giangri @XDAforums");'
+    echo    'ui_print("One UI 9 Experience for Galaxy A52s 5G");'
+    echo    'ui_print("Powered by UN1CA | salvo_giangri & contributors");'
     PRINT_SEPARATOR
     echo -n 'ui_print("'
     echo -n "One UI version: $ONEUI_VERSION"

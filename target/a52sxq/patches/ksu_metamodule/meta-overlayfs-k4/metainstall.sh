@@ -74,7 +74,7 @@ module_requires_overlay_move() {
     if k4_gpu_driver_module "$MODPATH"; then
         ui_print "- Adreno GPU driver module: not mounted by meta-overlayfs. The ROM's GPU driver selector"
         ui_print "  imports it on the next boot and tries it once (stock driver again if that boot fails):"
-        ui_print "  Settings > K4_UN1CA > UI > GPU driver"
+        ui_print "  Settings > UN1CA 9 > UI > GPU driver"
         return 1
     fi
 
